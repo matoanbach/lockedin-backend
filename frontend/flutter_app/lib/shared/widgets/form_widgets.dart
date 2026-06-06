@@ -145,11 +145,11 @@ class RadioOptionCard<T> extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Radio<T>(
-              value: value,
-              groupValue: groupValue,
-              onChanged: onChanged,
-              activeColor: AppColors.primary,
+            Icon(
+              isSelected
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_off,
+              color: isSelected ? AppColors.primary : AppColors.textMuted,
             ),
             Spacing.horizontalMd,
             Expanded(
