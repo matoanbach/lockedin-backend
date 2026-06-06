@@ -2,113 +2,206 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/api/api_error.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/theme.dart';
-import '../../../../shared/widgets/widgets.dart';
 import '../../../../shared/models/models.dart';
-
-/// Provider for notification tone setting.
-final notificationToneProvider =
-    NotifierProvider<NotificationToneNotifier, NotificationTone>(
-  NotificationToneNotifier.new,
-);
-
-class NotificationToneNotifier extends Notifier<NotificationTone> {
-  @override
-  NotificationTone build() => NotificationTone.professional;
-  void set(NotificationTone value) => state = value;
-}
+import '../../../../shared/widgets/widgets.dart';
+import '../../../preferences/data/preferences_provider.dart';
 
 /// Notification settings screen.
-class NotificationSettingsScreen extends ConsumerWidget {
+class NotificationSettingsScreen extends ConsumerStatefulWidget {
   const NotificationSettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final selectedTone = ref.watch(notificationToneProvider);
+  ConsumerState<NotificationSettingsScreen> createState() =>
+      _NotificationSettingsScreenState();
+}
+
+class _NotificationSettingsScreenState
+    extends ConsumerState<NotificationSettingsScreen> {
+  NotificationTone? _selectedTone;
+  bool _isSaving = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final preferencesAsync = ref.watch(preferencesControllerProvider);
+
+    return preferencesAsync.when(
+      data: (preferences) {
+        final selectedTone = _selectedTone ?? preferences.notificationTone;
+
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: Spacing.page,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ScreenHeader(
+                    title: 'Notifications',
+                    subtitle: 'Customize your notification style',
+                    onBack: () => context.pop(),
+                    label: 'HLR-4',
+                  ),
+                  Spacing.verticalXxl,
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.volume_up_outlined,
+                        color: AppColors.purple400,
+                        size: 20,
+                      ),
+                      Spacing.horizontalSm,
+                      Text('Notification Tone', style: AppTextStyles.titleMedium),
+                    ],
+                  ),
+                  Spacing.verticalMd,
+                  ...NotificationTone.values.map(
+                    (tone) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _ToneOptionCard(
+                        tone: tone,
+                        isSelected: selectedTone == tone,
+                        onTap: () {
+                          setState(() => _selectedTone = tone);
+                        },
+                      ),
+                    ),
+                  ),
+                  Spacing.verticalXxl,
+                  Text(
+                    'Other Settings',
+                    style: AppTextStyles.titleMedium.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  Spacing.verticalMd,
+                  _SettingsNavItem(
+                    icon: Icons.settings_outlined,
+                    label: 'Accessibility',
+                    onTap: () => context.push(AppRoutes.accessibilitySettings),
+                  ),
+                  Spacing.verticalMd,
+                  _SettingsNavItem(
+                    icon: Icons.settings_outlined,
+                    label: 'Privacy & Data',
+                    onTap: () => context.push(AppRoutes.privacyPolicy),
+                  ),
+                  Spacing.verticalXxl,
+                  PrimaryButton(
+                    onPressed: _isSaving
+                        ? null
+                        : () async {
+                            setState(() => _isSaving = true);
+
+                            try {
+                              await ref
+                                  .read(preferencesControllerProvider.notifier)
+                                  .updatePreferences(notificationTone: selectedTone);
+
+                              if (!mounted) {
+                                return;
+                              }
+
+                              ScaffoldMessenger.of(this.context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Notification tone updated to ${selectedTone.displayName}',
+                                  ),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            } catch (error) {
+                              if (!mounted) {
+                                return;
+                              }
+
+                              ScaffoldMessenger.of(this.context).showSnackBar(
+                                SnackBar(
+                                  content: Text(describeApiError(error)),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            } finally {
+                              if (mounted) {
+                                setState(() => _isSaving = false);
+                              }
+                            }
+                          },
+                    label: 'Save Changes',
+                    isLoading: _isSaving,
+                  ),
+                  Spacing.verticalLg,
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+      loading: () => const _NotificationLoadingState(),
+      error: (error, _) => _NotificationLoadingState(
+        errorMessage: describeApiError(error),
+        onRetry: () {
+          ref.read(preferencesControllerProvider.notifier).refresh();
+        },
+      ),
+    );
+  }
+}
+
+class _NotificationLoadingState extends StatelessWidget {
+  const _NotificationLoadingState({this.errorMessage, this.onRetry});
+
+  final String? errorMessage;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasError = errorMessage != null;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: Padding(
           padding: Spacing.page,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              ScreenHeader(
-                title: 'Notifications',
-                subtitle: 'Customize your notification style',
-                onBack: () => context.pop(),
-                label: 'HLR-4',
-              ),
-              Spacing.verticalXxl,
-
-              // Notification Tone Section
-              Row(
-                children: [
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!hasError)
+                  const CircularProgressIndicator(color: AppColors.purple400),
+                if (hasError)
                   const Icon(
-                    Icons.volume_up_outlined,
-                    color: AppColors.purple400,
-                    size: 20,
+                    Icons.cloud_off,
+                    color: AppColors.error,
+                    size: 36,
                   ),
-                  Spacing.horizontalSm,
-                  Text('Notification Tone', style: AppTextStyles.titleMedium),
-                ],
-              ),
-              Spacing.verticalMd,
-
-              // Tone Options
-              ...NotificationTone.values.map((tone) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _ToneOptionCard(
-                      tone: tone,
-                      isSelected: selectedTone == tone,
-                      onTap: () {
-                        ref.read(notificationToneProvider.notifier).set(tone);
-                      },
-                    ),
-                  )),
-              Spacing.verticalXxl,
-
-              // Other Settings
-              Text(
-                'Other Settings',
-                style: AppTextStyles.titleMedium.copyWith(
-                  color: AppColors.textSecondary,
+                Spacing.verticalLg,
+                Text(
+                  hasError
+                      ? 'Could not load notification settings'
+                      : 'Loading settings',
+                  style: AppTextStyles.titleLarge,
                 ),
-              ),
-              Spacing.verticalMd,
-
-              _SettingsNavItem(
-                icon: Icons.settings_outlined,
-                label: 'Accessibility',
-                onTap: () => context.push(AppRoutes.accessibilitySettings),
-              ),
-              Spacing.verticalMd,
-              _SettingsNavItem(
-                icon: Icons.settings_outlined,
-                label: 'Privacy & Data',
-                onTap: () => context.push(AppRoutes.privacyPolicy),
-              ),
-              Spacing.verticalXxl,
-
-              // Save Button
-              PrimaryButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Notification tone updated to ${selectedTone.displayName}',
-                      ),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                },
-                label: 'Save Changes',
-              ),
-              Spacing.verticalLg,
-            ],
+                Spacing.verticalSm,
+                Text(
+                  errorMessage ?? 'Fetching your saved notification tone.',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textTertiary,
+                  ),
+                ),
+                if (hasError && onRetry != null) ...[
+                  Spacing.verticalXxl,
+                  SizedBox(
+                    width: 160,
+                    child: SecondaryButton(onPressed: onRetry, label: 'Retry'),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ),
@@ -146,11 +239,14 @@ class _ToneOptionCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Radio<NotificationTone>(
-              value: tone,
-              groupValue: isSelected ? tone : null,
-              onChanged: (_) => onTap(),
-              activeColor: AppColors.primary,
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Icon(
+                isSelected
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_off,
+                color: isSelected ? AppColors.primary : AppColors.textMuted,
+              ),
             ),
             Spacing.horizontalMd,
             Expanded(
