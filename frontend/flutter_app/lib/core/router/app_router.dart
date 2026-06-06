@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:lockdin_app/features/onboarding/presentation/screens/app_bootstrap_screen.dart';
 import 'package:lockdin_app/features/onboarding/presentation/screens/onboarding_welcome_screen.dart';
 import 'package:lockdin_app/features/onboarding/presentation/screens/onboarding_permissions_screen.dart';
 import 'package:lockdin_app/features/onboarding/presentation/screens/onboarding_default_rule_screen.dart';
@@ -13,10 +14,11 @@ import 'package:lockdin_app/features/accountability/presentation/screens/account
 import 'package:lockdin_app/features/settings/presentation/screens/accessibility_settings_screen.dart';
 import 'package:lockdin_app/features/analytics/presentation/screens/analytics_summary_screen.dart';
 import 'package:lockdin_app/features/settings/presentation/screens/privacy_policy_screen.dart';
-import 'package:lockdin_app/features/onboarding/data/providers/onboarding_provider.dart';
 
 /// Route names for type-safe navigation.
 abstract class AppRoutes {
+  static const String bootstrap = '/';
+
   // Onboarding
   static const String onboardingWelcome = '/onboarding';
   static const String onboardingPermissions = '/onboarding/permissions';
@@ -39,14 +41,18 @@ abstract class AppRoutes {
 
 /// Main router provider using GoRouter.
 final routerProvider = Provider<GoRouter>((ref) {
-  final hasCompletedOnboarding = ref.watch(hasCompletedOnboardingProvider);
-
   return GoRouter(
-    initialLocation: hasCompletedOnboarding
-        ? AppRoutes.dashboard
-        : AppRoutes.onboardingWelcome,
+    initialLocation: AppRoutes.bootstrap,
     debugLogDiagnostics: true,
     routes: [
+      GoRoute(
+        path: AppRoutes.bootstrap,
+        name: 'bootstrap',
+        pageBuilder: (context, state) => const MaterialPage(
+          child: AppBootstrapScreen(),
+        ),
+      ),
+
       // === Onboarding Routes ===
       GoRoute(
         path: AppRoutes.onboardingWelcome,

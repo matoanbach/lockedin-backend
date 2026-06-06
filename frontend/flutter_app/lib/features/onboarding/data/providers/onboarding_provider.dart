@@ -1,19 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Provider to track onboarding completion status.
-final hasCompletedOnboardingProvider =
-    NotifierProvider<HasCompletedOnboardingNotifier, bool>(
-  HasCompletedOnboardingNotifier.new,
-);
-
-class HasCompletedOnboardingNotifier extends Notifier<bool> {
-  @override
-  bool build() => false;
-  
-  void set(bool value) => state = value;
-  void complete() => state = true;
-}
-
 /// Provider for granted permissions during onboarding.
 final onboardingPermissionsProvider =
     NotifierProvider<OnboardingPermissionsNotifier, OnboardingPermissions>(
@@ -65,17 +51,4 @@ class OnboardingPermissionsNotifier extends Notifier<OnboardingPermissions> {
   void reset() {
     state = const OnboardingPermissions();
   }
-}
-
-/// Provider for the default daily limit set during onboarding.
-final defaultDailyLimitProvider =
-    NotifierProvider<DefaultDailyLimitNotifier, int>(
-  DefaultDailyLimitNotifier.new,
-);
-
-class DefaultDailyLimitNotifier extends Notifier<int> {
-  @override
-  int build() => 180; // 3 hours in minutes
-  
-  void set(int value) => state = value;
 }
