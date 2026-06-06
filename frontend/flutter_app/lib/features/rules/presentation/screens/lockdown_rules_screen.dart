@@ -2,16 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/api/api_error.dart';
 import '../../../../core/theme/theme.dart';
+import '../../../../shared/models/models.dart';
 import '../../../../shared/widgets/widgets.dart';
-import '../../../dashboard/data/providers/dashboard_provider.dart';
+import '../../data/rules_provider.dart';
 
 /// Screen for managing lockdown rules.
 class LockdownRulesScreen extends ConsumerStatefulWidget {
   const LockdownRulesScreen({super.key});
 
   @override
-  ConsumerState<LockdownRulesScreen> createState() => _LockdownRulesScreenState();
+  ConsumerState<LockdownRulesScreen> createState() =>
+      _LockdownRulesScreenState();
 }
 
 class _LockdownRulesScreenState extends ConsumerState<LockdownRulesScreen> {
@@ -19,8 +22,7 @@ class _LockdownRulesScreenState extends ConsumerState<LockdownRulesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final rules = ref.watch(lockdownRulesProvider);
-    final activeCount = rules.where((r) => r.enabled).length;
+    final rulesAsync = ref.watch(lockdownRulesProvider);
 
     if (_showLockedState) {
       return _LockedStateView(
@@ -28,84 +30,172 @@ class _LockdownRulesScreenState extends ConsumerState<LockdownRulesScreen> {
       );
     }
 
+    return rulesAsync.when(
+      data: (rules) {
+        final activeCount = rules.where((rule) => rule.enabled).length;
+
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: Spacing.page,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ScreenHeader(
+                    title: 'Lockdown Rules',
+                    subtitle: 'Set limits for individual apps',
+                    onBack: () => context.pop(),
+                    label: 'HLR-2',
+                  ),
+                  Spacing.verticalXxl,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Active Rules',
+                        style: AppTextStyles.titleMedium.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      Text(
+                        '$activeCount active',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Spacing.verticalMd,
+                  if (rules.isEmpty)
+                    const InfoCard(
+                      message:
+                          'No backend rules exist yet. Create one through the API or add the in-app editor next.',
+                      icon: 'i',
+                      type: InfoCardType.info,
+                    ),
+                  ...rules.map(
+                    (rule) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _RuleCard(
+                        rule: rule,
+                        onToggle: () async {
+                          try {
+                            await ref
+                                .read(lockdownRulesProvider.notifier)
+                                .toggleRule(rule.id);
+                          } catch (error) {
+                            if (!mounted) {
+                              return;
+                            }
+
+                            ScaffoldMessenger.of(this.context).showSnackBar(
+                              SnackBar(
+                                content: Text(describeApiError(error)),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                  Spacing.verticalLg,
+                  SecondaryButton(
+                    onPressed: () => setState(() => _showLockedState = true),
+                    label: 'Preview Locked State',
+                    icon: Icons.lock_outline,
+                  ),
+                  Spacing.verticalXxl,
+                  DashedCard(
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Rule creation UI is next. The backend is ready for it.',
+                          ),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    },
+                    icon: Icons.add,
+                    title: 'Add New Rule',
+                    subtitle: 'Set limits for more apps',
+                  ),
+                  Spacing.verticalXxl,
+                  const InfoCard(
+                    message:
+                        'Apps will be blocked when you reach your time limit. Lockdown resets at midnight.',
+                    icon: '💡',
+                    type: InfoCardType.info,
+                  ),
+                  Spacing.verticalLg,
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+      loading: () => const _RulesLoadingState(),
+      error: (error, _) => _RulesLoadingState(
+        errorMessage: describeApiError(error),
+        onRetry: () {
+          ref.read(lockdownRulesProvider.notifier).refresh();
+        },
+      ),
+    );
+  }
+}
+
+class _RulesLoadingState extends StatelessWidget {
+  const _RulesLoadingState({this.errorMessage, this.onRetry});
+
+  final String? errorMessage;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasError = errorMessage != null;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: Padding(
           padding: Spacing.page,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              ScreenHeader(
-                title: 'Lockdown Rules',
-                subtitle: 'Set limits for individual apps',
-                onBack: () => context.pop(),
-                label: 'HLR-2',
-              ),
-              Spacing.verticalXxl,
-
-              // Active Rules Section
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Active Rules',
-                    style: AppTextStyles.titleMedium.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!hasError)
+                  const CircularProgressIndicator(color: AppColors.purple400),
+                if (hasError)
+                  const Icon(
+                    Icons.cloud_off,
+                    color: AppColors.error,
+                    size: 36,
                   ),
-                  Text(
-                    '$activeCount active',
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.textMuted,
-                    ),
+                Spacing.verticalLg,
+                Text(
+                  hasError ? 'Could not load rules' : 'Loading rules',
+                  style: AppTextStyles.titleLarge,
+                ),
+                Spacing.verticalSm,
+                Text(
+                  errorMessage ?? 'Fetching your current backend rule set.',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textTertiary,
+                  ),
+                ),
+                if (hasError && onRetry != null) ...[
+                  Spacing.verticalXxl,
+                  SizedBox(
+                    width: 160,
+                    child: SecondaryButton(onPressed: onRetry, label: 'Retry'),
                   ),
                 ],
-              ),
-              Spacing.verticalMd,
-
-              // Rules List
-              ...rules.map((rule) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _RuleCard(
-                      rule: rule,
-                      onToggle: () {
-                        ref
-                            .read(lockdownRulesProvider.notifier)
-                            .toggleRule(rule.id);
-                      },
-                    ),
-                  )),
-              Spacing.verticalLg,
-
-              // Preview Lock State Button
-              SecondaryButton(
-                onPressed: () => setState(() => _showLockedState = true),
-                label: 'Preview Locked State',
-                icon: Icons.lock_outline,
-              ),
-              Spacing.verticalXxl,
-
-              // Add New Rule
-              DashedCard(
-                onTap: () {
-                  // TODO: Navigate to add rule screen
-                },
-                icon: Icons.add,
-                title: 'Add New Rule',
-                subtitle: 'Set limits for more apps',
-              ),
-              Spacing.verticalXxl,
-
-              // Info Card
-              const InfoCard(
-                message: 'Apps will be blocked when you reach your time limit. Lockdown resets at midnight.',
-                icon: '💡',
-                type: InfoCardType.info,
-              ),
-              Spacing.verticalLg,
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -119,7 +209,7 @@ class _RuleCard extends StatelessWidget {
     required this.onToggle,
   });
 
-  final dynamic rule;
+  final LockdownRule rule;
   final VoidCallback onToggle;
 
   @override
@@ -185,7 +275,14 @@ class _RuleCard extends StatelessWidget {
                   ),
                   IconButton(
                     onPressed: () {
-                      // TODO: Edit rule
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Rule editing UI is next. Backend PATCH support is already ready.',
+                          ),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
                     },
                     icon: const Icon(
                       Icons.edit_outlined,
@@ -220,7 +317,6 @@ class _LockedStateView extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Lock Icon
               Container(
                 width: 96,
                 height: 96,
@@ -241,8 +337,6 @@ class _LockedStateView extends StatelessWidget {
                 ),
               ),
               Spacing.verticalXxl,
-
-              // Title
               Text(
                 'App Locked',
                 style: AppTextStyles.headlineMedium,
@@ -256,8 +350,6 @@ class _LockedStateView extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               Spacing.verticalXxl,
-
-              // Reset Timer
               AppCard(
                 child: RichText(
                   textAlign: TextAlign.center,
@@ -278,8 +370,6 @@ class _LockedStateView extends StatelessWidget {
                 ),
               ),
               Spacing.verticalXxl,
-
-              // Back Button
               SecondaryButton(
                 onPressed: onBack,
                 label: 'Back to Rules',
