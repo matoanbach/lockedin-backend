@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lockedin-backend"
+version = "0.1.0"
+description = "Python backend for LockdIn"
+readme = "PLAN.md"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi==0.116.1",
+  "uvicorn[standard]==0.35.0",
+  "sqlalchemy==2.0.42",
+  "alembic==1.16.4",
+  "pydantic-settings==2.10.1",
+  "email-validator==2.3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest==8.4.1",
+  "httpx==0.28.1",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["lockedin_backend*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-q"]
+filterwarnings = [
+  "ignore:The '(alias|validation_alias|serialization_alias)' attribute.*:pydantic.warnings.UnsupportedFieldAttributeWarning",
+]
