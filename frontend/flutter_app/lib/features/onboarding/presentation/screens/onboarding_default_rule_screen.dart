@@ -2,100 +2,195 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/api/api_error.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../../shared/widgets/widgets.dart';
-import '../../data/providers/onboarding_provider.dart';
+import '../../../preferences/data/preferences_provider.dart';
 
 /// Third onboarding screen - Set default daily limit.
-class OnboardingDefaultRuleScreen extends ConsumerWidget {
+class OnboardingDefaultRuleScreen extends ConsumerStatefulWidget {
   const OnboardingDefaultRuleScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final dailyLimit = ref.watch(defaultDailyLimitProvider);
+  ConsumerState<OnboardingDefaultRuleScreen> createState() =>
+      _OnboardingDefaultRuleScreenState();
+}
 
+class _OnboardingDefaultRuleScreenState
+    extends ConsumerState<OnboardingDefaultRuleScreen> {
+  int? _selectedLimit;
+  bool _isSaving = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final preferencesAsync = ref.watch(preferencesControllerProvider);
+
+    return preferencesAsync.when(
+      data: (preferences) {
+        final dailyLimit = _selectedLimit ?? preferences.defaultDailyLimitMinutes;
+
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          body: SafeArea(
+            child: Padding(
+              padding: Spacing.page,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ScreenHeader(
+                    title: 'Set Your Default Limit',
+                    subtitle:
+                        'Choose a daily screen time goal. You can customize this for individual apps later.',
+                    onBack: () => context.pop(),
+                    label: 'HLR-6',
+                  ),
+                  Spacing.verticalXxl,
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          _TimeDisplayCard(minutes: dailyLimit),
+                          Spacing.verticalXxl,
+                          _LimitSlider(
+                            value: dailyLimit,
+                            onChanged: (value) {
+                              setState(() => _selectedLimit = value);
+                            },
+                          ),
+                          Spacing.verticalXxl,
+                          _PresetOptions(
+                            selectedMinutes: dailyLimit,
+                            onSelect: (value) {
+                              setState(() => _selectedLimit = value);
+                            },
+                          ),
+                          Spacing.verticalXxl,
+                          AppCard(
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.smartphone,
+                                  color: AppColors.purple400,
+                                  size: 20,
+                                ),
+                                Spacing.horizontalMd,
+                                Expanded(
+                                  child: Text(
+                                    'This is your total daily limit across all apps. Individual app limits can be set from the dashboard.',
+                                    style: AppTextStyles.bodySmall.copyWith(
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Spacing.verticalLg,
+                  PrimaryButton(
+                    onPressed: _isSaving
+                        ? null
+                        : () async {
+                            setState(() => _isSaving = true);
+
+                            try {
+                              await ref
+                                  .read(preferencesControllerProvider.notifier)
+                                  .updatePreferences(
+                                    hasCompletedOnboarding: true,
+                                    defaultDailyLimitMinutes: dailyLimit,
+                                  );
+
+                              if (!mounted) {
+                                return;
+                              }
+
+                              GoRouter.of(this.context).go(AppRoutes.dashboard);
+                            } catch (error) {
+                              if (!mounted) {
+                                return;
+                              }
+
+                              ScaffoldMessenger.of(this.context).showSnackBar(
+                                SnackBar(
+                                  content: Text(describeApiError(error)),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            } finally {
+                              if (mounted) {
+                                setState(() => _isSaving = false);
+                              }
+                            }
+                          },
+                    label: 'Complete Setup',
+                    isLoading: _isSaving,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+      loading: () => const _AsyncScreenState(
+        title: 'Loading your setup',
+        message: 'Fetching your saved screen-time preferences.',
+      ),
+      error: (error, _) => _AsyncScreenState(
+        title: 'Could not load setup',
+        message: describeApiError(error),
+        action: SecondaryButton(
+          onPressed: () {
+            ref.read(preferencesControllerProvider.notifier).refresh();
+          },
+          label: 'Retry',
+        ),
+      ),
+    );
+  }
+}
+
+class _AsyncScreenState extends StatelessWidget {
+  const _AsyncScreenState({
+    required this.title,
+    required this.message,
+    this.action,
+  });
+
+  final String title;
+  final String message;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: Padding(
           padding: Spacing.page,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              ScreenHeader(
-                title: 'Set Your Default Limit',
-                subtitle: 'Choose a daily screen time goal. You can customize this for individual apps later.',
-                onBack: () => context.pop(),
-                label: 'HLR-6',
-              ),
-              
-              Spacing.verticalXxl,
-              
-              // Time Display Card
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      _TimeDisplayCard(minutes: dailyLimit),
-                      Spacing.verticalXxl,
-                      
-                      // Slider Section
-                      _LimitSlider(
-                        value: dailyLimit,
-                        onChanged: (value) {
-                          ref.read(defaultDailyLimitProvider.notifier).set(value);
-                        },
-                      ),
-                      Spacing.verticalXxl,
-                      
-                      // Preset Options
-                      _PresetOptions(
-                        selectedMinutes: dailyLimit,
-                        onSelect: (value) {
-                          ref.read(defaultDailyLimitProvider.notifier).set(value);
-                        },
-                      ),
-                      Spacing.verticalXxl,
-                      
-                      // Info Card
-                      AppCard(
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.smartphone,
-                              color: AppColors.purple400,
-                              size: 20,
-                            ),
-                            Spacing.horizontalMd,
-                            Expanded(
-                              child: Text(
-                                'This is your total daily limit across all apps. Individual app limits can be set from the dashboard.',
-                                style: AppTextStyles.bodySmall.copyWith(
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(title, style: AppTextStyles.headlineLarge),
+                Spacing.verticalMd,
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textTertiary,
                   ),
                 ),
-              ),
-              
-              Spacing.verticalLg,
-              
-              // Complete Button
-              PrimaryButton(
-                onPressed: () {
-                  ref.read(hasCompletedOnboardingProvider.notifier).complete();
-                  context.go(AppRoutes.dashboard);
-                },
-                label: 'Complete Setup',
-              ),
-            ],
+                if (action != null) ...[
+                  Spacing.verticalXxl,
+                  SizedBox(width: 180, child: action),
+                ],
+              ],
+            ),
           ),
         ),
       ),
