@@ -25,6 +25,7 @@ class UsageData {
 /// Lockdown rule model.
 class LockdownRule {
   final String id;
+  final String appId;
   final String appName;
   final IconData icon;
   final int limitMinutes;
@@ -33,6 +34,7 @@ class LockdownRule {
 
   const LockdownRule({
     required this.id,
+    required this.appId,
     required this.appName,
     required this.icon,
     required this.limitMinutes,
@@ -42,6 +44,7 @@ class LockdownRule {
 
   LockdownRule copyWith({
     String? id,
+    String? appId,
     String? appName,
     IconData? icon,
     int? limitMinutes,
@@ -50,6 +53,7 @@ class LockdownRule {
   }) {
     return LockdownRule(
       id: id ?? this.id,
+      appId: appId ?? this.appId,
       appName: appName ?? this.appName,
       icon: icon ?? this.icon,
       limitMinutes: limitMinutes ?? this.limitMinutes,

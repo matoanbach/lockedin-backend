@@ -35,6 +35,7 @@ class LockdownRulesNotifier extends Notifier<List<LockdownRule>> {
   List<LockdownRule> build() => [
     const LockdownRule(
       id: '1',
+      appId: 'com.instagram.android',
       appName: 'Instagram',
       icon: Icons.camera_alt,
       limitMinutes: 120,
@@ -43,6 +44,7 @@ class LockdownRulesNotifier extends Notifier<List<LockdownRule>> {
     ),
     const LockdownRule(
       id: '2',
+      appId: 'com.youtube.android',
       appName: 'YouTube',
       icon: Icons.play_circle_filled,
       limitMinutes: 90,
@@ -51,6 +53,7 @@ class LockdownRulesNotifier extends Notifier<List<LockdownRule>> {
     ),
     const LockdownRule(
       id: '3',
+      appId: 'com.google.android.apps.messaging',
       appName: 'Messages',
       icon: Icons.message,
       limitMinutes: 60,
