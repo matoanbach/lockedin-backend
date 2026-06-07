@@ -1,0 +1,113 @@
+/*
+  LockdIn backend docs styling.
+
+  Keep MkDocs Material structure, but give the backend docs a distinct look that
+  stays readable in both light and dark themes.
+*/
+
+:root {
+  --lockdin-radius: 16px;
+  --lockdin-accent: #8b5cf6;
+}
+
+html[data-md-color-scheme="default"] {
+  --lockdin-page-bg: radial-gradient(1200px circle at 15% 10%, rgba(139, 92, 246, 0.12), transparent 60%),
+    radial-gradient(900px circle at 85% 18%, rgba(34, 197, 94, 0.08), transparent 55%),
+    linear-gradient(180deg, #faf9ff 0%, #f5f3ff 45%, #faf9ff 100%);
+  --lockdin-surface: rgba(255, 255, 255, 0.74);
+  --lockdin-surface-2: rgba(255, 255, 255, 0.58);
+  --lockdin-border: rgba(15, 23, 42, 0.10);
+  --lockdin-shadow: 0 10px 35px rgba(2, 6, 23, 0.10);
+}
+
+html[data-md-color-scheme="slate"] {
+  --lockdin-page-bg: radial-gradient(1200px circle at 15% 10%, rgba(139, 92, 246, 0.16), transparent 60%),
+    radial-gradient(900px circle at 85% 18%, rgba(34, 197, 94, 0.10), transparent 55%),
+    linear-gradient(180deg, #0b1020 0%, #111827 55%, #090d1a 100%);
+  --lockdin-surface: rgba(255, 255, 255, 0.06);
+  --lockdin-surface-2: rgba(255, 255, 255, 0.04);
+  --lockdin-border: rgba(255, 255, 255, 0.10);
+  --lockdin-shadow: 0 16px 55px rgba(0, 0, 0, 0.45);
+}
+
+body {
+  background: var(--lockdin-page-bg);
+}
+
+.md-container {
+  background: transparent;
+}
+
+.md-header,
+.md-tabs {
+  background: var(--lockdin-surface);
+  background: color-mix(in srgb, var(--lockdin-surface), transparent 15%);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--lockdin-border);
+}
+
+.md-sidebar__scrollwrap {
+  background: var(--lockdin-surface-2);
+  background: color-mix(in srgb, var(--lockdin-surface-2), transparent 15%);
+  border-right: 1px solid var(--lockdin-border);
+}
+
+.md-content__inner {
+  background: var(--lockdin-surface);
+  border: 1px solid var(--lockdin-border);
+  border-radius: var(--lockdin-radius);
+  box-shadow: var(--lockdin-shadow);
+  padding: 1.2rem 1.2rem 1.8rem;
+}
+
+@media (max-width: 60em) {
+  .md-content__inner {
+    padding: 1rem 0.9rem 1.4rem;
+    border-radius: 14px;
+  }
+}
+
+.md-typeset h1 {
+  letter-spacing: -0.02em;
+}
+
+.md-typeset h2,
+.md-typeset h3 {
+  letter-spacing: -0.015em;
+}
+
+.md-typeset a {
+  color: var(--lockdin-accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+.md-typeset a:hover {
+  text-decoration: underline;
+}
+
+.md-typeset code {
+  border: 1px solid var(--lockdin-border);
+  border-radius: 8px;
+}
+
+.md-typeset pre > code {
+  border-radius: 12px;
+}
+
+.md-typeset .admonition,
+.md-typeset details {
+  border-radius: 12px;
+  border: 1px solid var(--lockdin-border);
+  background: var(--lockdin-surface-2);
+  background: color-mix(in srgb, var(--lockdin-surface-2), transparent 10%);
+}
+
+.md-footer {
+  background: transparent;
+}
+
+.md-footer-meta {
+  background: transparent;
+  border-top: 1px solid var(--lockdin-border);
+}

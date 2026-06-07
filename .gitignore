@@ -1,5 +1,6 @@
 .DS_Store
 **/.DS_Store
 excalidraw.log
+backend/.artifacts/
 database/.env
 frontend/flutter_app/.env

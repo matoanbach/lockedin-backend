@@ -1,4 +1,4 @@
-.PHONY: install-venv init-env run test test-postgres clean
+.PHONY: install-venv init-env run build-docs docs-build docs-serve test test-postgres clean
 
 PROJECT_DIR := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 PY ?= python3
@@ -18,6 +18,14 @@ init-env:
 
 run:
 	cd "$(PROJECT_DIR)" && "$(VENV_PY)" -m uvicorn lockedin_backend.app.main:app --host $(HOST) --port $(PORT)
+
+build-docs:
+	cd "$(PROJECT_DIR)" && "$(VENV_PY)" -m mkdocs build -f "$(PROJECT_DIR)/conf/mkdocs.yml"
+
+docs-build: build-docs
+
+docs-serve:
+	cd "$(PROJECT_DIR)" && "$(VENV_PY)" -m mkdocs serve -f "$(PROJECT_DIR)/conf/mkdocs.yml" --dev-addr $(HOST):9001
 
 test:
 	cd "$(PROJECT_DIR)" && "$(VENV_PY)" -m pytest
