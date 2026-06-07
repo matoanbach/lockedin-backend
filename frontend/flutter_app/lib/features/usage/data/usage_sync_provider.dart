@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/notifications/local_notification_service.dart';
 import '../../analytics/data/analytics_provider.dart';
 import '../../enforcement/data/live_intervention_provider.dart';
 import '../../enforcement/data/rule_alert_provider.dart';
@@ -30,14 +31,49 @@ class DevicePermissions {
     required this.usageAccess,
     required this.notifications,
     required this.accessibility,
+    required this.notificationDiagnostics,
   });
 
   final bool isSupported;
   final bool usageAccess;
   final bool notifications;
   final bool accessibility;
+  final NotificationDiagnostics notificationDiagnostics;
 
   bool get readyToContinue => !isSupported || usageAccess;
+}
+
+class NotificationDiagnostics {
+  const NotificationDiagnostics({
+    required this.appEnabled,
+    required this.channelId,
+    required this.channelExists,
+    required this.channelEnabled,
+    required this.channelImportance,
+    required this.channelImportanceLabel,
+  });
+
+  final bool appEnabled;
+  final String channelId;
+  final bool channelExists;
+  final bool channelEnabled;
+  final int channelImportance;
+  final String channelImportanceLabel;
+
+  bool get isHealthy => appEnabled && channelExists && channelEnabled;
+
+  String get summary {
+    if (!appEnabled) {
+      return 'App notifications are disabled in Android settings.';
+    }
+    if (!channelExists) {
+      return 'Warning channel has not been created yet.';
+    }
+    if (!channelEnabled) {
+      return 'LockdIn warnings channel is blocked or silent.';
+    }
+    return 'Warning channel is enabled with $channelImportanceLabel importance.';
+  }
 }
 
 class UsageSyncResult {
@@ -76,8 +112,31 @@ class DevicePermissionsController extends AsyncNotifier<DevicePermissions> {
     return _repository.openNotificationSettings();
   }
 
+  Future<void> openNotificationAccess() async {
+    final notifications = ref.read(localNotificationsProvider);
+    await notifications.initialize();
+
+    if (await notifications.areNotificationsEnabled()) {
+      await _repository.openNotificationSettings();
+      return;
+    }
+
+    final granted = await notifications.requestPermission();
+    await refresh();
+    if (!granted) {
+      await _repository.openNotificationSettings();
+      await refresh();
+    }
+  }
+
   Future<void> openAccessibilitySettings() {
     return _repository.openAccessibilitySettings();
+  }
+
+  Future<bool> sendTestWarningNotification() async {
+    final shown = await _repository.sendTestWarningNotification();
+    await refresh();
+    return shown;
   }
 }
 
@@ -103,9 +162,12 @@ class UsageSyncController extends AsyncNotifier<UsageSyncResult?> {
       final statuses = await ref
           .read(liveInterventionProvider.notifier)
           .refreshRuleStateCache();
-      await ref
-          .read(ruleAlertProvider.notifier)
-          .evaluateAndQueueNextAlert(statuses: statuses);
+      final permissions = await _repository.fetchPermissions();
+      if (!(permissions.accessibility && permissions.notifications)) {
+        await ref
+            .read(ruleAlertProvider.notifier)
+            .evaluateAndQueueNextAlert(statuses: statuses);
+      }
       return result;
     } catch (error, stackTrace) {
       state = AsyncError(error, stackTrace);
@@ -139,9 +201,12 @@ class UsageSyncController extends AsyncNotifier<UsageSyncResult?> {
       final statuses = await ref
           .read(liveInterventionProvider.notifier)
           .refreshRuleStateCache();
-      await ref
-          .read(ruleAlertProvider.notifier)
-          .evaluateAndQueueNextAlert(statuses: statuses);
+      final permissions = await _repository.fetchPermissions();
+      if (!(permissions.accessibility && permissions.notifications)) {
+        await ref
+            .read(ruleAlertProvider.notifier)
+            .evaluateAndQueueNextAlert(statuses: statuses);
+      }
       return result;
     } catch (_) {
       return null;
@@ -173,6 +238,14 @@ class UsageSyncRepository {
         usageAccess: false,
         notifications: false,
         accessibility: false,
+        notificationDiagnostics: NotificationDiagnostics(
+          appEnabled: false,
+          channelId: 'lockdin_warnings',
+          channelExists: false,
+          channelEnabled: false,
+          channelImportance: 0,
+          channelImportanceLabel: 'unavailable',
+        ),
       );
     }
 

@@ -26,6 +26,9 @@ class MainActivity : FlutterActivity() {
         ).setMethodCallHandler { call, result ->
             when (call.method) {
                 "getPermissionStatus" -> result.success(getPermissionStatus())
+                "sendTestWarningNotification" -> {
+                    result.success(NativeWarningNotifier.showTestWarning(this))
+                }
                 "openUsageAccessSettings" -> {
                     openUsageAccessSettings()
                     result.success(null)
@@ -76,11 +79,12 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun getPermissionStatus(): Map<String, Boolean> {
+    private fun getPermissionStatus(): Map<String, Any> {
         return mapOf(
             "usageAccess" to hasUsageAccess(),
             "notifications" to NotificationManagerCompat.from(this).areNotificationsEnabled(),
             "accessibility" to RuleEnforcementStore.isAccessibilityServiceEnabled(this),
+            "notificationDiagnostics" to NativeWarningNotifier.diagnostics(this),
         )
     }
 
@@ -123,6 +127,12 @@ class MainActivity : FlutterActivity() {
 
     private fun openAccessibilitySettings() {
         startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+    }
+
+    private fun consumePendingLaunchNavigation(): Map<String, String>? {
+        val route = intent?.getStringExtra(NativeWarningNotifier.EXTRA_LAUNCH_ROUTE) ?: return null
+        intent?.removeExtra(NativeWarningNotifier.EXTRA_LAUNCH_ROUTE)
+        return mapOf("route" to route)
     }
 
     private fun collectUsageEvents(days: Int): List<Map<String, Any?>> {
