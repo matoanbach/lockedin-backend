@@ -49,3 +49,36 @@ def test_create_enforcement_event_for_missing_rule_returns_not_found(client) -> 
     )
 
     assert response.status_code == 404
+
+
+def test_create_intervention_dismissed_event_persists_record(client, db_session) -> None:
+    rule_response = client.post(
+        "/api/v1/rules",
+        json={
+            "appId": "com.google.android.youtube",
+            "appName": "YouTube",
+            "limitMinutes": 10,
+            "enabled": True,
+        },
+    )
+    rule_id = rule_response.json()["id"]
+
+    response = client.post(
+        "/api/v1/enforcement/events",
+        json={
+            "ruleId": rule_id,
+            "appId": "com.google.android.youtube",
+            "eventType": "intervention_dismissed",
+            "usageDate": "2026-06-08",
+            "usedMinutes": 14,
+            "limitMinutes": 10,
+            "metadata": {"source": "android_accessibility", "action": "stay_in_lockdin"},
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["eventType"] == "intervention_dismissed"
+
+    stored_event = db_session.query(EnforcementEvent).order_by(EnforcementEvent.created_at.desc()).first()
+    assert stored_event is not None
+    assert stored_event.event_type == "intervention_dismissed"

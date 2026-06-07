@@ -13,6 +13,7 @@ class EnforcementEventType(StrEnum):
     WARNING_APPROACHING_LIMIT = "warning_approaching_limit"
     WARNING_LIMIT_REACHED = "warning_limit_reached"
     INTERVENTION_BLOCKED = "intervention_blocked"
+    INTERVENTION_DISMISSED = "intervention_dismissed"
 
 
 class EnforcementEventCreate(APIModel):
