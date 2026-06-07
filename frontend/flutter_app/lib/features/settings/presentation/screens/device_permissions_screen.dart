@@ -87,7 +87,30 @@ class _DevicePermissionsScreenState
                       description:
                           'Optional, but recommended, so LockdIn can surface local warnings before you cross a limit.',
                       isGranted: permissions.notifications,
-                      onTap: controller.openNotificationSettings,
+                      onTap: controller.openNotificationAccess,
+                    ),
+                    Spacing.verticalMd,
+                    _NotificationDiagnosticsCard(
+                      diagnostics: permissions.notificationDiagnostics,
+                      onSendTestWarning: () async {
+                        final messenger = ScaffoldMessenger.of(this.context);
+                        final shown = await controller
+                            .sendTestWarningNotification();
+                        if (!mounted) {
+                          return;
+                        }
+
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              shown
+                                  ? 'Test warning sent. Check your Android notification shade.'
+                                  : 'Test warning was not shown. Review the diagnostics card below.',
+                            ),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      },
                     ),
                     Spacing.verticalLg,
                     Row(
@@ -287,6 +310,110 @@ class _PermissionStateCard extends StatelessWidget {
               child: SecondaryButton(onPressed: onAction, label: actionLabel!),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _NotificationDiagnosticsCard extends StatelessWidget {
+  const _NotificationDiagnosticsCard({
+    required this.diagnostics,
+    required this.onSendTestWarning,
+  });
+
+  final NotificationDiagnostics diagnostics;
+  final Future<void> Function() onSendTestWarning;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = diagnostics.isHealthy
+        ? AppColors.purple400
+        : AppColors.warning;
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.bug_report_outlined, color: color, size: 18),
+              Spacing.horizontalSm,
+              Text(
+                'Warning Channel Diagnostics',
+                style: AppTextStyles.titleSmall,
+              ),
+            ],
+          ),
+          Spacing.verticalMd,
+          Text(
+            diagnostics.summary,
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          Spacing.verticalMd,
+          _DiagnosticLine(label: 'Channel', value: diagnostics.channelId),
+          _DiagnosticLine(
+            label: 'App notifications',
+            value: diagnostics.appEnabled ? 'enabled' : 'disabled',
+          ),
+          _DiagnosticLine(
+            label: 'Channel exists',
+            value: diagnostics.channelExists ? 'yes' : 'no',
+          ),
+          _DiagnosticLine(
+            label: 'Channel enabled',
+            value: diagnostics.channelEnabled ? 'yes' : 'no',
+          ),
+          _DiagnosticLine(
+            label: 'Importance',
+            value: diagnostics.channelImportanceLabel,
+          ),
+          Spacing.verticalLg,
+          SizedBox(
+            width: double.infinity,
+            child: SecondaryButton(
+              onPressed: onSendTestWarning,
+              label: 'Send Test Warning',
+              icon: Icons.notifications_active_outlined,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DiagnosticLine extends StatelessWidget {
+  const _DiagnosticLine({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 124,
+            child: Text(
+              label,
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColors.textMuted,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: AppTextStyles.bodySmall.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
         ],
       ),
     );

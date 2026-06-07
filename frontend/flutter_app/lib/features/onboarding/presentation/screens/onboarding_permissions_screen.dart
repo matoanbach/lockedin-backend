@@ -82,9 +82,9 @@ class _OnboardingPermissionsScreenState
                           icon: Icons.notifications_outlined,
                           title: 'Notifications',
                           description:
-                              'Optional for now. Lets LockdIn send limit alerts from this device later.',
+                              'Optional, but recommended. Lets LockdIn send local limit alerts from this device.',
                           isGranted: permissions.notifications,
-                          onTap: controller.openNotificationSettings,
+                          onTap: controller.openNotificationAccess,
                         ),
                         Spacing.verticalMd,
                         _PermissionCard(
