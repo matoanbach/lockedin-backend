@@ -30,6 +30,16 @@ data class PendingIntervention(
     val source: String,
 )
 
+data class PendingEnforcementEvent(
+    val ruleId: String,
+    val appId: String,
+    val eventType: String,
+    val usageDate: String,
+    val usedMinutes: Int,
+    val limitMinutes: Int,
+    val source: String,
+)
+
 data class UploadedUsageInterval(
     val startMillis: Long,
     val endMillis: Long,
@@ -43,6 +53,9 @@ object RuleEnforcementStore {
     private const val KEY_LAST_INTERVENED_AT = "last_intervened_at"
     private const val KEY_LOCAL_USAGE_MILLIS = "local_usage_millis_json"
     private const val KEY_LIVE_UPLOADED_INTERVALS = "live_uploaded_intervals_json"
+    private const val KEY_WARNING_EMISSIONS = "warning_emissions_json"
+    private const val KEY_PENDING_ENFORCEMENT_EVENTS = "pending_enforcement_events_json"
+    private const val KEY_NOTIFICATION_TONE = "notification_tone"
 
     fun cacheRuleStatuses(context: Context, rawStatuses: List<Map<String, Any?>>) {
         val statuses = rawStatuses.mapNotNull(::cachedRuleStatusFromMap)
@@ -270,6 +283,74 @@ object RuleEnforcementStore {
 
     fun currentUsageDate(): String = LocalDate.now(ZoneId.systemDefault()).toString()
 
+    fun cacheNotificationTone(context: Context, tone: String) {
+        prefs(context).edit().putString(KEY_NOTIFICATION_TONE, tone).apply()
+    }
+
+    fun notificationTone(context: Context): String {
+        return prefs(context).getString(KEY_NOTIFICATION_TONE, "professional") ?: "professional"
+    }
+
+    fun hasIssuedWarning(
+        context: Context,
+        ruleId: String,
+        usageDate: String,
+        eventType: String,
+    ): Boolean {
+        return loadWarningEmissions(context).optBoolean(
+            warningEmissionKey(ruleId, usageDate, eventType),
+            false,
+        )
+    }
+
+    fun markWarningIssued(
+        context: Context,
+        ruleId: String,
+        usageDate: String,
+        eventType: String,
+    ) {
+        val emissions = loadWarningEmissions(context)
+        emissions.put(warningEmissionKey(ruleId, usageDate, eventType), true)
+        prefs(context).edit().putString(KEY_WARNING_EMISSIONS, emissions.toString()).apply()
+    }
+
+    fun queuePendingEnforcementEvent(context: Context, event: PendingEnforcementEvent) {
+        val events = loadPendingEnforcementEvents(context)
+        events.put(
+            JSONObject().apply {
+                put("ruleId", event.ruleId)
+                put("appId", event.appId)
+                put("eventType", event.eventType)
+                put("usageDate", event.usageDate)
+                put("usedMinutes", event.usedMinutes)
+                put("limitMinutes", event.limitMinutes)
+                put("source", event.source)
+            },
+        )
+        prefs(context).edit().putString(KEY_PENDING_ENFORCEMENT_EVENTS, events.toString()).apply()
+    }
+
+    fun consumePendingEnforcementEvents(context: Context): List<Map<String, Any?>> {
+        val storedEvents = loadPendingEnforcementEvents(context)
+        prefs(context).edit().remove(KEY_PENDING_ENFORCEMENT_EVENTS).apply()
+        val consumed = mutableListOf<Map<String, Any?>>()
+
+        for (index in 0 until storedEvents.length()) {
+            val item = storedEvents.optJSONObject(index) ?: continue
+            consumed += mapOf(
+                "ruleId" to item.optString("ruleId"),
+                "appId" to item.optString("appId"),
+                "eventType" to item.optString("eventType"),
+                "usageDate" to item.optString("usageDate"),
+                "usedMinutes" to item.optInt("usedMinutes"),
+                "limitMinutes" to item.optInt("limitMinutes"),
+                "source" to item.optString("source"),
+            )
+        }
+
+        return consumed
+    }
+
     fun canonicalizeAppId(appId: String): String {
         return when (appId.trim().lowercase()) {
             "com.youtube.android" -> "com.google.android.youtube"
@@ -317,6 +398,24 @@ object RuleEnforcementStore {
         }
     }
 
+    private fun loadWarningEmissions(context: Context): JSONObject {
+        val raw = prefs(context).getString(KEY_WARNING_EMISSIONS, null)
+        return if (raw.isNullOrBlank()) {
+            JSONObject()
+        } else {
+            JSONObject(raw)
+        }
+    }
+
+    private fun loadPendingEnforcementEvents(context: Context): JSONArray {
+        val raw = prefs(context).getString(KEY_PENDING_ENFORCEMENT_EVENTS, null)
+        return if (raw.isNullOrBlank()) {
+            JSONArray()
+        } else {
+            JSONArray(raw)
+        }
+    }
+
     private fun cachedRuleStatusFromMap(raw: Map<String, Any?>): CachedRuleStatus? {
         val ruleId = raw["ruleId"] as? String ?: return null
         val appId = raw["appId"] as? String ?: return null
@@ -341,6 +440,9 @@ object RuleEnforcementStore {
 
     private fun localUsageKey(appId: String, usageDate: String): String =
         "$usageDate|${canonicalizeAppId(appId)}"
+
+    private fun warningEmissionKey(ruleId: String, usageDate: String, eventType: String): String =
+        "$usageDate|$ruleId|$eventType"
 
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

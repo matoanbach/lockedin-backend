@@ -17,6 +17,11 @@ import java.time.Instant
 import java.time.ZoneId
 
 class MainActivity : FlutterActivity() {
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
@@ -48,6 +53,13 @@ class MainActivity : FlutterActivity() {
                     }
                     result.success(null)
                 }
+                "cacheNotificationTone" -> {
+                    val tone = call.argument<String>("tone")
+                    if (!tone.isNullOrBlank()) {
+                        RuleEnforcementStore.cacheNotificationTone(this, tone)
+                    }
+                    result.success(null)
+                }
                 "flushPendingUsageUploads" -> {
                     NativeUsageUploader.flushPendingUploads(this) { summary ->
                         result.success(summary)
@@ -60,6 +72,12 @@ class MainActivity : FlutterActivity() {
                 }
                 "consumePendingIntervention" -> {
                     result.success(RuleEnforcementStore.consumePendingIntervention(this))
+                }
+                "consumePendingEnforcementEvents" -> {
+                    result.success(RuleEnforcementStore.consumePendingEnforcementEvents(this))
+                }
+                "consumePendingLaunchNavigation" -> {
+                    result.success(consumePendingLaunchNavigation())
                 }
                 "collectUsageEvents" -> {
                     if (!hasUsageAccess()) {

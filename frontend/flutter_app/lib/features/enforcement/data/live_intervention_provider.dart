@@ -42,6 +42,26 @@ class PendingIntervention {
       'You hit today\'s $limitMinutes-minute limit for $appName and are already at $usedMinutes minutes. Step away before jumping back in.';
 }
 
+class PendingEnforcementEvent {
+  const PendingEnforcementEvent({
+    required this.ruleId,
+    required this.appId,
+    required this.eventType,
+    required this.usageDate,
+    required this.usedMinutes,
+    required this.limitMinutes,
+    required this.source,
+  });
+
+  final String ruleId;
+  final String appId;
+  final String eventType;
+  final String usageDate;
+  final int usedMinutes;
+  final int limitMinutes;
+  final String source;
+}
+
 class LiveInterventionController extends Notifier<PendingIntervention?> {
   bool _isChecking = false;
 
@@ -100,6 +120,47 @@ class LiveInterventionController extends Notifier<PendingIntervention?> {
   void clear() {
     state = null;
   }
+
+  Future<void> recordDismissedIntervention(
+    PendingIntervention pending, {
+    required String action,
+  }) async {
+    await ref
+        .read(enforcementRepositoryProvider)
+        .createEvent(
+          ruleId: pending.ruleId,
+          appId: pending.appId,
+          eventType: 'intervention_dismissed',
+          usageDate: pending.usageDate,
+          usedMinutes: pending.usedMinutes,
+          limitMinutes: pending.limitMinutes,
+          metadata: {'source': pending.source, 'action': action},
+        );
+  }
+
+  Future<void> flushPendingNativeEnforcementEvents() async {
+    final events = await ref
+        .read(liveEnforcementRepositoryProvider)
+        .consumePendingEnforcementEvents();
+
+    for (final event in events) {
+      try {
+        await ref
+            .read(enforcementRepositoryProvider)
+            .createEvent(
+              ruleId: event.ruleId,
+              appId: event.appId,
+              eventType: event.eventType,
+              usageDate: event.usageDate,
+              usedMinutes: event.usedMinutes,
+              limitMinutes: event.limitMinutes,
+              metadata: {'source': event.source},
+            );
+      } catch (_) {
+        // Keep foreground resume working even if one event cannot be logged.
+      }
+    }
+  }
 }
 
 class LiveEnforcementRepository {
@@ -115,6 +176,14 @@ class LiveEnforcementRepository {
     await _channel.invokeMethod<void>('cacheBackendBaseUrl', {
       'baseUrl': baseUrl ?? ApiConfig.baseUrl,
     });
+  }
+
+  Future<void> cacheNotificationTone(String tone) async {
+    if (!_isAndroid) {
+      return;
+    }
+
+    await _channel.invokeMethod<void>('cacheNotificationTone', {'tone': tone});
   }
 
   Future<Map<String, dynamic>> flushPendingUsageUploads() async {
@@ -178,6 +247,48 @@ class LiveEnforcementRepository {
       status: json['status'] as String? ?? 'at_limit',
       source: json['source'] as String? ?? 'android_accessibility',
     );
+  }
+
+  Future<List<PendingEnforcementEvent>>
+  consumePendingEnforcementEvents() async {
+    if (!_isAndroid) {
+      return const [];
+    }
+
+    final raw = await _channel.invokeListMethod<dynamic>(
+      'consumePendingEnforcementEvents',
+    );
+    if (raw == null || raw.isEmpty) {
+      return const [];
+    }
+
+    return raw
+        .whereType<Map<dynamic, dynamic>>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .map(
+          (json) => PendingEnforcementEvent(
+            ruleId: json['ruleId'] as String? ?? '',
+            appId: json['appId'] as String? ?? '',
+            eventType: json['eventType'] as String? ?? '',
+            usageDate: json['usageDate'] as String? ?? '',
+            usedMinutes: (json['usedMinutes'] as num?)?.toInt() ?? 0,
+            limitMinutes: (json['limitMinutes'] as num?)?.toInt() ?? 0,
+            source: json['source'] as String? ?? 'android_accessibility',
+          ),
+        )
+        .where((event) => event.ruleId.isNotEmpty && event.eventType.isNotEmpty)
+        .toList();
+  }
+
+  Future<String?> consumePendingLaunchNavigation() async {
+    if (!_isAndroid) {
+      return null;
+    }
+
+    final json = await _channel.invokeMapMethod<String, dynamic>(
+      'consumePendingLaunchNavigation',
+    );
+    return json?['route'] as String?;
   }
 
   bool get _isAndroid =>

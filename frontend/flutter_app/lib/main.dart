@@ -5,8 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'features/analytics/data/analytics_provider.dart';
+import 'core/notifications/local_notification_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
+import 'shared/models/models.dart';
 import 'features/enforcement/data/live_intervention_provider.dart';
 import 'features/enforcement/data/rule_alert_provider.dart';
 import 'features/preferences/data/preferences_provider.dart';
@@ -26,7 +28,7 @@ class LockdInApp extends ConsumerStatefulWidget {
 
 class _LockdInAppState extends ConsumerState<LockdInApp>
     with WidgetsBindingObserver {
-  bool _didAttemptInitialAutoSync = false;
+  bool _didHandleInitialForeground = false;
   bool _isPresentingRuleAlert = false;
   bool _isPresentingLiveIntervention = false;
   bool _resumeRefreshInFlight = false;
@@ -62,9 +64,7 @@ class _LockdInAppState extends ConsumerState<LockdInApp>
         });
       },
     );
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(_handleInitialAppForeground());
-    });
+    unawaited(_initializeLocalNotificationsSafely());
   }
 
   @override
@@ -87,9 +87,9 @@ class _LockdInAppState extends ConsumerState<LockdInApp>
     final router = ref.watch(routerProvider);
     final preferences = ref.watch(preferencesControllerProvider);
 
-    if (!_didAttemptInitialAutoSync &&
+    if (!_didHandleInitialForeground &&
         preferences.asData?.value.hasCompletedOnboarding == true) {
-      _didAttemptInitialAutoSync = true;
+      _didHandleInitialForeground = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         unawaited(_handleInitialAppForeground());
       });
@@ -118,6 +118,42 @@ class _LockdInAppState extends ConsumerState<LockdInApp>
     }
   }
 
+  Future<void> _initializeLocalNotificationsSafely() async {
+    try {
+      await ref.read(localNotificationsProvider).initialize();
+    } catch (_) {
+      // Local notification setup should not block the app lifecycle.
+    }
+  }
+
+  Future<void> _consumePendingNotificationNavigationSafely() async {
+    if (_isPresentingLiveIntervention ||
+        ref.read(liveInterventionProvider) != null) {
+      return;
+    }
+
+    try {
+      await ref.read(localNotificationsProvider).consumePendingNavigation();
+      final route = await ref
+          .read(liveEnforcementRepositoryProvider)
+          .consumePendingLaunchNavigation();
+      if (route == null || !mounted) {
+        return;
+      }
+
+      final navigatorContext = ref
+          .read(rootNavigatorKeyProvider)
+          .currentContext;
+      if (navigatorContext == null || !navigatorContext.mounted) {
+        return;
+      }
+
+      GoRouter.of(navigatorContext).go(route);
+    } catch (_) {
+      // Notification tap routing should stay best-effort.
+    }
+  }
+
   Future<void> _handleInitialAppForeground() async {
     final preferences = ref.read(preferencesControllerProvider).asData?.value;
     if (preferences == null || !preferences.hasCompletedOnboarding) {
@@ -129,7 +165,9 @@ class _LockdInAppState extends ConsumerState<LockdInApp>
     await _maybeAutoSyncSafely();
     _refreshBackendBackedViews();
     await _refreshLiveEnforcementCacheSafely();
+    await _flushPendingNativeEnforcementEventsSafely();
     await _checkPendingInterventionSafely();
+    await _consumePendingNotificationNavigationSafely();
   }
 
   Future<void> _handleAppResume() async {
@@ -158,7 +196,9 @@ class _LockdInAppState extends ConsumerState<LockdInApp>
       final queueSummary = await _flushPendingNativeUploadsSafely();
       _refreshBackendBackedViews();
       await _refreshLiveEnforcementCacheSafely();
+      await _flushPendingNativeEnforcementEventsSafely();
       await _checkPendingInterventionSafely();
+      await _consumePendingNotificationNavigationSafely();
 
       if (_shouldRunForegroundSync(
         permissions: permissions,
@@ -168,6 +208,7 @@ class _LockdInAppState extends ConsumerState<LockdInApp>
         await _foregroundSyncSafely();
         _refreshBackendBackedViews();
         await _refreshLiveEnforcementCacheSafely();
+        await _consumePendingNotificationNavigationSafely();
       }
     } finally {
       _resumeRefreshInFlight = false;
@@ -177,8 +218,26 @@ class _LockdInAppState extends ConsumerState<LockdInApp>
   Future<void> _configureNativeBackendSafely() async {
     try {
       await ref.read(liveEnforcementRepositoryProvider).cacheBackendBaseUrl();
+      final tone = ref
+          .read(preferencesControllerProvider)
+          .asData
+          ?.value
+          .notificationTone;
+      await ref
+          .read(liveEnforcementRepositoryProvider)
+          .cacheNotificationTone((tone ?? NotificationTone.professional).name);
     } catch (_) {
       // Native base URL caching should not break foreground refresh.
+    }
+  }
+
+  Future<void> _flushPendingNativeEnforcementEventsSafely() async {
+    try {
+      await ref
+          .read(liveInterventionProvider.notifier)
+          .flushPendingNativeEnforcementEvents();
+    } catch (_) {
+      // Native enforcement event draining should stay best-effort.
     }
   }
 
@@ -298,7 +357,7 @@ class _LockdInAppState extends ConsumerState<LockdInApp>
     _isPresentingRuleAlert = false;
 
     if (action == 'rules' && navigatorContext.mounted) {
-      GoRouter.of(navigatorContext).push(AppRoutes.lockdownRules);
+      GoRouter.of(navigatorContext).go(AppRoutes.lockdownRules);
     }
   }
 
@@ -339,8 +398,21 @@ class _LockdInAppState extends ConsumerState<LockdInApp>
 
     _isPresentingLiveIntervention = false;
 
+    if (action == 'stay') {
+      try {
+        await ref
+            .read(liveInterventionProvider.notifier)
+            .recordDismissedIntervention(
+              intervention,
+              action: 'stay_in_lockdin',
+            );
+      } catch (_) {
+        // Keep the UI responsive even if dismissal logging fails.
+      }
+    }
+
     if (action == 'rules' && navigatorContext.mounted) {
-      GoRouter.of(navigatorContext).push(AppRoutes.lockdownRules);
+      GoRouter.of(navigatorContext).go(AppRoutes.lockdownRules);
     }
   }
 }

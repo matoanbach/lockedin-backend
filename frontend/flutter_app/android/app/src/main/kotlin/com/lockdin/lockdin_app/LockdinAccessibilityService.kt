@@ -5,11 +5,15 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Intent
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import java.time.Instant
 import java.time.ZoneId
+import kotlin.math.absoluteValue
+import kotlin.math.roundToInt
 
 class LockdinAccessibilityService : AccessibilityService() {
+    private val tag = "LockdInAccessibility"
     private val monitorHandler = Handler(Looper.getMainLooper())
     private val monitorRunnable = object : Runnable {
         override fun run() {
@@ -29,6 +33,7 @@ class LockdinAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        Log.d(tag, "Accessibility service connected")
         serviceInfo = serviceInfo.apply {
             eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or
                 AccessibilityEvent.TYPE_WINDOWS_CHANGED
@@ -43,11 +48,17 @@ class LockdinAccessibilityService : AccessibilityService() {
         }
 
         val packageName = event.packageName?.toString()?.takeIf { it.isNotBlank() } ?: return
+        Log.d(tag, "Foreground accessibility event for package=$packageName type=${event.eventType}")
         handleForegroundPackage(packageName)
     }
 
     override fun onInterrupt() {
         finalizeActivePackageSession()
+    }
+
+    override fun onDestroy() {
+        finalizeActivePackageSession()
+        super.onDestroy()
     }
 
     private fun handleForegroundPackage(packageName: String) {
@@ -58,6 +69,7 @@ class LockdinAccessibilityService : AccessibilityService() {
         if (activePackageName != packageName) {
             val metadata = resolveAppMetadata(packageName)
             val startedAtMillis = System.currentTimeMillis()
+            Log.d(tag, "Tracking package=$packageName appName=${metadata.appName}")
             activePackageName = packageName
             activePackageAppName = metadata.appName
             activePackageCategory = metadata.category
@@ -89,11 +101,20 @@ class LockdinAccessibilityService : AccessibilityService() {
         val nowMillis = System.currentTimeMillis()
         flushUsageSlices(nowMillis, forceUploadPartialSlice)
 
-        val rule = RuleEnforcementStore.findRuleForPackage(this, packageName) ?: return true
+        val rule = RuleEnforcementStore.findRuleForPackage(this, packageName) ?: run {
+            Log.d(tag, "No cached rule match for package=$packageName")
+            return true
+        }
         val elapsedMillis = (nowMillis - sessionStart).coerceAtLeast(0L)
         val liveUsedMinutes = RuleEnforcementStore.calculateLiveUsedMinutes(this, rule, elapsedMillis)
+        Log.d(
+            tag,
+            "Evaluated package=$packageName rule=${rule.ruleId} used=$liveUsedMinutes limit=${rule.limitMinutes}",
+        )
 
-        if (liveUsedMinutes < rule.limitMinutes) {
+        maybeIssueNativeWarning(rule, liveUsedMinutes)
+
+        if (liveUsedMinutes <= rule.limitMinutes) {
             return true
         }
 
@@ -104,6 +125,7 @@ class LockdinAccessibilityService : AccessibilityService() {
                 timestampMillis = System.currentTimeMillis(),
             )
         ) {
+            Log.d(tag, "Skipping intervention due to cooldown for package=$packageName")
             return false
         }
 
@@ -125,16 +147,9 @@ class LockdinAccessibilityService : AccessibilityService() {
         )
 
         performGlobalAction(GLOBAL_ACTION_HOME)
-        startActivity(
-            Intent(this, MainActivity::class.java).apply {
-                addFlags(
-                    Intent.FLAG_ACTIVITY_NEW_TASK or
-                        Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                        Intent.FLAG_ACTIVITY_CLEAR_TOP,
-                )
-            },
-        )
+        launchLockdinIntervention()
         stopMonitoring()
+        Log.d(tag, "Queued live intervention for package=$packageName used=$liveUsedMinutes")
         return false
     }
 
@@ -242,6 +257,107 @@ class LockdinAccessibilityService : AccessibilityService() {
         monitorHandler.removeCallbacks(monitorRunnable)
     }
 
+    private fun maybeIssueNativeWarning(rule: CachedRuleStatus, liveUsedMinutes: Int) {
+        val eventType = warningEventType(rule.limitMinutes, liveUsedMinutes) ?: return
+        val usageDate = RuleEnforcementStore.currentUsageDate()
+        if (RuleEnforcementStore.hasIssuedWarning(this, rule.ruleId, usageDate, eventType)) {
+            Log.d(tag, "Skipping $eventType warning for rule=${rule.ruleId} because it already fired today")
+            return
+        }
+
+        val warning = warningContent(rule, liveUsedMinutes, eventType) ?: return
+        val notificationShown = NativeWarningNotifier.showWarning(
+            context = this,
+            notificationId = (rule.ruleId.hashCode() * 31 + eventType.hashCode()).absoluteValue,
+            title = warning.first,
+            body = warning.second,
+        )
+        if (!notificationShown) {
+            Log.w(tag, "Native warning notification was not shown for rule=${rule.ruleId} eventType=$eventType")
+            return
+        }
+
+        RuleEnforcementStore.markWarningIssued(this, rule.ruleId, usageDate, eventType)
+        Log.d(tag, "Issued $eventType warning for rule=${rule.ruleId} used=$liveUsedMinutes")
+        RuleEnforcementStore.queuePendingEnforcementEvent(
+            context = this,
+            event = PendingEnforcementEvent(
+                ruleId = rule.ruleId,
+                appId = rule.appId,
+                eventType = eventType,
+                usageDate = usageDate,
+                usedMinutes = liveUsedMinutes,
+                limitMinutes = rule.limitMinutes,
+                source = "android_accessibility",
+            ),
+        )
+    }
+
+    private fun warningEventType(limitMinutes: Int, liveUsedMinutes: Int): String? {
+        if (liveUsedMinutes >= limitMinutes) {
+            return "warning_limit_reached"
+        }
+
+        if (liveUsedMinutes >= (limitMinutes * 0.8).roundToInt()) {
+            return "warning_approaching_limit"
+        }
+
+        return null
+    }
+
+    private fun warningContent(
+        rule: CachedRuleStatus,
+        liveUsedMinutes: Int,
+        eventType: String,
+    ): Pair<String, String>? {
+        val tone = RuleEnforcementStore.notificationTone(this)
+        return when (eventType) {
+            "warning_approaching_limit" -> {
+                val remainingMinutes = (rule.limitMinutes - liveUsedMinutes).coerceAtLeast(0)
+                val title = "${rule.appName} is approaching its limit"
+                val body = when (tone) {
+                    "fun" -> "Heads up: only $remainingMinutes minutes left before ${rule.appName} hits today's limit."
+                    "edgy" -> "$remainingMinutes minutes left. ${rule.appName} is almost out of runway."
+                    else -> "$remainingMinutes minutes remain before you hit today's ${rule.limitMinutes}-minute limit for ${rule.appName}."
+                }
+                title to body
+            }
+
+            "warning_limit_reached" -> {
+                val title = if (liveUsedMinutes > rule.limitMinutes) {
+                    "${rule.appName} is over limit"
+                } else {
+                    "${rule.appName} reached its limit"
+                }
+                val body = when (tone) {
+                    "fun" -> "You just hit today's ${rule.limitMinutes}-minute limit for ${rule.appName}. Time to step out for a reset."
+                    "edgy" -> "Limit reached. Close ${rule.appName} before it steals more of your day."
+                    else -> "You have hit today's ${rule.limitMinutes}-minute limit for ${rule.appName}."
+                }
+                title to body
+            }
+
+            else -> null
+        }
+    }
+
+    private fun launchLockdinIntervention() {
+        monitorHandler.postDelayed(
+            {
+                startActivity(
+                    Intent(this, MainActivity::class.java).apply {
+                        addFlags(
+                            Intent.FLAG_ACTIVITY_NEW_TASK or
+                                Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                                Intent.FLAG_ACTIVITY_REORDER_TO_FRONT,
+                        )
+                    },
+                )
+            },
+            RETURN_TO_LOCKDIN_DELAY_MILLIS,
+        )
+    }
+
     private fun isRelevantEvent(eventType: Int): Boolean {
         return eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
             eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED
@@ -285,11 +401,12 @@ class LockdinAccessibilityService : AccessibilityService() {
     }
 
     companion object {
-        private const val MONITOR_INTERVAL_MILLIS = 60_000L
+        private const val MONITOR_INTERVAL_MILLIS = 15_000L
         private const val INTERVENTION_COOLDOWN_MILLIS = 2_000L
         private const val MINUTE_MILLIS = 60_000L
         private const val MAX_SLICES_PER_FLUSH = 15
         private const val MAX_UPLOAD_BACKFILL_MILLIS =
             MAX_SLICES_PER_FLUSH * MINUTE_MILLIS
+        private const val RETURN_TO_LOCKDIN_DELAY_MILLIS = 150L
     }
 }
