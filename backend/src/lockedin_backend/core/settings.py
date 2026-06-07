@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 BASE_DIR = Path(__file__).resolve().parents[3]
-DEFAULT_DATABASE_URL = f"sqlite:///{BASE_DIR / 'lockdin.db'}"
+DEFAULT_DATABASE_URL = "postgresql+psycopg://postgres:postgres@localhost:5433/lockedin"
 
 
 class Settings(BaseSettings):
