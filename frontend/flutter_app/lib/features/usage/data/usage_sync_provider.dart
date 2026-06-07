@@ -259,6 +259,24 @@ class UsageSyncRepository {
       usageAccess: json['usageAccess'] == true,
       notifications: json['notifications'] == true,
       accessibility: json['accessibility'] == true,
+      notificationDiagnostics: _notificationDiagnosticsFromJson(
+        json['notificationDiagnostics'],
+      ),
+    );
+  }
+
+  NotificationDiagnostics _notificationDiagnosticsFromJson(Object? raw) {
+    final json = raw is Map
+        ? Map<String, dynamic>.from(raw)
+        : const <String, dynamic>{};
+    return NotificationDiagnostics(
+      appEnabled: json['appEnabled'] == true,
+      channelId: json['channelId'] as String? ?? 'lockdin_warnings',
+      channelExists: json['channelExists'] == true,
+      channelEnabled: json['channelEnabled'] == true,
+      channelImportance: (json['channelImportance'] as num?)?.toInt() ?? 0,
+      channelImportanceLabel:
+          json['channelImportanceLabel'] as String? ?? 'unknown',
     );
   }
 
@@ -284,6 +302,17 @@ class UsageSyncRepository {
     }
 
     await _channel.invokeMethod<void>('openAccessibilitySettings');
+  }
+
+  Future<bool> sendTestWarningNotification() async {
+    if (!_isAndroid) {
+      return false;
+    }
+
+    final shown = await _channel.invokeMethod<bool>(
+      'sendTestWarningNotification',
+    );
+    return shown == true;
   }
 
   Future<UsageSyncResult> syncRecentUsage({int days = 14}) async {
