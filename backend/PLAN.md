@@ -25,7 +25,7 @@ Current direction:
 - one FastAPI service
 - REST API only
 - modular monolith structure
-- SQLite for the initial local database
+- Postgres initialized from the top-level `database/` folder
 - authentication deferred to a later phase
 - Supabase integration deferred to a later phase
 
@@ -58,7 +58,7 @@ The backend should be designed so auth and Supabase can be added later without f
 1. Keep the backend simple first.
 2. Build around the current frontend and the project requirements.
 3. Separate business logic cleanly inside one service.
-4. Keep the database portable so SQLite can be replaced later.
+4. Keep the database contract stable between backend code and the initialized Postgres schema.
 5. Avoid premature infrastructure complexity.
 6. Make each module testable in isolation.
 7. Prefer backend-first progress without blocking on frontend integration.
@@ -113,14 +113,13 @@ What it is:
 What it does:
 - manages database connection and sessions
 - defines schema and models
-- supports migrations
 - stores app data reliably
 
 Implementation plan:
-- start with SQLite for local development
-- design models so moving to Postgres later is straightforward
+- connect to the initialized Postgres database from the top-level `database/` folder
+- keep backend schema definitions aligned with the database bootstrap SQL
 - use SQLAlchemy or SQLModel
-- use Alembic for migrations
+- evolve schema through the SQL bootstrap files under `database/initdb/`
 
 Why it matters:
 - the database is the foundation for rules, analytics, and accountability
