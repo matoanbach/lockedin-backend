@@ -70,12 +70,12 @@ class PrivacyPolicyScreen extends StatelessWidget {
                             _PolicySection(
                               title: '1. Data Collection',
                               content:
-                                  'LockdIn collects app usage statistics solely for the purpose of tracking your screen time. All data is stored locally on your device and is never transmitted to external servers.',
+                                  'LockdIn collects app usage statistics solely for the purpose of tracking your screen time. When Android usage sync is enabled, session summaries are transmitted to your configured LockdIn backend so analytics can be calculated consistently across the app.',
                             ),
                             _PolicySection(
                               title: '2. Data Storage',
                               content:
-                                  'Your usage data, preferences, and settings are encrypted and stored only on your device. We do not have access to your data at any time.',
+                                  'Your preferences are stored in the LockdIn backend you connect to. Usage sessions collected from Android are synced to that backend as well. We do not share that data with third parties.',
                             ),
                             _PolicySection(
                               title: '3. Permissions',

@@ -25,5 +25,13 @@ String describeApiError(Object error) {
     }
   }
 
+  if (error is StateError || error is UnsupportedError) {
+    return error.toString().replaceFirst('Bad state: ', '');
+  }
+
+  if (error is Exception && error.toString().isNotEmpty) {
+    return error.toString().replaceFirst('Exception: ', '');
+  }
+
   return 'Something went wrong while talking to the backend.';
 }

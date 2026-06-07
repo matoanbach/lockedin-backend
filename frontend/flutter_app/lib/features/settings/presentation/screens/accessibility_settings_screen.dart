@@ -42,8 +42,8 @@ class _AccessibilitySettingsScreenState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   ScreenHeader(
-                    title: 'Accessibility',
-                    subtitle: 'Customize for better usability',
+                    title: 'Display & Accessibility',
+                    subtitle: 'Customize text size, contrast, and tap targets',
                     onBack: () => context.pop(),
                     label: 'HLR-7',
                   ),
@@ -145,7 +145,9 @@ class _AccessibilitySettingsScreenState
                     duration: const Duration(milliseconds: 200),
                     padding: Spacing.card,
                     decoration: BoxDecoration(
-                      color: highContrast ? Colors.black : AppColors.cardBackground,
+                      color: highContrast
+                          ? Colors.black
+                          : AppColors.cardBackground,
                       borderRadius: Spacing.borderRadiusLg,
                       border: Border.all(
                         color: highContrast ? Colors.white : AppColors.border,
@@ -190,7 +192,8 @@ class _AccessibilitySettingsScreenState
                   ),
                   Spacing.verticalXxl,
                   const InfoCard(
-                    message: 'WCAG 2.1 Level AA compliant with current settings',
+                    message:
+                        'WCAG 2.1 Level AA compliant with current settings',
                     icon: '✓',
                     type: InfoCardType.success,
                   ),
@@ -280,11 +283,7 @@ class _AccessibilityLoadingState extends StatelessWidget {
                 if (!hasError)
                   const CircularProgressIndicator(color: AppColors.purple400),
                 if (hasError)
-                  const Icon(
-                    Icons.cloud_off,
-                    color: AppColors.error,
-                    size: 36,
-                  ),
+                  const Icon(Icons.cloud_off, color: AppColors.error, size: 36),
                 Spacing.verticalLg,
                 Text(
                   hasError
@@ -294,7 +293,8 @@ class _AccessibilityLoadingState extends StatelessWidget {
                 ),
                 Spacing.verticalSm,
                 Text(
-                  errorMessage ?? 'Fetching your saved accessibility preferences.',
+                  errorMessage ??
+                      'Fetching your saved accessibility preferences.',
                   textAlign: TextAlign.center,
                   style: AppTextStyles.bodyMedium.copyWith(
                     color: AppColors.textTertiary,

@@ -9,6 +9,7 @@ import 'package:lockdin_app/features/onboarding/presentation/screens/onboarding_
 import 'package:lockdin_app/features/dashboard/presentation/screens/dashboard_screen.dart';
 import 'package:lockdin_app/features/rules/presentation/screens/lockdown_rules_screen.dart';
 import 'package:lockdin_app/features/trends/presentation/screens/trends_screen.dart';
+import 'package:lockdin_app/features/settings/presentation/screens/device_permissions_screen.dart';
 import 'package:lockdin_app/features/settings/presentation/screens/notification_settings_screen.dart';
 import 'package:lockdin_app/features/accountability/presentation/screens/accountability_screen.dart';
 import 'package:lockdin_app/features/settings/presentation/screens/accessibility_settings_screen.dart';
@@ -31,8 +32,10 @@ abstract class AppRoutes {
   static const String analytics = '/analytics';
 
   // Settings
+  static const String devicePermissions = '/settings/device-permissions';
   static const String notificationSettings = '/settings/notifications';
-  static const String accessibilitySettings = '/settings/accessibility';
+  static const String displayAccessibilitySettings =
+      '/settings/display-accessibility';
   static const String privacyPolicy = '/settings/privacy';
 
   // Accountability
@@ -40,17 +43,23 @@ abstract class AppRoutes {
 }
 
 /// Main router provider using GoRouter.
+final rootNavigatorKeyProvider = Provider<GlobalKey<NavigatorState>>((ref) {
+  return GlobalKey<NavigatorState>();
+});
+
 final routerProvider = Provider<GoRouter>((ref) {
+  final navigatorKey = ref.watch(rootNavigatorKeyProvider);
+
   return GoRouter(
+    navigatorKey: navigatorKey,
     initialLocation: AppRoutes.bootstrap,
     debugLogDiagnostics: true,
     routes: [
       GoRoute(
         path: AppRoutes.bootstrap,
         name: 'bootstrap',
-        pageBuilder: (context, state) => const MaterialPage(
-          child: AppBootstrapScreen(),
-        ),
+        pageBuilder: (context, state) =>
+            const MaterialPage(child: AppBootstrapScreen()),
       ),
 
       // === Onboarding Routes ===
@@ -122,6 +131,15 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // === Settings Routes ===
       GoRoute(
+        path: AppRoutes.devicePermissions,
+        name: 'device-permissions',
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const DevicePermissionsScreen(),
+          transitionsBuilder: _slideTransition,
+        ),
+      ),
+      GoRoute(
         path: AppRoutes.notificationSettings,
         name: 'notification-settings',
         pageBuilder: (context, state) => CustomTransitionPage(
@@ -131,8 +149,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(
-        path: AppRoutes.accessibilitySettings,
-        name: 'accessibility-settings',
+        path: AppRoutes.displayAccessibilitySettings,
+        name: 'display-accessibility-settings',
         pageBuilder: (context, state) => CustomTransitionPage(
           key: state.pageKey,
           child: const AccessibilitySettingsScreen(),
@@ -163,9 +181,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     errorPageBuilder: (context, state) => MaterialPage(
       key: state.pageKey,
       child: Scaffold(
-        body: Center(
-          child: Text('Page not found: ${state.uri}'),
-        ),
+        body: Center(child: Text('Page not found: ${state.uri}')),
       ),
     ),
   );
@@ -182,10 +198,7 @@ Widget _slideTransition(
     position: Tween<Offset>(
       begin: const Offset(1.0, 0.0),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: animation,
-      curve: Curves.easeOutCubic,
-    )),
+    ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
     child: child,
   );
 }
@@ -197,8 +210,5 @@ Widget _fadeTransition(
   Animation<double> secondaryAnimation,
   Widget child,
 ) {
-  return FadeTransition(
-    opacity: animation,
-    child: child,
-  );
+  return FadeTransition(opacity: animation, child: child);
 }

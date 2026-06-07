@@ -1,37 +1,22 @@
-import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../core/api/api_error.dart';
 import '../../../../core/theme/theme.dart';
-import '../../../../shared/widgets/widgets.dart';
 import '../../../../shared/models/models.dart';
+import '../../../../shared/widgets/widgets.dart';
+import '../../../analytics/data/analytics_provider.dart';
 
 /// Trends screen showing usage patterns and insights.
-class TrendsScreen extends StatelessWidget {
+class TrendsScreen extends ConsumerWidget {
   const TrendsScreen({super.key});
 
-  static const hourlyData = [
-    HourlyUsage(hour: '6am', minutes: 5),
-    HourlyUsage(hour: '9am', minutes: 15),
-    HourlyUsage(hour: '12pm', minutes: 35),
-    HourlyUsage(hour: '3pm', minutes: 25),
-    HourlyUsage(hour: '6pm', minutes: 45),
-    HourlyUsage(hour: '9pm', minutes: 65),
-    HourlyUsage(hour: '12am', minutes: 35),
-  ];
-
-  static const weeklyData = [
-    DailyUsage(day: 'Mon', hours: 3.2),
-    DailyUsage(day: 'Tue', hours: 4.5),
-    DailyUsage(day: 'Wed', hours: 2.8),
-    DailyUsage(day: 'Thu', hours: 5.1),
-    DailyUsage(day: 'Fri', hours: 4.2),
-    DailyUsage(day: 'Sat', hours: 6.3),
-    DailyUsage(day: 'Sun', hours: 5.8),
-  ];
-
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final trendsAsync = ref.watch(trendsAnalyticsProvider);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -40,7 +25,6 @@ class TrendsScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
               ScreenHeader(
                 title: 'Trends & Insights',
                 subtitle: 'Understand your usage patterns',
@@ -48,34 +32,55 @@ class TrendsScreen extends StatelessWidget {
                 label: 'HLR-3',
               ),
               Spacing.verticalXxl,
-
-              // Time of Day Chart
-              _TimeOfDayChart(data: hourlyData),
-              Spacing.verticalXxl,
-
-              // Peak Usage Insight
-              _PeakUsageCard(),
-              Spacing.verticalXxl,
-
-              // Weekly Comparison
-              _WeeklyComparisonChart(data: weeklyData),
-              Spacing.verticalXxl,
-
-              // Location Insights
-              _LocationInsights(),
-              Spacing.verticalXxl,
-
-              // Recommendation
-              const InfoCard(
-                message: 'Great progress! You\'ve reduced screen time by 26% this week. Keep it up!',
-                icon: '📈',
-                type: InfoCardType.success,
+              trendsAsync.when(
+                data: (analytics) => _TrendsContent(analytics: analytics),
+                loading: () => const _TrendsStateCard(
+                  message: 'Loading your latest trend data from the backend.',
+                ),
+                error: (error, _) => _TrendsStateCard(
+                  message: describeApiError(error),
+                  actionLabel: 'Retry',
+                  onAction: () => ref.invalidate(trendsAnalyticsProvider),
+                  isError: true,
+                ),
               ),
-              Spacing.verticalLg,
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _TrendsContent extends StatelessWidget {
+  const _TrendsContent({required this.analytics});
+
+  final TrendsAnalyticsData analytics;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _TimeOfDayChart(data: analytics.hourlyUsage),
+        Spacing.verticalXxl,
+        _PeakUsageCard(peakUsageWindow: analytics.peakUsageWindow),
+        Spacing.verticalXxl,
+        _WeeklyComparisonChart(data: analytics.weeklyUsage),
+        Spacing.verticalXxl,
+        _TopAppsSection(apps: analytics.topApps),
+        Spacing.verticalXxl,
+        InfoCard(
+          message: analytics.peakUsageWindow.isEmpty
+              ? 'Sync Android usage sessions to unlock trend insights here.'
+              : 'Your busiest window is ${analytics.peakUsageWindow}. Consider nudging your evening routine around it.',
+          icon: '📈',
+          type: analytics.peakUsageWindow.isEmpty
+              ? InfoCardType.info
+              : InfoCardType.success,
+        ),
+        Spacing.verticalLg,
+      ],
     );
   }
 }
@@ -87,6 +92,9 @@ class _TimeOfDayChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final maxMinutes = data.fold<int>(0, (max, item) => item.minutes > max ? item.minutes : max);
+    final maxY = maxMinutes <= 20 ? 20.0 : ((maxMinutes / 20).ceil() * 20).toDouble();
+
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -94,13 +102,13 @@ class _TimeOfDayChart extends StatelessWidget {
           Text('Usage by Time of Day', style: AppTextStyles.titleMedium),
           Spacing.verticalLg,
           SizedBox(
-            height: 200,
+            height: 220,
             child: LineChart(
               LineChartData(
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
-                  horizontalInterval: 20,
+                  horizontalInterval: maxY / 4,
                   getDrawingHorizontalLine: (value) => FlLine(
                     color: AppColors.border,
                     strokeWidth: 1,
@@ -121,16 +129,18 @@ class _TimeOfDayChart extends StatelessWidget {
                     sideTitles: SideTitles(
                       showTitles: true,
                       getTitlesWidget: (value, meta) {
-                        if (value.toInt() >= 0 && value.toInt() < data.length) {
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Text(
-                              data[value.toInt()].hour,
-                              style: AppTextStyles.labelSmall,
-                            ),
-                          );
+                        final index = value.toInt();
+                        if (index < 0 || index >= data.length || index % 3 != 0) {
+                          return const SizedBox.shrink();
                         }
-                        return const SizedBox.shrink();
+
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            data[index].hour,
+                            style: AppTextStyles.labelSmall,
+                          ),
+                        );
                       },
                     ),
                   ),
@@ -144,8 +154,8 @@ class _TimeOfDayChart extends StatelessWidget {
                 borderData: FlBorderData(show: false),
                 lineBarsData: [
                   LineChartBarData(
-                    spots: data.asMap().entries.map((e) {
-                      return FlSpot(e.key.toDouble(), e.value.minutes.toDouble());
+                    spots: data.asMap().entries.map((entry) {
+                      return FlSpot(entry.key.toDouble(), entry.value.minutes.toDouble());
                     }).toList(),
                     isCurved: true,
                     color: AppColors.primary,
@@ -154,7 +164,7 @@ class _TimeOfDayChart extends StatelessWidget {
                       show: true,
                       getDotPainter: (spot, percent, barData, index) {
                         return FlDotCirclePainter(
-                          radius: 4,
+                          radius: 3.5,
                           color: AppColors.primary,
                           strokeWidth: 0,
                         );
@@ -167,7 +177,7 @@ class _TimeOfDayChart extends StatelessWidget {
                   ),
                 ],
                 minY: 0,
-                maxY: 80,
+                maxY: maxY,
               ),
             ),
           ),
@@ -178,13 +188,19 @@ class _TimeOfDayChart extends StatelessWidget {
 }
 
 class _PeakUsageCard extends StatelessWidget {
+  const _PeakUsageCard({required this.peakUsageWindow});
+
+  final String peakUsageWindow;
+
   @override
   Widget build(BuildContext context) {
+    final hasInsight = peakUsageWindow.isNotEmpty;
+
     return GradientCard(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          IconBox(
+          const IconBox(
             icon: Icons.nightlight_outlined,
             size: 48,
             iconSize: 24,
@@ -195,10 +211,15 @@ class _PeakUsageCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Peak Usage: Evenings', style: AppTextStyles.titleMedium),
+                Text(
+                  hasInsight ? 'Peak Usage Window' : 'Trend Insight Pending',
+                  style: AppTextStyles.titleMedium,
+                ),
                 Spacing.verticalXs,
                 Text(
-                  'You scroll more at night, especially between 9 PM - 11 PM. Try setting a wind-down routine.',
+                  hasInsight
+                      ? 'Your busiest usage window lately is $peakUsageWindow. That is the best slot to place a wind-down habit or stricter rule.'
+                      : 'Once Android usage events start syncing, this card will call out the busiest time window in your day.',
                   style: AppTextStyles.bodySmall.copyWith(
                     color: AppColors.textSecondary,
                   ),
@@ -219,6 +240,9 @@ class _WeeklyComparisonChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final totalHours = data.fold<double>(0, (sum, item) => sum + item.hours);
+    final maxY = data.fold<double>(0, (max, item) => item.hours > max ? item.hours : max);
+
     return AppCard(
       child: Column(
         children: [
@@ -226,21 +250,11 @@ class _WeeklyComparisonChart extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('This Week', style: AppTextStyles.titleMedium),
-              Row(
-                children: [
-                  const Icon(
-                    Icons.trending_down,
-                    color: AppColors.success,
-                    size: 16,
-                  ),
-                  Spacing.horizontalXs,
-                  Text(
-                    '12% less',
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.success,
-                    ),
-                  ),
-                ],
+              Text(
+                '${totalHours.toStringAsFixed(1)}h total',
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: AppColors.textTertiary,
+                ),
               ),
             ],
           ),
@@ -252,7 +266,7 @@ class _WeeklyComparisonChart extends StatelessWidget {
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
-                  horizontalInterval: 2,
+                  horizontalInterval: (maxY <= 2 ? 1 : maxY / 4),
                   getDrawingHorizontalLine: (value) => FlLine(
                     color: AppColors.border,
                     strokeWidth: 1,
@@ -273,16 +287,18 @@ class _WeeklyComparisonChart extends StatelessWidget {
                     sideTitles: SideTitles(
                       showTitles: true,
                       getTitlesWidget: (value, meta) {
-                        if (value.toInt() >= 0 && value.toInt() < data.length) {
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Text(
-                              data[value.toInt()].day,
-                              style: AppTextStyles.labelSmall,
-                            ),
-                          );
+                        final index = value.toInt();
+                        if (index < 0 || index >= data.length) {
+                          return const SizedBox.shrink();
                         }
-                        return const SizedBox.shrink();
+
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            data[index].day,
+                            style: AppTextStyles.labelSmall,
+                          ),
+                        );
                       },
                     ),
                   ),
@@ -294,12 +310,12 @@ class _WeeklyComparisonChart extends StatelessWidget {
                   ),
                 ),
                 borderData: FlBorderData(show: false),
-                barGroups: data.asMap().entries.map((e) {
+                barGroups: data.asMap().entries.map((entry) {
                   return BarChartGroupData(
-                    x: e.key,
+                    x: entry.key,
                     barRods: [
                       BarChartRodData(
-                        toY: e.value.hours,
+                        toY: entry.value.hours,
                         color: AppColors.primary,
                         width: 24,
                         borderRadius: const BorderRadius.vertical(
@@ -309,7 +325,7 @@ class _WeeklyComparisonChart extends StatelessWidget {
                     ],
                   );
                 }).toList(),
-                maxY: 8,
+                maxY: maxY == 0 ? 1 : maxY + 1,
               ),
             ),
           ),
@@ -319,87 +335,132 @@ class _WeeklyComparisonChart extends StatelessWidget {
   }
 }
 
-class _LocationInsights extends StatelessWidget {
+class _TopAppsSection extends StatelessWidget {
+  const _TopAppsSection({required this.apps});
+
+  final List<TopAppUsage> apps;
+
   @override
   Widget build(BuildContext context) {
+    final maxMinutes = apps.fold<int>(0, (max, item) => item.minutes > max ? item.minutes : max);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Location Insights',
+          'Top Apps This Week',
           style: AppTextStyles.titleMedium.copyWith(
             color: AppColors.textSecondary,
           ),
         ),
         Spacing.verticalMd,
-        _LocationCard(
-          name: 'Home',
-          averageHours: 3.2,
-          percentage: 0.65,
-        ),
-        Spacing.verticalMd,
-        _LocationCard(
-          name: 'Work/School',
-          averageHours: 1.8,
-          percentage: 0.35,
-        ),
+        if (apps.isEmpty)
+          const AppCard(
+            child: Text('No app usage has been aggregated yet.'),
+          )
+        else
+          ...apps.asMap().entries.map(
+            (entry) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: AppCard(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.apps_rounded,
+                          color: _topAppColor(entry.key),
+                          size: 20,
+                        ),
+                        Spacing.horizontalMd,
+                        Expanded(
+                          child: Text(
+                            entry.value.appName,
+                            style: AppTextStyles.titleMedium,
+                          ),
+                        ),
+                        Text(
+                          entry.value.formattedTime,
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.textTertiary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Spacing.verticalSm,
+                    AppProgressBar(
+                      value: maxMinutes == 0 ? 0 : entry.value.minutes / maxMinutes,
+                      color: _topAppColor(entry.key),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
 }
 
-class _LocationCard extends StatelessWidget {
-  const _LocationCard({
-    required this.name,
-    required this.averageHours,
-    required this.percentage,
+class _TrendsStateCard extends StatelessWidget {
+  const _TrendsStateCard({
+    required this.message,
+    this.actionLabel,
+    this.onAction,
+    this.isError = false,
   });
 
-  final String name;
-  final double averageHours;
-  final double percentage;
+  final String message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+  final bool isError;
 
   @override
   Widget build(BuildContext context) {
     return AppCard(
-      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(
-                Icons.location_on_outlined,
-                color: AppColors.purple400,
-                size: 20,
-              ),
+              if (!isError)
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                const Icon(Icons.error_outline, color: AppColors.error),
               Spacing.horizontalMd,
-              Text(name, style: AppTextStyles.titleMedium),
-            ],
-          ),
-          Spacing.verticalSm,
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Average usage',
-                style: AppTextStyles.bodySmall.copyWith(
-                  color: AppColors.textTertiary,
+              Expanded(
+                child: Text(
+                  message,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: isError ? AppColors.error : AppColors.textSecondary,
+                  ),
                 ),
               ),
-              Text(
-                '${averageHours}h/day',
-                style: AppTextStyles.titleSmall,
-              ),
             ],
           ),
-          Spacing.verticalSm,
-          AppProgressBar(
-            value: percentage,
-            height: 8,
-          ),
+          if (actionLabel != null && onAction != null) ...[
+            Spacing.verticalLg,
+            OutlinedButton(onPressed: onAction, child: Text(actionLabel!)),
+          ],
         ],
       ),
     );
   }
+}
+
+Color _topAppColor(int index) {
+  const palette = [
+    AppColors.chart1,
+    AppColors.chart2,
+    AppColors.info,
+    AppColors.warning,
+    AppColors.success,
+  ];
+
+  return palette[index % palette.length];
 }

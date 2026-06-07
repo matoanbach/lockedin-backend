@@ -40,8 +40,8 @@ class _NotificationSettingsScreenState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   ScreenHeader(
-                    title: 'Notifications',
-                    subtitle: 'Customize your notification style',
+                    title: 'Notification Tone',
+                    subtitle: 'Customize how LockdIn talks to you',
                     onBack: () => context.pop(),
                     label: 'HLR-4',
                   ),
@@ -54,7 +54,10 @@ class _NotificationSettingsScreenState
                         size: 20,
                       ),
                       Spacing.horizontalSm,
-                      Text('Notification Tone', style: AppTextStyles.titleMedium),
+                      Text(
+                        'Notification Tone',
+                        style: AppTextStyles.titleMedium,
+                      ),
                     ],
                   ),
                   Spacing.verticalMd,
@@ -79,9 +82,16 @@ class _NotificationSettingsScreenState
                   ),
                   Spacing.verticalMd,
                   _SettingsNavItem(
-                    icon: Icons.settings_outlined,
-                    label: 'Accessibility',
-                    onTap: () => context.push(AppRoutes.accessibilitySettings),
+                    icon: Icons.visibility_outlined,
+                    label: 'Device Permissions',
+                    onTap: () => context.push(AppRoutes.devicePermissions),
+                  ),
+                  Spacing.verticalMd,
+                  _SettingsNavItem(
+                    icon: Icons.text_fields_outlined,
+                    label: 'Display & Accessibility',
+                    onTap: () =>
+                        context.push(AppRoutes.displayAccessibilitySettings),
                   ),
                   Spacing.verticalMd,
                   _SettingsNavItem(
@@ -99,7 +109,9 @@ class _NotificationSettingsScreenState
                             try {
                               await ref
                                   .read(preferencesControllerProvider.notifier)
-                                  .updatePreferences(notificationTone: selectedTone);
+                                  .updatePreferences(
+                                    notificationTone: selectedTone,
+                                  );
 
                               if (!mounted) {
                                 return;
@@ -173,15 +185,11 @@ class _NotificationLoadingState extends StatelessWidget {
                 if (!hasError)
                   const CircularProgressIndicator(color: AppColors.purple400),
                 if (hasError)
-                  const Icon(
-                    Icons.cloud_off,
-                    color: AppColors.error,
-                    size: 36,
-                  ),
+                  const Icon(Icons.cloud_off, color: AppColors.error, size: 36),
                 Spacing.verticalLg,
                 Text(
                   hasError
-                      ? 'Could not load notification settings'
+                      ? 'Could not load notification tone settings'
                       : 'Loading settings',
                   style: AppTextStyles.titleLarge,
                 ),
@@ -313,11 +321,7 @@ class _SettingsNavItem extends StatelessWidget {
               Text(label, style: AppTextStyles.bodyMedium),
             ],
           ),
-          const Icon(
-            Icons.chevron_right,
-            color: AppColors.textMuted,
-            size: 20,
-          ),
+          const Icon(Icons.chevron_right, color: AppColors.textMuted, size: 20),
         ],
       ),
     );

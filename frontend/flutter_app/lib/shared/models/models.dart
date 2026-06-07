@@ -104,6 +104,79 @@ class DailyUsage {
   });
 }
 
+/// Dashboard analytics payload.
+class DashboardAnalyticsData {
+  final int todayTotalMinutes;
+  final List<UsageData> categoryBreakdown;
+  final List<double> weeklyUsageHours;
+  final int deltaFromYesterdayPercent;
+
+  const DashboardAnalyticsData({
+    required this.todayTotalMinutes,
+    required this.categoryBreakdown,
+    required this.weeklyUsageHours,
+    required this.deltaFromYesterdayPercent,
+  });
+}
+
+/// Top app usage entry for trends.
+class TopAppUsage {
+  final String appId;
+  final String appName;
+  final int minutes;
+
+  const TopAppUsage({
+    required this.appId,
+    required this.appName,
+    required this.minutes,
+  });
+
+  String get formattedTime {
+    final hours = minutes ~/ 60;
+    final mins = minutes % 60;
+    if (hours > 0) {
+      return '${hours}h ${mins > 0 ? '${mins}m' : ''}'.trim();
+    }
+    return '${mins}m';
+  }
+}
+
+/// Trends analytics payload.
+class TrendsAnalyticsData {
+  final List<HourlyUsage> hourlyUsage;
+  final List<DailyUsage> weeklyUsage;
+  final List<TopAppUsage> topApps;
+  final String peakUsageWindow;
+
+  const TrendsAnalyticsData({
+    required this.hourlyUsage,
+    required this.weeklyUsage,
+    required this.topApps,
+    required this.peakUsageWindow,
+  });
+}
+
+/// Weekly summary analytics payload.
+class WeeklySummaryData {
+  final int screenTimeReductionPercent;
+  final double totalWeekHours;
+  final double dailyAverageHours;
+  final int goalsMetDays;
+  final int longestStreakDays;
+
+  const WeeklySummaryData({
+    required this.screenTimeReductionPercent,
+    required this.totalWeekHours,
+    required this.dailyAverageHours,
+    required this.goalsMetDays,
+    required this.longestStreakDays,
+  });
+
+  bool get hasImproved => screenTimeReductionPercent > 0;
+  bool get hasRegression => screenTimeReductionPercent < 0;
+  int get goalSuccessPercent => ((goalsMetDays / 7) * 100).round();
+}
+
 /// Notification tone options.
 enum NotificationTone {
   fun,
