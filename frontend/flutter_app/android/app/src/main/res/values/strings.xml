@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="lockdin_accessibility_service_description">Monitor foreground apps so LockdIn can interrupt apps that have reached a saved daily limit.</string>
+</resources>
