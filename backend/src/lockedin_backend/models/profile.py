@@ -33,3 +33,23 @@ class Profile(Base, TimestampMixin):
         back_populates="profile",
         cascade="all, delete-orphan",
     )
+    usage_events = relationship(
+        "UsageEvent",
+        back_populates="profile",
+        cascade="all, delete-orphan",
+    )
+    usage_daily_app_aggregates = relationship(
+        "UsageDailyAppAggregate",
+        back_populates="profile",
+        cascade="all, delete-orphan",
+    )
+    usage_daily_category_aggregates = relationship(
+        "UsageDailyCategoryAggregate",
+        back_populates="profile",
+        cascade="all, delete-orphan",
+    )
+    enforcement_events = relationship(
+        "EnforcementEvent",
+        back_populates="profile",
+        cascade="all, delete-orphan",
+    )

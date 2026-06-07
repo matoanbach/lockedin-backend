@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from lockedin_backend.core.errors import ConflictError, NotFoundError
 from lockedin_backend.repositories.rule_repository import RuleRepository
 from lockedin_backend.schemas.rules import RuleCreate, RuleResponse, RuleUpdate
+from lockedin_backend.services.app_identity import canonicalize_app_id
 from lockedin_backend.services.profile_context import profile_context_service
 
 
@@ -17,14 +18,15 @@ class RulesService:
 
     def create_rule(self, db: Session, payload: RuleCreate) -> RuleResponse:
         profile = profile_context_service.ensure_default_profile(db)
-        existing_rule = self.repository.get_by_app_id(db, profile.id, payload.app_id)
-        if existing_rule is not None:
-            raise ConflictError(f"Rule already exists for app_id '{payload.app_id}'")
+        requested_app_id = canonicalize_app_id(payload.app_id)
+        for existing_rule in self.repository.list_by_profile_id(db, profile.id):
+            if canonicalize_app_id(existing_rule.app_id) == requested_app_id:
+                raise ConflictError(f"Rule already exists for app_id '{payload.app_id}'")
 
         rule = self.repository.create(
             db,
             profile_id=profile.id,
-            app_id=payload.app_id,
+            app_id=requested_app_id,
             app_name=payload.app_name,
             limit_minutes=payload.limit_minutes,
             enabled=payload.enabled,

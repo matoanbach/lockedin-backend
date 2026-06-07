@@ -36,5 +36,14 @@ def test_alembic_upgrade_head_supports_app_startup(tmp_path, monkeypatch) -> Non
     engine.dispose()
     get_settings.cache_clear()
 
-    assert {"profiles", "preferences", "rules", "accountability_contacts"} <= table_names
+    assert {
+        "profiles",
+        "preferences",
+        "rules",
+        "accountability_contacts",
+        "usage_events",
+        "usage_daily_app_aggregates",
+        "usage_daily_category_aggregates",
+        "enforcement_events",
+    } <= table_names
     assert response.status_code == 200

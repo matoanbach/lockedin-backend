@@ -24,3 +24,4 @@ class Rule(Base, TimestampMixin):
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     profile = relationship("Profile", back_populates="rules")
+    enforcement_events = relationship("EnforcementEvent", back_populates="rule")
