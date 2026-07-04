@@ -1,0 +1,143 @@
+
+name: Frontend CI
+
+on:
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci.yml'
+  push:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci.yml'
+
+jobs:
+  # ============================================
+  # FRONTEND (Flutter) - Code Quality
+  # ============================================
+  
+  frontend-analyze:
+    name: Frontend - Analyze Code
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+      
+      - name: Install dependencies
+        working-directory: frontend/flutter_app
+        run: flutter pub get
+      
+      - name: Run Flutter Analyzer (Linting)
+        working-directory: frontend/flutter_app
+        run: flutter analyze --fatal-infos
+      
+      - name: Check Dart formatting
+        working-directory: frontend/flutter_app
+        run: dart format --set-exit-if-changed .
+
+  frontend-test:
+    name: Frontend - Run Tests
+    runs-on: ubuntu-latest
+    needs: frontend-analyze
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+      
+      - name: Install dependencies
+        working-directory: frontend/flutter_app
+        run: flutter pub get
+      
+      - name: Run tests with coverage
+        working-directory: frontend/flutter_app
+        run: flutter test --coverage
+      
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./frontend/flutter_app/coverage/lcov.info
+          fail_ci_if_error: false
+        continue-on-error: true
+
+  # ============================================
+  # FRONTEND (Flutter) - Build Artifacts
+  # ============================================
+  
+  frontend-build-android:
+    name: Frontend - Build Android APK
+    runs-on: ubuntu-latest
+    needs: frontend-test
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+      
+      - name: Install dependencies
+        working-directory: frontend/flutter_app
+        run: flutter pub get
+      
+      - name: Build Android APK (Debug)
+        working-directory: frontend/flutter_app
+        run: flutter build apk --debug
+      
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk
+          path: frontend/flutter_app/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 7
+
+  frontend-build-windows:
+    name: Frontend - Build Windows App
+    runs-on: windows-latest
+    needs: frontend-test
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+      
+      - name: Install dependencies
+        working-directory: frontend/flutter_app
+        run: flutter pub get
+      
+      - name: Build Windows App
+        working-directory: frontend/flutter_app
+        run: flutter build windows --debug
+      
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-app
+          path: frontend/flutter_app/build/windows/x64/runner/Debug/
+          retention-days: 7
