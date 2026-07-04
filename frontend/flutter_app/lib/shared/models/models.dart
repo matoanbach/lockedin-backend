@@ -87,10 +87,7 @@ class HourlyUsage {
   final String hour;
   final int minutes;
 
-  const HourlyUsage({
-    required this.hour,
-    required this.minutes,
-  });
+  const HourlyUsage({required this.hour, required this.minutes});
 }
 
 /// Daily usage data for charts.
@@ -98,10 +95,7 @@ class DailyUsage {
   final String day;
   final double hours;
 
-  const DailyUsage({
-    required this.day,
-    required this.hours,
-  });
+  const DailyUsage({required this.day, required this.hours});
 }
 
 /// Dashboard analytics payload.
@@ -178,28 +172,24 @@ class WeeklySummaryData {
 }
 
 /// Notification tone options.
-enum NotificationTone {
-  fun,
-  edgy,
-  professional,
-}
+enum NotificationTone { fun, edgy, professional }
 
 extension NotificationToneExtension on NotificationTone {
   String get displayName => switch (this) {
-        NotificationTone.fun => 'Fun',
-        NotificationTone.edgy => 'Edgy',
-        NotificationTone.professional => 'Professional',
-      };
+    NotificationTone.fun => 'Fun',
+    NotificationTone.edgy => 'Edgy',
+    NotificationTone.professional => 'Professional',
+  };
 
   String get description => switch (this) {
-        NotificationTone.fun => '🎉 Playful and encouraging messages',
-        NotificationTone.edgy => '⚡ Direct and bold reminders',
-        NotificationTone.professional => '💼 Polite and formal notifications',
-      };
+    NotificationTone.fun => '🎉 Playful and encouraging messages',
+    NotificationTone.edgy => '⚡ Direct and bold reminders',
+    NotificationTone.professional => '💼 Polite and formal notifications',
+  };
 
   String get example => switch (this) {
-        NotificationTone.fun => '"Woah there! Time to take a break!"',
-        NotificationTone.edgy => '"Stop scrolling. Seriously."',
-        NotificationTone.professional => '"You\'ve reached your daily limit."',
-      };
+    NotificationTone.fun => '"Woah there! Time to take a break!"',
+    NotificationTone.edgy => '"Stop scrolling. Seriously."',
+    NotificationTone.professional => '"You\'ve reached your daily limit."',
+  };
 }

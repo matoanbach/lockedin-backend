@@ -45,10 +45,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
                 else
                   const SizedBox(width: 40),
                 if (label != null)
-                  Text(
-                    label!,
-                    style: AppTextStyles.labelSmall,
-                  ),
+                  Text(label!, style: AppTextStyles.labelSmall),
               ],
             ),
             Spacing.verticalLg,
@@ -138,8 +135,7 @@ class ScreenHeader extends StatelessWidget {
               )
             else
               const SizedBox.shrink(),
-            if (label != null)
-              Text(label!, style: AppTextStyles.labelSmall),
+            if (label != null) Text(label!, style: AppTextStyles.labelSmall),
           ],
         ),
         Spacing.verticalLg,
@@ -165,10 +161,7 @@ class ScreenHeader extends StatelessWidget {
               ),
             ),
             if (actions != null && actions!.isNotEmpty)
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: actions!,
-              ),
+              Row(mainAxisSize: MainAxisSize.min, children: actions!),
           ],
         ),
       ],

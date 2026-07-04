@@ -65,9 +65,7 @@ class AppTheme {
           foregroundColor: Colors.white,
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: Spacing.borderRadiusLg,
-          ),
+          shape: RoundedRectangleBorder(borderRadius: Spacing.borderRadiusLg),
           textStyle: AppTextStyles.button,
         ),
       ),
@@ -78,9 +76,7 @@ class AppTheme {
           foregroundColor: AppColors.textPrimary,
           side: BorderSide(color: AppColors.border),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: Spacing.borderRadiusLg,
-          ),
+          shape: RoundedRectangleBorder(borderRadius: Spacing.borderRadiusLg),
           textStyle: AppTextStyles.button,
         ),
       ),
@@ -100,9 +96,7 @@ class AppTheme {
           foregroundColor: AppColors.textPrimary,
           backgroundColor: AppColors.cardBackground,
           padding: const EdgeInsets.all(12),
-          shape: RoundedRectangleBorder(
-            borderRadius: Spacing.borderRadiusMd,
-          ),
+          shape: RoundedRectangleBorder(borderRadius: Spacing.borderRadiusMd),
         ),
       ),
 
@@ -110,7 +104,10 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.inputBackground,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
         border: OutlineInputBorder(
           borderRadius: Spacing.borderRadiusMd,
           borderSide: BorderSide(color: AppColors.border),
@@ -178,18 +175,14 @@ class AppTheme {
       // === Dialog ===
       dialogTheme: DialogThemeData(
         backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: Spacing.borderRadiusXxl,
-        ),
+        shape: RoundedRectangleBorder(borderRadius: Spacing.borderRadiusXxl),
       ),
 
       // === Snackbar ===
       snackBarTheme: SnackBarThemeData(
         backgroundColor: AppColors.surface,
         contentTextStyle: AppTextStyles.bodyMedium,
-        shape: RoundedRectangleBorder(
-          borderRadius: Spacing.borderRadiusMd,
-        ),
+        shape: RoundedRectangleBorder(borderRadius: Spacing.borderRadiusMd),
         behavior: SnackBarBehavior.floating,
       ),
 

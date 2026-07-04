@@ -3,21 +3,14 @@ import '../../core/theme/theme.dart';
 
 /// Custom switch matching the app's design.
 class AppSwitch extends StatelessWidget {
-  const AppSwitch({
-    super.key,
-    required this.value,
-    required this.onChanged,
-  });
+  const AppSwitch({super.key, required this.value, required this.onChanged});
 
   final bool value;
   final ValueChanged<bool>? onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Switch(
-      value: value,
-      onChanged: onChanged,
-    );
+    return Switch(value: value, onChanged: onChanged);
   }
 }
 
@@ -146,9 +139,7 @@ class RadioOptionCard<T> extends StatelessWidget {
         child: Row(
           children: [
             Icon(
-              isSelected
-                  ? Icons.radio_button_checked
-                  : Icons.radio_button_off,
+              isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
               color: isSelected ? AppColors.primary : AppColors.textMuted,
             ),
             Spacing.horizontalMd,

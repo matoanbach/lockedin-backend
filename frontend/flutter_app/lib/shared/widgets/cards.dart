@@ -32,9 +32,7 @@ class AppCard extends StatelessWidget {
         color: gradient == null ? (color ?? AppColors.cardBackground) : null,
         gradient: gradient,
         borderRadius: effectiveRadius,
-        border: Border.all(
-          color: borderColor ?? AppColors.border,
-        ),
+        border: Border.all(color: borderColor ?? AppColors.border),
       ),
       child: Material(
         color: Colors.transparent,
@@ -42,10 +40,7 @@ class AppCard extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           borderRadius: effectiveRadius,
-          child: Padding(
-            padding: padding ?? Spacing.card,
-            child: child,
-          ),
+          child: Padding(padding: padding ?? Spacing.card, child: child),
         ),
       ),
     );
@@ -75,16 +70,15 @@ class GradientCard extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: colors ??
+          colors:
+              colors ??
               [
                 AppColors.purple600.withValues(alpha: 0.2),
                 AppColors.purple400.withValues(alpha: 0.1),
               ],
         ),
         borderRadius: Spacing.borderRadiusXxl,
-        border: Border.all(
-          color: borderColor ?? AppColors.borderPurple,
-        ),
+        border: Border.all(color: borderColor ?? AppColors.borderPurple),
       ),
       padding: padding ?? Spacing.cardLarge,
       child: child,
@@ -110,25 +104,25 @@ class InfoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final (bgColor, borderColor, textColor) = switch (type) {
       InfoCardType.info => (
-          AppColors.infoLight,
-          AppColors.info.withValues(alpha: 0.3),
-          AppColors.info,
-        ),
+        AppColors.infoLight,
+        AppColors.info.withValues(alpha: 0.3),
+        AppColors.info,
+      ),
       InfoCardType.success => (
-          AppColors.successLight,
-          AppColors.success.withValues(alpha: 0.3),
-          AppColors.success,
-        ),
+        AppColors.successLight,
+        AppColors.success.withValues(alpha: 0.3),
+        AppColors.success,
+      ),
       InfoCardType.warning => (
-          AppColors.warningLight,
-          AppColors.warning.withValues(alpha: 0.3),
-          AppColors.warning,
-        ),
+        AppColors.warningLight,
+        AppColors.warning.withValues(alpha: 0.3),
+        AppColors.warning,
+      ),
       InfoCardType.error => (
-          AppColors.errorLight,
-          AppColors.error.withValues(alpha: 0.3),
-          AppColors.error,
-        ),
+        AppColors.errorLight,
+        AppColors.error.withValues(alpha: 0.3),
+        AppColors.error,
+      ),
     };
 
     return Container(
@@ -146,11 +140,11 @@ class InfoCard extends StatelessWidget {
   }
 
   String get _defaultIcon => switch (type) {
-        InfoCardType.info => '💡',
-        InfoCardType.success => '✓',
-        InfoCardType.warning => '⚠️',
-        InfoCardType.error => '❌',
-      };
+    InfoCardType.info => '💡',
+    InfoCardType.success => '✓',
+    InfoCardType.warning => '⚠️',
+    InfoCardType.error => '❌',
+  };
 }
 
 enum InfoCardType { info, success, warning, error }
@@ -195,11 +189,7 @@ class DashedCard extends StatelessWidget {
                 color: AppColors.primary.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                icon,
-                color: AppColors.primary,
-                size: 28,
-              ),
+              child: Icon(icon, color: AppColors.primary, size: 28),
             ),
             Spacing.verticalMd,
             Text(title, style: AppTextStyles.titleMedium),

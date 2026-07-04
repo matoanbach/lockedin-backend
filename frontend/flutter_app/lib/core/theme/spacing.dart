@@ -36,8 +36,9 @@ class Spacing {
 
   // === Edge Insets Presets ===
   static const EdgeInsets page = EdgeInsets.all(pagePadding);
-  static const EdgeInsets pageHorizontal =
-      EdgeInsets.symmetric(horizontal: pagePadding);
+  static const EdgeInsets pageHorizontal = EdgeInsets.symmetric(
+    horizontal: pagePadding,
+  );
   static const EdgeInsets card = EdgeInsets.all(cardPadding);
   static const EdgeInsets cardLarge = EdgeInsets.all(cardPaddingLarge);
 

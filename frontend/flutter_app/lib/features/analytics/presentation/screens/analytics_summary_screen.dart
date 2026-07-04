@@ -9,9 +9,12 @@ import '../../../../shared/widgets/widgets.dart';
 import '../../data/analytics_provider.dart';
 
 /// Provider for star rating.
-final ratingProvider = NotifierProvider<RatingNotifier, int>(RatingNotifier.new);
-final feedbackProvider =
-    NotifierProvider<FeedbackNotifier, String>(FeedbackNotifier.new);
+final ratingProvider = NotifierProvider<RatingNotifier, int>(
+  RatingNotifier.new,
+);
+final feedbackProvider = NotifierProvider<FeedbackNotifier, String>(
+  FeedbackNotifier.new,
+);
 
 class RatingNotifier extends Notifier<int> {
   @override
@@ -117,21 +120,21 @@ class _MainAchievementCard extends StatelessWidget {
     final metricColor = summary.hasRegression
         ? AppColors.error
         : summary.hasImproved
-            ? AppColors.success
-            : AppColors.purple200;
+        ? AppColors.success
+        : AppColors.purple200;
     final title = summary.hasRegression
         ? 'Screen time increase'
         : 'Screen time reduction';
     final caption = summary.hasRegression
         ? 'A heavier week than last week'
         : summary.hasImproved
-            ? 'Great progress!'
-            : 'Holding steady week over week';
+        ? 'Great progress!'
+        : 'Holding steady week over week';
     final trendIcon = summary.hasRegression
         ? Icons.trending_up
         : summary.hasImproved
-            ? Icons.trending_down
-            : Icons.horizontal_rule;
+        ? Icons.trending_down
+        : Icons.horizontal_rule;
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -205,8 +208,8 @@ class _StatsGrid extends StatelessWidget {
     final totalWeekChange = summary.screenTimeReductionPercent == 0
         ? 'Same as last week'
         : summary.hasImproved
-            ? '${summary.screenTimeReductionPercent}% less than last week'
-            : '${summary.screenTimeReductionPercent.abs()}% more than last week';
+        ? '${summary.screenTimeReductionPercent}% less than last week'
+        : '${summary.screenTimeReductionPercent.abs()}% more than last week';
 
     return GridView.count(
       crossAxisCount: 2,
@@ -222,8 +225,8 @@ class _StatsGrid extends StatelessWidget {
           isPositive: summary.hasImproved
               ? true
               : summary.hasRegression
-                  ? false
-                  : null,
+              ? false
+              : null,
         ),
         _StatCard(
           value: '${_formatHours(summary.dailyAverageHours)}h',
@@ -266,8 +269,8 @@ class _StatCard extends StatelessWidget {
     final changeColor = isPositive == null
         ? AppColors.purple400
         : isPositive!
-            ? AppColors.success
-            : AppColors.error;
+        ? AppColors.success
+        : AppColors.error;
 
     return AppCard(
       child: Column(
@@ -368,12 +371,7 @@ class _AchievementCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          IconBox(
-            icon: icon,
-            size: 48,
-            iconSize: 24,
-            color: iconColor,
-          ),
+          IconBox(icon: icon, size: 48, iconSize: 24, color: iconColor),
           Spacing.horizontalLg,
           Expanded(
             child: Column(
@@ -518,5 +516,7 @@ class _SummaryStateCard extends StatelessWidget {
 
 String _formatHours(double hours) {
   final rounded = hours.toStringAsFixed(1);
-  return rounded.endsWith('.0') ? rounded.substring(0, rounded.length - 2) : rounded;
+  return rounded.endsWith('.0')
+      ? rounded.substring(0, rounded.length - 2)
+      : rounded;
 }

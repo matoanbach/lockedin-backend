@@ -28,7 +28,8 @@ class _OnboardingDefaultRuleScreenState
 
     return preferencesAsync.when(
       data: (preferences) {
-        final dailyLimit = _selectedLimit ?? preferences.defaultDailyLimitMinutes;
+        final dailyLimit =
+            _selectedLimit ?? preferences.defaultDailyLimitMinutes;
 
         return Scaffold(
           backgroundColor: AppColors.background,
@@ -227,10 +228,7 @@ class _TimeDisplayCard extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppColors.primary.withValues(alpha: 0.2),
               shape: BoxShape.circle,
-              border: Border.all(
-                color: AppColors.borderPurpleStrong,
-                width: 4,
-              ),
+              border: Border.all(color: AppColors.borderPurpleStrong, width: 4),
             ),
             child: const Center(
               child: Icon(
@@ -241,7 +239,7 @@ class _TimeDisplayCard extends StatelessWidget {
             ),
           ),
           Spacing.verticalXxl,
-          
+
           // Time Display
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 200),
@@ -265,10 +263,7 @@ class _TimeDisplayCard extends StatelessWidget {
 }
 
 class _LimitSlider extends StatelessWidget {
-  const _LimitSlider({
-    required this.value,
-    required this.onChanged,
-  });
+  const _LimitSlider({required this.value, required this.onChanged});
 
   final int value;
   final ValueChanged<int> onChanged;
@@ -306,14 +301,8 @@ class _LimitSlider extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              '30m',
-              style: AppTextStyles.labelSmall,
-            ),
-            Text(
-              '8h',
-              style: AppTextStyles.labelSmall,
-            ),
+            Text('30m', style: AppTextStyles.labelSmall),
+            Text('8h', style: AppTextStyles.labelSmall),
           ],
         ),
       ],
@@ -322,10 +311,7 @@ class _LimitSlider extends StatelessWidget {
 }
 
 class _PresetOptions extends StatelessWidget {
-  const _PresetOptions({
-    required this.selectedMinutes,
-    required this.onSelect,
-  });
+  const _PresetOptions({required this.selectedMinutes, required this.onSelect});
 
   final int selectedMinutes;
   final ValueChanged<int> onSelect;
@@ -374,10 +360,7 @@ class _PresetOptions extends StatelessWidget {
                     ),
                     child: Column(
                       children: [
-                        Text(
-                          preset.$2,
-                          style: AppTextStyles.titleLarge,
-                        ),
+                        Text(preset.$2, style: AppTextStyles.titleLarge),
                         Spacing.verticalXs,
                         Text(
                           preset.$3,

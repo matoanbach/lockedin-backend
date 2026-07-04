@@ -38,7 +38,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          preferencesControllerProvider.overrideWith(_TestPreferencesController.new),
+          preferencesControllerProvider.overrideWith(
+            _TestPreferencesController.new,
+          ),
         ],
         child: LockdInApp(),
       ),

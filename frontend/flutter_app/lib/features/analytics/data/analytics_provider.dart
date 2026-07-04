@@ -10,7 +10,9 @@ final analyticsRepositoryProvider = Provider<AnalyticsRepository>((ref) {
   return AnalyticsRepository(ref.watch(dioProvider));
 });
 
-final dashboardAnalyticsProvider = FutureProvider<DashboardAnalyticsData>((ref) {
+final dashboardAnalyticsProvider = FutureProvider<DashboardAnalyticsData>((
+  ref,
+) {
   return ref.watch(analyticsRepositoryProvider).fetchDashboard();
 });
 
@@ -46,9 +48,9 @@ class AnalyticsRepository {
             ),
           ),
       ],
-      weeklyUsageHours: _listFromJson(json['weeklyUsageHours'])
-          .map((item) => (item['value'] as num).toDouble())
-          .toList(),
+      weeklyUsageHours: _listFromJson(
+        json['weeklyUsageHours'],
+      ).map((item) => (item['value'] as num).toDouble()).toList(),
       deltaFromYesterdayPercent:
           (json['deltaFromYesterdayPercent'] as num?)?.toInt() ?? 0,
     );
@@ -108,14 +110,12 @@ List<Map<String, dynamic>> _listFromJson(Object? value) {
     return const [];
   }
 
-  return value
-      .map((item) {
-        if (item is Map) {
-          return Map<String, dynamic>.from(item);
-        }
-        return <String, dynamic>{'value': item};
-      })
-      .toList();
+  return value.map((item) {
+    if (item is Map) {
+      return Map<String, dynamic>.from(item);
+    }
+    return <String, dynamic>{'value': item};
+  }).toList();
 }
 
 const _categoryPalette = <Color>[

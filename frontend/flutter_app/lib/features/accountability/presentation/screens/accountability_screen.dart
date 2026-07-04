@@ -310,11 +310,7 @@ class _AccountabilityLoadingState extends StatelessWidget {
                 if (!hasError)
                   const CircularProgressIndicator(color: AppColors.purple400),
                 if (hasError)
-                  const Icon(
-                    Icons.cloud_off,
-                    color: AppColors.error,
-                    size: 36,
-                  ),
+                  const Icon(Icons.cloud_off, color: AppColors.error, size: 36),
                 Spacing.verticalLg,
                 Text(
                   hasError
@@ -324,7 +320,8 @@ class _AccountabilityLoadingState extends StatelessWidget {
                 ),
                 Spacing.verticalSm,
                 Text(
-                  errorMessage ?? 'Fetching your saved accountability partners.',
+                  errorMessage ??
+                      'Fetching your saved accountability partners.',
                   textAlign: TextAlign.center,
                   style: AppTextStyles.bodyMedium.copyWith(
                     color: AppColors.textTertiary,
@@ -347,10 +344,7 @@ class _AccountabilityLoadingState extends StatelessWidget {
 }
 
 class _PartnerCard extends StatelessWidget {
-  const _PartnerCard({
-    required this.partner,
-    required this.onRemove,
-  });
+  const _PartnerCard({required this.partner, required this.onRemove});
 
   final AccountabilityPartner partner;
   final VoidCallback onRemove;

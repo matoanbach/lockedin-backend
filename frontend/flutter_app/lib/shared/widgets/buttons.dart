@@ -111,18 +111,13 @@ class SecondaryButton extends StatelessWidget {
           foregroundColor: AppColors.textPrimary,
           side: BorderSide(color: AppColors.border),
           backgroundColor: AppColors.cardBackground,
-          shape: RoundedRectangleBorder(
-            borderRadius: Spacing.borderRadiusLg,
-          ),
+          shape: RoundedRectangleBorder(borderRadius: Spacing.borderRadiusLg),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (icon != null) ...[
-              Icon(icon, size: 20),
-              Spacing.horizontalSm,
-            ],
+            if (icon != null) ...[Icon(icon, size: 20), Spacing.horizontalSm],
             Text(label, style: AppTextStyles.button),
           ],
         ),

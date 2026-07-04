@@ -35,11 +35,7 @@ class IconBox extends StatelessWidget {
         borderRadius: borderRadius ?? Spacing.borderRadiusMd,
       ),
       child: Center(
-        child: Icon(
-          icon,
-          size: iconSize,
-          color: effectiveColor,
-        ),
+        child: Icon(icon, size: iconSize, color: effectiveColor),
       ),
     );
   }
@@ -76,11 +72,7 @@ class CircleIconBox extends StatelessWidget {
         shape: BoxShape.circle,
       ),
       child: Center(
-        child: Icon(
-          icon,
-          size: iconSize,
-          color: effectiveColor,
-        ),
+        child: Icon(icon, size: iconSize, color: effectiveColor),
       ),
     );
   }
@@ -109,11 +101,7 @@ class AppIcon extends StatelessWidget {
         borderRadius: Spacing.borderRadiusMd,
       ),
       child: Center(
-        child: Icon(
-          icon,
-          color: color,
-          size: size * 0.5,
-        ),
+        child: Icon(icon, color: color, size: size * 0.5),
       ),
     );
   }

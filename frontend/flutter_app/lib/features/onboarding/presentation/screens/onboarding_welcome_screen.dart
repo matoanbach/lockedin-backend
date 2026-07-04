@@ -21,12 +21,9 @@ class OnboardingWelcomeScreen extends StatelessWidget {
               // HLR Label
               Align(
                 alignment: Alignment.centerRight,
-                child: Text(
-                  'HLR-6',
-                  style: AppTextStyles.labelSmall,
-                ),
+                child: Text('HLR-6', style: AppTextStyles.labelSmall),
               ),
-              
+
               // Main Content
               Expanded(
                 child: Column(
@@ -35,18 +32,18 @@ class OnboardingWelcomeScreen extends StatelessWidget {
                     // Logo/Icon
                     _buildLogo(),
                     Spacing.verticalXxl,
-                    
+
                     // App Name & Tagline
                     _buildTitle(),
                     Spacing.verticalXxl,
                     Spacing.verticalLg,
-                    
+
                     // Feature Highlights
                     _buildFeatureList(),
                   ],
                 ),
               ),
-              
+
               // CTA Button
               PrimaryButton(
                 onPressed: () => context.push(AppRoutes.onboardingPermissions),
@@ -83,11 +80,7 @@ class OnboardingWelcomeScreen extends StatelessWidget {
             ],
           ),
           child: const Center(
-            child: Icon(
-              Icons.lock_outline,
-              size: 48,
-              color: Colors.white,
-            ),
+            child: Icon(Icons.lock_outline, size: 48, color: Colors.white),
           ),
         ),
         // Target badge
@@ -102,11 +95,7 @@ class OnboardingWelcomeScreen extends StatelessWidget {
               shape: BoxShape.circle,
             ),
             child: const Center(
-              child: Icon(
-                Icons.track_changes,
-                size: 16,
-                color: Colors.white,
-              ),
+              child: Icon(Icons.track_changes, size: 16, color: Colors.white),
             ),
           ),
         ),
@@ -123,9 +112,7 @@ class OnboardingWelcomeScreen extends StatelessWidget {
           ).createShader(bounds),
           child: Text(
             'LockdIn',
-            style: AppTextStyles.displayLarge.copyWith(
-              color: Colors.white,
-            ),
+            style: AppTextStyles.displayLarge.copyWith(color: Colors.white),
           ),
         ),
         Spacing.verticalSm,

@@ -9,11 +9,14 @@ final preferencesRepositoryProvider = Provider<PreferencesRepository>((ref) {
   return PreferencesRepository(ref.watch(dioProvider));
 });
 
-final preferencesControllerProvider = AsyncNotifierProvider<
-    PreferencesController, AppPreferences>(PreferencesController.new);
+final preferencesControllerProvider =
+    AsyncNotifierProvider<PreferencesController, AppPreferences>(
+      PreferencesController.new,
+    );
 
 class PreferencesController extends AsyncNotifier<AppPreferences> {
-  PreferencesRepository get _repository => ref.read(preferencesRepositoryProvider);
+  PreferencesRepository get _repository =>
+      ref.read(preferencesRepositoryProvider);
 
   @override
   Future<AppPreferences> build() {
@@ -33,12 +36,12 @@ class PreferencesController extends AsyncNotifier<AppPreferences> {
     bool? largeTapTargets,
   }) async {
     final updated = await _repository.updatePreferences({
-      'hasCompletedOnboarding':? hasCompletedOnboarding,
-      'defaultDailyLimitMinutes':? defaultDailyLimitMinutes,
-      'notificationTone':? notificationTone?.name,
-      'textSizePercent':? textSizePercent,
-      'highContrast':? highContrast,
-      'largeTapTargets':? largeTapTargets,
+      'hasCompletedOnboarding': ?hasCompletedOnboarding,
+      'defaultDailyLimitMinutes': ?defaultDailyLimitMinutes,
+      'notificationTone': ?notificationTone?.name,
+      'textSizePercent': ?textSizePercent,
+      'highContrast': ?highContrast,
+      'largeTapTargets': ?largeTapTargets,
     });
 
     state = AsyncData(updated);

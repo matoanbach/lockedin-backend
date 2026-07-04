@@ -92,8 +92,13 @@ class _TimeOfDayChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final maxMinutes = data.fold<int>(0, (max, item) => item.minutes > max ? item.minutes : max);
-    final maxY = maxMinutes <= 20 ? 20.0 : ((maxMinutes / 20).ceil() * 20).toDouble();
+    final maxMinutes = data.fold<int>(
+      0,
+      (max, item) => item.minutes > max ? item.minutes : max,
+    );
+    final maxY = maxMinutes <= 20
+        ? 20.0
+        : ((maxMinutes / 20).ceil() * 20).toDouble();
 
     return AppCard(
       child: Column(
@@ -109,10 +114,8 @@ class _TimeOfDayChart extends StatelessWidget {
                   show: true,
                   drawVerticalLine: false,
                   horizontalInterval: maxY / 4,
-                  getDrawingHorizontalLine: (value) => FlLine(
-                    color: AppColors.border,
-                    strokeWidth: 1,
-                  ),
+                  getDrawingHorizontalLine: (value) =>
+                      FlLine(color: AppColors.border, strokeWidth: 1),
                 ),
                 titlesData: FlTitlesData(
                   leftTitles: AxisTitles(
@@ -130,7 +133,9 @@ class _TimeOfDayChart extends StatelessWidget {
                       showTitles: true,
                       getTitlesWidget: (value, meta) {
                         final index = value.toInt();
-                        if (index < 0 || index >= data.length || index % 3 != 0) {
+                        if (index < 0 ||
+                            index >= data.length ||
+                            index % 3 != 0) {
                           return const SizedBox.shrink();
                         }
 
@@ -155,7 +160,10 @@ class _TimeOfDayChart extends StatelessWidget {
                 lineBarsData: [
                   LineChartBarData(
                     spots: data.asMap().entries.map((entry) {
-                      return FlSpot(entry.key.toDouble(), entry.value.minutes.toDouble());
+                      return FlSpot(
+                        entry.key.toDouble(),
+                        entry.value.minutes.toDouble(),
+                      );
                     }).toList(),
                     isCurved: true,
                     color: AppColors.primary,
@@ -241,7 +249,10 @@ class _WeeklyComparisonChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final totalHours = data.fold<double>(0, (sum, item) => sum + item.hours);
-    final maxY = data.fold<double>(0, (max, item) => item.hours > max ? item.hours : max);
+    final maxY = data.fold<double>(
+      0,
+      (max, item) => item.hours > max ? item.hours : max,
+    );
 
     return AppCard(
       child: Column(
@@ -267,10 +278,8 @@ class _WeeklyComparisonChart extends StatelessWidget {
                   show: true,
                   drawVerticalLine: false,
                   horizontalInterval: (maxY <= 2 ? 1 : maxY / 4),
-                  getDrawingHorizontalLine: (value) => FlLine(
-                    color: AppColors.border,
-                    strokeWidth: 1,
-                  ),
+                  getDrawingHorizontalLine: (value) =>
+                      FlLine(color: AppColors.border, strokeWidth: 1),
                 ),
                 titlesData: FlTitlesData(
                   leftTitles: AxisTitles(
@@ -342,7 +351,10 @@ class _TopAppsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final maxMinutes = apps.fold<int>(0, (max, item) => item.minutes > max ? item.minutes : max);
+    final maxMinutes = apps.fold<int>(
+      0,
+      (max, item) => item.minutes > max ? item.minutes : max,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -355,9 +367,7 @@ class _TopAppsSection extends StatelessWidget {
         ),
         Spacing.verticalMd,
         if (apps.isEmpty)
-          const AppCard(
-            child: Text('No app usage has been aggregated yet.'),
-          )
+          const AppCard(child: Text('No app usage has been aggregated yet.'))
         else
           ...apps.asMap().entries.map(
             (entry) => Padding(
@@ -390,7 +400,9 @@ class _TopAppsSection extends StatelessWidget {
                     ),
                     Spacing.verticalSm,
                     AppProgressBar(
-                      value: maxMinutes == 0 ? 0 : entry.value.minutes / maxMinutes,
+                      value: maxMinutes == 0
+                          ? 0
+                          : entry.value.minutes / maxMinutes,
                       color: _topAppColor(entry.key),
                     ),
                   ],

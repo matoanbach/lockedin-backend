@@ -9,11 +9,15 @@ class PreferencesRepository {
 
   Future<AppPreferences> fetchPreferences() async {
     final response = await _dio.get('/api/v1/me/preferences');
-    return AppPreferences.fromJson(Map<String, dynamic>.from(response.data as Map));
+    return AppPreferences.fromJson(
+      Map<String, dynamic>.from(response.data as Map),
+    );
   }
 
   Future<AppPreferences> updatePreferences(Map<String, dynamic> payload) async {
     final response = await _dio.put('/api/v1/me/preferences', data: payload);
-    return AppPreferences.fromJson(Map<String, dynamic>.from(response.data as Map));
+    return AppPreferences.fromJson(
+      Map<String, dynamic>.from(response.data as Map),
+    );
   }
 }

@@ -4,14 +4,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
 import '../../../shared/models/models.dart';
 
-final accountabilityRepositoryProvider =
-    Provider<AccountabilityRepository>((ref) {
+final accountabilityRepositoryProvider = Provider<AccountabilityRepository>((
+  ref,
+) {
   return AccountabilityRepository(ref.watch(dioProvider));
 });
 
-final accountabilityPartnersProvider = AsyncNotifierProvider<
-    AccountabilityPartnersController,
-    List<AccountabilityPartner>>(AccountabilityPartnersController.new);
+final accountabilityPartnersProvider =
+    AsyncNotifierProvider<
+      AccountabilityPartnersController,
+      List<AccountabilityPartner>
+    >(AccountabilityPartnersController.new);
 
 class AccountabilityPartnersController
     extends AsyncNotifier<List<AccountabilityPartner>> {

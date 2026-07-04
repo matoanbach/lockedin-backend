@@ -36,10 +36,19 @@ class PrivacyPolicyScreen extends StatelessWidget {
                 physics: const NeverScrollableScrollPhysics(),
                 childAspectRatio: 1.5,
                 children: const [
-                  _KeyPointCard(icon: Icons.shield_outlined, label: '100% Private'),
+                  _KeyPointCard(
+                    icon: Icons.shield_outlined,
+                    label: '100% Private',
+                  ),
                   _KeyPointCard(icon: Icons.lock_outline, label: 'On-Device'),
-                  _KeyPointCard(icon: Icons.visibility_off_outlined, label: 'No Tracking'),
-                  _KeyPointCard(icon: Icons.description_outlined, label: 'Open Source'),
+                  _KeyPointCard(
+                    icon: Icons.visibility_off_outlined,
+                    label: 'No Tracking',
+                  ),
+                  _KeyPointCard(
+                    icon: Icons.description_outlined,
+                    label: 'Open Source',
+                  ),
                 ],
               ),
               Spacing.verticalXxl,
@@ -58,7 +67,10 @@ class PrivacyPolicyScreen extends StatelessWidget {
                           bottom: BorderSide(color: AppColors.border),
                         ),
                       ),
-                      child: Text('Privacy Policy', style: AppTextStyles.titleMedium),
+                      child: Text(
+                        'Privacy Policy',
+                        style: AppTextStyles.titleMedium,
+                      ),
                     ),
                     SizedBox(
                       height: 400,
@@ -134,10 +146,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
 }
 
 class _KeyPointCard extends StatelessWidget {
-  const _KeyPointCard({
-    required this.icon,
-    required this.label,
-  });
+  const _KeyPointCard({required this.icon, required this.label});
 
   final IconData icon;
   final String label;
@@ -178,10 +187,7 @@ class _PolicySection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: AppTextStyles.titleSmall,
-        ),
+        Text(title, style: AppTextStyles.titleSmall),
         Spacing.verticalSm,
         Text(
           content,
@@ -192,28 +198,30 @@ class _PolicySection extends StatelessWidget {
         ),
         if (bulletPoints != null) ...[
           Spacing.verticalSm,
-          ...bulletPoints!.map((point) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '• ',
+          ...bulletPoints!.map(
+            (point) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '• ',
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.purple400,
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      point,
                       style: AppTextStyles.bodySmall.copyWith(
-                        color: AppColors.purple400,
+                        color: AppColors.textSecondary,
                       ),
                     ),
-                    Expanded(
-                      child: Text(
-                        point,
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              )),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
         Spacing.verticalLg,
         Divider(color: AppColors.border, height: 1),

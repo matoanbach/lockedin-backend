@@ -36,7 +36,8 @@ class AppProgressBar extends StatelessWidget {
                 height: height,
                 decoration: BoxDecoration(
                   color: color ?? AppColors.primary,
-                  borderRadius: borderRadius ?? BorderRadius.circular(height / 2),
+                  borderRadius:
+                      borderRadius ?? BorderRadius.circular(height / 2),
                 ),
               ),
             ],
@@ -87,10 +88,7 @@ class VerticalBar extends StatelessWidget {
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [
-                      color ?? AppColors.purple400,
-                      AppColors.purple600,
-                    ],
+                    colors: [color ?? AppColors.purple400, AppColors.purple600],
                   ),
                   borderRadius: BorderRadius.circular(width / 2),
                 ),

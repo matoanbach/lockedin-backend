@@ -9,6 +9,7 @@ import '../../../../shared/models/models.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../../../enforcement/data/live_intervention_provider.dart';
 import '../../data/rules_provider.dart';
+import '../widgets/app_limit_warning.dart';
 
 /// Screen for managing lockdown rules.
 class LockdownRulesScreen extends ConsumerStatefulWidget {
@@ -21,6 +22,22 @@ class LockdownRulesScreen extends ConsumerStatefulWidget {
 
 class _LockdownRulesScreenState extends ConsumerState<LockdownRulesScreen> {
   bool _showLockedState = false;
+  int _reminderThresholdMinutes = 30;
+  late final TextEditingController _reminderThresholdController;
+
+  @override
+  void initState() {
+    super.initState();
+    _reminderThresholdController = TextEditingController(
+      text: '$_reminderThresholdMinutes',
+    );
+  }
+
+  @override
+  void dispose() {
+    _reminderThresholdController.dispose();
+    super.dispose();
+  }
 
   Future<void> _openRuleSheet({LockdownRule? initialRule}) async {
     await showModalBottomSheet<void>(
@@ -90,6 +107,10 @@ class _LockdownRulesScreenState extends ConsumerState<LockdownRulesScreen> {
               in ruleStatusesAsync.asData?.value ?? const <RuleStatusData>[])
             status.ruleId: status,
         };
+        final reminderStatus = firstReminderStatusFor(
+          statusMap.values,
+          _reminderThresholdMinutes,
+        );
 
         return Scaffold(
           backgroundColor: AppColors.background,
@@ -106,6 +127,13 @@ class _LockdownRulesScreenState extends ConsumerState<LockdownRulesScreen> {
                     label: 'HLR-2',
                   ),
                   Spacing.verticalXxl,
+                  if (reminderStatus != null) ...[
+                    ReminderBanner(
+                      status: reminderStatus,
+                      onShowPopup: () => _showReminderSnackBar(reminderStatus),
+                    ),
+                    Spacing.verticalXxl,
+                  ],
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -140,35 +168,55 @@ class _LockdownRulesScreenState extends ConsumerState<LockdownRulesScreen> {
                         type: InfoCardType.warning,
                       ),
                     ),
+                  ReminderThresholdCard(
+                    controller: _reminderThresholdController,
+                    thresholdMinutes: _reminderThresholdMinutes,
+                    onApply: (value) {
+                      setState(() => _reminderThresholdMinutes = value);
+                    },
+                  ),
+                  Spacing.verticalMd,
                   ...rules.map(
                     (rule) => Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: _RuleCard(
-                        rule: rule,
-                        status: statusMap[rule.id],
-                        onToggle: () async {
-                          try {
-                            await ref
-                                .read(lockdownRulesProvider.notifier)
-                                .toggleRule(rule.id);
-                            await ref
-                                .read(liveInterventionProvider.notifier)
-                                .refreshRuleStateCache();
-                          } catch (error) {
-                            if (!mounted) {
-                              return;
-                            }
+                      child: Builder(
+                        builder: (context) {
+                          final status = statusMap[rule.id];
 
-                            ScaffoldMessenger.of(this.context).showSnackBar(
-                              SnackBar(
-                                content: Text(describeApiError(error)),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          }
-                        },
-                        onEdit: () async {
-                          await _openRuleSheet(initialRule: rule);
+                          return AppLimitUsageCard(
+                            appName: rule.appName,
+                            icon: rule.icon,
+                            color: rule.color,
+                            enabled: rule.enabled,
+                            limitMinutes:
+                                status?.limitMinutes ?? rule.limitMinutes,
+                            status: status,
+                            reminderThresholdMinutes: _reminderThresholdMinutes,
+                            onToggle: () async {
+                              try {
+                                await ref
+                                    .read(lockdownRulesProvider.notifier)
+                                    .toggleRule(rule.id);
+                                await ref
+                                    .read(liveInterventionProvider.notifier)
+                                    .refreshRuleStateCache();
+                              } catch (error) {
+                                if (!mounted) {
+                                  return;
+                                }
+
+                                ScaffoldMessenger.of(this.context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(describeApiError(error)),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            },
+                            onEdit: () async {
+                              await _openRuleSheet(initialRule: rule);
+                            },
+                          );
                         },
                       ),
                     ),
@@ -208,6 +256,15 @@ class _LockdownRulesScreenState extends ConsumerState<LockdownRulesScreen> {
         onRetry: () {
           ref.read(lockdownRulesProvider.notifier).refresh();
         },
+      ),
+    );
+  }
+
+  void _showReminderSnackBar(RuleStatusData status) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(reminderPopupText(status)),
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }
@@ -263,192 +320,6 @@ class _RulesLoadingState extends StatelessWidget {
       ),
     );
   }
-}
-
-class _RuleCard extends StatelessWidget {
-  const _RuleCard({
-    required this.rule,
-    required this.status,
-    required this.onToggle,
-    required this.onEdit,
-  });
-
-  final LockdownRule rule;
-  final RuleStatusData? status;
-  final VoidCallback onToggle;
-  final VoidCallback onEdit;
-
-  @override
-  Widget build(BuildContext context) {
-    final hasStatus = status != null;
-    final statusColor = _statusColor(status?.status, rule.color);
-    final statusLabel = _statusLabel(status?.status, rule.enabled);
-
-    return AppCard(
-      child: Column(
-        children: [
-          Row(
-            children: [
-              AppIcon(icon: rule.icon, color: rule.color),
-              Spacing.horizontalLg,
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(rule.appName, style: AppTextStyles.titleMedium),
-                    Spacing.verticalXs,
-                    Text(
-                      hasStatus
-                          ? status!.formattedUsage
-                          : 'Block after ${rule.formattedLimit}',
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: AppColors.textTertiary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (hasStatus) ...[
-                Spacing.horizontalMd,
-                _StatusChip(label: statusLabel, color: statusColor),
-              ],
-              AppSwitch(value: rule.enabled, onChanged: (_) => onToggle()),
-            ],
-          ),
-          if (hasStatus) ...[
-            Spacing.verticalMd,
-            AppProgressBar(
-              value: status!.progressValue,
-              color: statusColor,
-              backgroundColor: AppColors.cardBackgroundLight,
-              height: 8,
-            ),
-            Spacing.verticalSm,
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  _statusDetailText(status!),
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                Text(
-                  '${status!.progressPercent}%',
-                  style: AppTextStyles.labelSmall.copyWith(color: statusColor),
-                ),
-              ],
-            ),
-          ],
-          if (rule.enabled) ...[
-            Spacing.verticalMd,
-            Container(
-              padding: const EdgeInsets.only(top: 12),
-              decoration: BoxDecoration(
-                border: Border(top: BorderSide(color: AppColors.border)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.lock_outline,
-                        color: AppColors.purple400,
-                        size: 16,
-                      ),
-                      Spacing.horizontalSm,
-                      Text(
-                        hasStatus && status!.isBlockedNow
-                            ? 'Over limit now'
-                            : 'Lockdown enabled',
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: hasStatus && status!.isBlockedNow
-                              ? AppColors.error
-                              : AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  IconButton(
-                    onPressed: onEdit,
-                    icon: const Icon(
-                      Icons.edit_outlined,
-                      size: 16,
-                      color: AppColors.textTertiary,
-                    ),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.35)),
-      ),
-      child: Text(
-        label,
-        style: AppTextStyles.labelSmall.copyWith(color: color),
-      ),
-    );
-  }
-}
-
-Color _statusColor(String? status, Color fallbackColor) {
-  return switch (status) {
-    'over_limit' => AppColors.error,
-    'at_limit' => AppColors.warning,
-    'approaching_limit' => AppColors.warning,
-    'disabled' => AppColors.textMuted,
-    'under_limit' => AppColors.success,
-    _ => fallbackColor,
-  };
-}
-
-String _statusLabel(String? status, bool enabled) {
-  if (!enabled) {
-    return 'Disabled';
-  }
-
-  return switch (status) {
-    'over_limit' => 'Over Limit',
-    'at_limit' => 'At Limit',
-    'approaching_limit' => 'Approaching',
-    'under_limit' => 'Under Limit',
-    'disabled' => 'Disabled',
-    _ => 'Pending',
-  };
-}
-
-String _statusDetailText(RuleStatusData status) {
-  return switch (status.status) {
-    'over_limit' =>
-      '${status.usedMinutes - status.limitMinutes} min over today',
-    'at_limit' => 'Daily limit reached',
-    'approaching_limit' => '${status.remainingMinutes} min remaining today',
-    'under_limit' => '${status.remainingMinutes} min remaining today',
-    'disabled' => 'Rule disabled. Usage is still tracked.',
-    _ => 'Waiting for current usage status.',
-  };
 }
 
 class _RuleFormValue {
