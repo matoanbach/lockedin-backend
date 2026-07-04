@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import sessionmaker
 
 from lockedin_backend.api.router import api_router
@@ -31,6 +32,13 @@ def create_app(session_factory: sessionmaker | None = None) -> FastAPI:
         redoc_url="/api/redoc",
         openapi_url="/openapi.json",
         swagger_ui_oauth2_redirect_url="/api/docs/oauth2-redirect",
+    )
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex=settings.cors_allowed_origin_regex,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
     mount_docs_site(app)
     app.state.session_factory = resolved_session_factory

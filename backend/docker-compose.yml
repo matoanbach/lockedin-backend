@@ -10,6 +10,7 @@ services:
       APP_NAME: ${APP_NAME:-LockdIn Backend}
       APP_VERSION: ${APP_VERSION:-0.1.0}
       DEBUG: ${DEBUG:-true}
+      CORS_ALLOWED_ORIGIN_REGEX: ${CORS_ALLOWED_ORIGIN_REGEX:-^https?://(localhost|127\.0\.0\.1)(:\d+)?$}
       BIND: ${BIND:-0.0.0.0:8000}
       WORKERS: ${WORKERS:-1}
       WORKER_CLASS: ${WORKER_CLASS:-uvicorn.workers.UvicornWorker}
