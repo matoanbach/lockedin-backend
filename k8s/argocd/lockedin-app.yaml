@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: lockedin
+  namespace: argocd
+spec:
+  project: default
+
+  source:
+    path: k8s/backend
+    repoURL: https://github.com/matoanbach/lockedin-backend.git
+    targetRevision: main
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: lockedin
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
