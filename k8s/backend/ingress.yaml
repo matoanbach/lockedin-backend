@@ -6,10 +6,9 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: lockedin.local
-      http:
+    - http:
         paths:
-          - path: /
+          - path: /lockedin
             pathType: Prefix
             backend:
               service:
