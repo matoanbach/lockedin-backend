@@ -9,7 +9,7 @@ spec:
     - host: lockedin.local
       http:
         paths:
-          - path: /lockedin
+          - path: /
             pathType: Prefix
             backend:
               service:
