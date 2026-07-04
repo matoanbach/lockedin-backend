@@ -3,7 +3,7 @@ pipeline {
     environment {
         GITHUB_TOKEN=credentials('github-token')
         IMAGE_NAME='matoanbach/lockedin-backend'
-        IMAGE_VERSION='9.2-205'
+        IMAGE_VERSION='latest'
     }
 
     stages {
