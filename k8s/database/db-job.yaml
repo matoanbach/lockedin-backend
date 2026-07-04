@@ -1,0 +1,33 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: postgres-initdb
+  namespace: lockedin
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: psql
+          image: postgres:16
+          envFrom:
+            - secretRef:
+                name: db-secret
+          
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              export PGPASSWORD="$POSTGRES_PASSWORD"
+              psql -h postgres -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /initdb/00-extensions.sql
+              psql -h postgres -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /initdb/10-schema.sql
+              psql -h postgres -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /initdb/20-seed.sql
+          volumeMounts:
+            - name: initdb
+              mountPath: /initdb
+              readOnly: true
+      volumes:
+        - name: initdb
+          configMap:
+            name: postgres-init-data
