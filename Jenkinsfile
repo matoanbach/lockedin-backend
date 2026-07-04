@@ -10,7 +10,14 @@ pipeline {
         stage("Build the image") {
             steps {
                 echo "Build the image ..."
-                sh 'docker build -t $IMAGE_NAME:$IMAGE_VERSION ./backend'
+                sh '''
+			docker build \
+			--label org.opencontainers.image.source=https://github.com/matoanbach/lockedin-backend \
+			--label org.opencontainers.image.revision=$GIT_COMMIT \
+			--label org.opencontainers.image.version=$IMAGE_VERSION \
+			--label org.opencontainers.image.created=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+			-t $IMAGE_NAME:$IMAGE_VERSION ./backend
+		'''
             }
         }
         stage("Login to GHCR") {
