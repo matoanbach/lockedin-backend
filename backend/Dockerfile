@@ -16,7 +16,7 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 FROM python:3.12-slim
 
-LABEL org.opencontainers.image.source https://github.com/matoanbach/lockedin-backend
+LABEL org.opencontainers.image.source=https://github.com/matoanbach/lockedin-backend
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
