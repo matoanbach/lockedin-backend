@@ -1,0 +1,18 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: lockedin-backend-ingress
+  namespace: lockedin
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: lockedin.local
+      http:
+        paths:
+          - path: /lockedin
+            pathType: Prefix
+            backend:
+              service:
+                name: lockedin-backend
+                port:
+                  number: 8000

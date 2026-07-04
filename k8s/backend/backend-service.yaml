@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: lockedin-backend
+  namespace: lockedin
+spec:
+  type: ClusterIP
+  selector:
+    app: lockedin-backend
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000

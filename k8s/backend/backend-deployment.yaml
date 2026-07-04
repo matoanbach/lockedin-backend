@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lockedin-backend
+  namespace: lockedin
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lockedin-backend
+  template:
+    metadata:
+      labels:
+        app: lockedin-backend
+    spec:
+      imagePullSecrets:
+        - name: ghcr-secret
+      containers:
+        - name: lockedin-backend
+          image: ghcr.io/matoanbach/lockedin-backend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - secretRef:
+                name: db-secret
+
+---
+#kubectl create secret docker-registry ghcr-secret \
+#  --namespace lockedin \
+#  --docker-server=ghcr.io \
+#  --docker-username=YOUR_GITHUB_USERNAME \
+#  --docker-password=YOUR_GITHUB_PAT \
+#  --docker-email=YOUR_EMAIL
