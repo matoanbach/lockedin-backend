@@ -1,12 +1,29 @@
 from datetime import date
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from lockedin_backend.models import UsageDailyAppAggregate
 
 
 class UsageDailyAppAggregateRepository:
+    def delete_for_profile(self, db: Session, profile_id: str) -> None:
+        db.execute(
+            delete(UsageDailyAppAggregate).where(
+                UsageDailyAppAggregate.profile_id == profile_id
+            )
+        )
+
+    def count_for_profile(self, db: Session, profile_id: str) -> int:
+        return int(
+            db.scalar(
+                select(func.count()).select_from(UsageDailyAppAggregate).where(
+                    UsageDailyAppAggregate.profile_id == profile_id
+                )
+            )
+            or 0
+        )
+
     def get_by_keys(
         self, db: Session, profile_id: str, usage_date: date, app_id: str
     ) -> UsageDailyAppAggregate | None:

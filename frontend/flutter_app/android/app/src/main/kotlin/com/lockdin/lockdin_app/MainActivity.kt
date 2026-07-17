@@ -79,7 +79,7 @@ class MainActivity : FlutterActivity() {
                 "consumePendingLaunchNavigation" -> {
                     result.success(consumePendingLaunchNavigation())
                 }
-                "collectUsageEvents" -> {
+                "collectUsageEventBatch" -> {
                     if (!hasUsageAccess()) {
                         result.error(
                             "usage_access_denied",
@@ -89,8 +89,20 @@ class MainActivity : FlutterActivity() {
                         return@setMethodCallHandler
                     }
 
-                    val days = call.argument<Int>("days") ?: DEFAULT_SYNC_DAYS
-                    result.success(collectUsageEvents(days))
+                    val queryStartMillis = call.argument<Number>("queryStartMillis")?.toLong()
+                        ?: (System.currentTimeMillis() - MAX_QUERY_WINDOW_MILLIS)
+                    val queryEndMillis = call.argument<Number>("queryEndMillis")?.toLong()
+                        ?: System.currentTimeMillis()
+                    val afterEndedAtMillis = call.argument<Number>("afterEndedAtMillis")?.toLong()
+                    val afterSourceEventId = call.argument<String>("afterSourceEventId")
+                    result.success(
+                        collectUsageEventBatch(
+                            requestedStartMillis = queryStartMillis,
+                            requestedEndMillis = queryEndMillis,
+                            afterEndedAtMillis = afterEndedAtMillis,
+                            afterSourceEventId = afterSourceEventId,
+                        ),
+                    )
                 }
                 else -> result.notImplemented()
             }
@@ -153,96 +165,85 @@ class MainActivity : FlutterActivity() {
         return mapOf("route" to route)
     }
 
-    private fun collectUsageEvents(days: Int): List<Map<String, Any?>> {
+    private fun collectUsageEventBatch(
+        requestedStartMillis: Long,
+        requestedEndMillis: Long,
+        afterEndedAtMillis: Long?,
+        afterSourceEventId: String?,
+    ): Map<String, Any?> {
         val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-        val endTimeMillis = System.currentTimeMillis()
-        val startTimeMillis = endTimeMillis - days.coerceAtLeast(1) * MILLIS_PER_DAY
-        val events = usageStatsManager.queryEvents(startTimeMillis, endTimeMillis)
+        val nowMillis = System.currentTimeMillis()
+        val endTimeMillis = requestedEndMillis.coerceIn(0L, nowMillis)
+        val startTimeMillis = requestedStartMillis.coerceAtLeast(
+            endTimeMillis - MAX_QUERY_WINDOW_MILLIS,
+        ).coerceAtMost(endTimeMillis)
+        val reconstructionStartMillis = (startTimeMillis - MAX_SESSION_MILLIS).coerceAtLeast(
+            endTimeMillis - MAX_QUERY_WINDOW_MILLIS,
+        )
+        val events = usageStatsManager.queryEvents(reconstructionStartMillis, endTimeMillis)
         val event = UsageEvents.Event()
-        val openSessions = mutableMapOf<String, Long>()
-        val usageSessions = mutableListOf<Map<String, Any?>>()
+        val timelineEvents = mutableListOf<UsageTimelineEvent>()
         val timeZoneId = ZoneId.systemDefault().id
 
         while (events.hasNextEvent()) {
             events.getNextEvent(event)
-            val packageName = event.packageName ?: continue
-            if (!shouldTrackPackage(packageName)) {
-                continue
-            }
-
-            when (event.eventType) {
-                UsageEvents.Event.ACTIVITY_RESUMED,
-                UsageEvents.Event.MOVE_TO_FOREGROUND,
-                -> openSessions.putIfAbsent(packageName, event.timeStamp)
-
-                UsageEvents.Event.ACTIVITY_PAUSED,
-                UsageEvents.Event.MOVE_TO_BACKGROUND,
-                -> {
-                    val sessionStart = openSessions.remove(packageName) ?: continue
-                    if (event.timeStamp <= sessionStart) {
-                        continue
-                    }
-
-                    appendUsageSlices(
-                        usageSessions = usageSessions,
-                        packageName = packageName,
-                        startedAtMillis = sessionStart,
-                        endedAtMillis = event.timeStamp,
-                        timeZoneId = timeZoneId,
-                    )
-                }
-            }
-        }
-
-        for ((packageName, sessionStart) in openSessions) {
-            if (endTimeMillis <= sessionStart) {
-                continue
-            }
-
-            appendUsageSlices(
-                usageSessions = usageSessions,
-                packageName = packageName,
-                startedAtMillis = sessionStart,
-                endedAtMillis = endTimeMillis,
-                timeZoneId = timeZoneId,
+            timelineEvents += UsageTimelineEvent(
+                packageName = event.packageName,
+                className = event.className,
+                eventType = event.eventType,
+                timestampMillis = event.timeStamp,
             )
         }
 
-        return usageSessions.sortedBy { it["startedAt"] as String }
-    }
-
-    private fun appendUsageSlices(
-        usageSessions: MutableList<Map<String, Any?>>,
-        packageName: String,
-        startedAtMillis: Long,
-        endedAtMillis: Long,
-        timeZoneId: String,
-    ) {
-        if (endedAtMillis <= startedAtMillis) {
-            return
-        }
-
-        val metadata = resolveAppMetadata(packageName)
-        for ((segmentStart, segmentEnd) in subtractUploadedIntervals(packageName, startedAtMillis, endedAtMillis)) {
-            var sliceStart = segmentStart
-            while (sliceStart < segmentEnd) {
-                val sliceEnd = minOf(sliceStart + MILLIS_PER_MINUTE, segmentEnd)
-                usageSessions += mapOf(
-                    "sourceEventId" to "android:$packageName:$sliceStart:$sliceEnd",
-                    "appId" to packageName,
-                    "appName" to metadata.appName,
-                    "category" to metadata.category,
-                    "startedAt" to Instant.ofEpochMilli(sliceStart).toString(),
-                    "endedAt" to Instant.ofEpochMilli(sliceEnd).toString(),
-                    "timezone" to timeZoneId,
+        val reconstructed = UsageEventReconstructor(
+            excludedPackages = setOf(packageName),
+            maximumSessionMillis = MAX_SESSION_MILLIS,
+        ).reconstruct(timelineEvents)
+        val payloads = mutableListOf<UsageSessionPayload>()
+        for (session in reconstructed) {
+            val clippedStart = maxOf(session.startedAtMillis, startTimeMillis)
+            if (session.endedAtMillis <= clippedStart) {
+                continue
+            }
+            for ((segmentStart, segmentEnd) in subtractUploadedIntervals(
+                session.packageName,
+                clippedStart,
+                session.endedAtMillis,
+            )) {
+                val metadata = resolveAppMetadata(session.packageName)
+                payloads += UsageSessionPayload(
+                    sourceEventId = "android-usage:${session.packageName}:$segmentStart:$segmentEnd",
+                    packageName = session.packageName,
+                    appName = metadata.appName,
+                    category = metadata.category,
+                    startedAtMillis = segmentStart,
+                    endedAtMillis = segmentEnd,
+                    timezone = timeZoneId,
                 )
-                sliceStart = sliceEnd
             }
         }
-    }
 
-    private fun shouldTrackPackage(packageName: String): Boolean {
-        return packageName != this.packageName
+        val sortedPayloads = payloads.sortedWith(
+            compareBy<UsageSessionPayload> { it.endedAtMillis }.thenBy { it.sourceEventId },
+        )
+        val remaining = sortedPayloads.filter { payload ->
+            when {
+                afterEndedAtMillis == null -> true
+                payload.endedAtMillis > afterEndedAtMillis -> true
+                payload.endedAtMillis < afterEndedAtMillis -> false
+                else -> payload.sourceEventId > afterSourceEventId.orEmpty()
+            }
+        }
+        val page = remaining.take(MAX_SESSIONS_PER_BATCH)
+        val last = page.lastOrNull()
+        return mapOf(
+            "events" to page.map(UsageSessionPayload::toChannelMap),
+            "hasMore" to (remaining.size > page.size),
+            "nextEndedAtMillis" to last?.endedAtMillis,
+            "nextSourceEventId" to last?.sourceEventId,
+            "queryStartMillis" to startTimeMillis,
+            "queryEndMillis" to endTimeMillis,
+        )
     }
 
     private fun subtractUploadedIntervals(
@@ -335,10 +336,30 @@ class MainActivity : FlutterActivity() {
 
     companion object {
         private const val CHANNEL_NAME = "lockdin/usage"
-        private const val DEFAULT_SYNC_DAYS = 14
-        private const val MILLIS_PER_DAY = 24L * 60L * 60L * 1000L
-        private const val MILLIS_PER_MINUTE = 60L * 1000L
+        private const val MAX_QUERY_WINDOW_MILLIS = 3L * 24L * 60L * 60L * 1000L
+        private const val MAX_SESSION_MILLIS = 6L * 60L * 60L * 1000L
+        private const val MAX_SESSIONS_PER_BATCH = 100
     }
+}
+
+data class UsageSessionPayload(
+    val sourceEventId: String,
+    val packageName: String,
+    val appName: String,
+    val category: String?,
+    val startedAtMillis: Long,
+    val endedAtMillis: Long,
+    val timezone: String,
+) {
+    fun toChannelMap(): Map<String, Any?> = mapOf(
+        "sourceEventId" to sourceEventId,
+        "appId" to packageName,
+        "appName" to appName,
+        "category" to category,
+        "startedAt" to Instant.ofEpochMilli(startedAtMillis).toString(),
+        "endedAt" to Instant.ofEpochMilli(endedAtMillis).toString(),
+        "timezone" to timezone,
+    )
 }
 
 data class AppMetadata(
