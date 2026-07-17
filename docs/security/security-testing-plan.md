@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.2 (Review Candidate) |
+| Version | 0.3 (Review Candidate) |
 | Date | 2026-07-17 |
 | Status | Draft for team review |
-| System baseline | Git commit `15d1c57` |
+| System baseline | Git commit `cc9720b` |
 
 ## 1. Purpose
 
@@ -154,7 +154,15 @@ Risk score = Likelihood x Impact. Scores are prioritization aids, not probabilit
 
 Risk acceptance must identify the owner, rationale, compensating controls, expiry/review date, and residual risk. Remediation timelines are set by the team after considering exposure and release plans.
 
-## 6. Risk Register
+## 6. Threat Identification
+
+### 6.1 Identification of Potential Threats
+
+Potential threats are identified through repository and architecture review, data-flow analysis, abuse-case analysis, dependency and deployment review, mobile platform review, prior defects, and results from the testing techniques in Section 7. Threat identification covers external attackers, malicious or compromised users, abusive accountability relationships, lost or compromised devices, insiders, CI/CD compromise, vulnerable dependencies, configuration mistakes, and failures of operational response.
+
+A threat remains a hypothesis until testing produces evidence. A verified control gap is recorded separately in Section 4.2, while a confirmed exploitable weakness is documented as a finding under Section 10.
+
+### 6.2 Prioritized Risk Register
 
 Scores are provisional until the deployment facts in Section 4.3 are resolved.
 
@@ -183,9 +191,22 @@ Scores are provisional until the deployment facts in Section 4.3 are resolved.
 | H5 | Contact emails are harvested or reused for phishing. | 2 | 3 | 6 | Depends on API exposure and notification design; DATA-02, PRIV-04. |
 | H6 | A security event is not detected, contained, or communicated because response ownership and monitoring are undefined. | 4 | 4 | 16 | Verified documentation gap; OPS-01 through OPS-04. |
 
-## 7. Test Strategy and Tooling
+### 6.3 Risk-to-Testing-Focus Mapping
+
+The risk score determines testing order, while the mapped test IDs determine the concrete focus. A lower-scored risk may be tested earlier when it is inexpensive to verify, blocks another test, or is affected by a current change.
+
+| Risk level | Primary testing focus | Representative risks and tests |
+|---|---|---|
+| Critical (20-25) | Missing authentication, shared-profile isolation, credential exposure, and TLS on externally reachable paths. | T1-T4; AUTH-01 through AUTH-04, DATA-01, DEP-03, CICD-02, NET-01 through NET-04. |
+| High (12-19) | Resource exhaustion, production configuration, supply chain, CI/CD, workload isolation, privileged Android behavior, privacy/abuse, and incident readiness. | T7-T12, M4, H1-H3, H6; AVAIL, CONF, SUP, CICD, DEP, MOB-PLAT, PRIV, and OPS test groups. |
+| Medium (6-11) | Injection regression, device storage/network preconditions, reverse engineering, bypass behavior, and phishing/data leakage. | T5, M1-M3, H4-H5; INP, MOB-STOR, MOB-NET, MOB-RES, DATA-02, and PRIV-04. |
+| Low (1-5) | Defense-in-depth and regression cases with limited current exposure, including browser output encoding where no HTML sink exists. | T6; INP-05 and relevant configuration review. |
+
+## 7. Testing Techniques and Tools
 
 Tools support testing; their output is not automatically a confirmed finding. Tool versions and rulesets must be pinned or recorded so results are reproducible.
+
+### 7.1 Tools
 
 | Technique/tool | Purpose | Decision rationale | Execution |
 |---|---|---|---|
@@ -199,6 +220,26 @@ Tools support testing; their output is not automatically a confirmed finding. To
 | SQLMap | Targeted confirmation of suspected SQL injection only. | Broad automated exploitation is noisy and can damage data; ORM review and harmless manual probes come first. | Isolated staging only with explicit approval. |
 | Flutter/Dart analysis and tests | Detect client regressions and validate release behavior. | Mobile controls cannot be inferred solely from backend tests. | Every pull request. |
 | Manual Android testing | Inspect manifests, storage, backups, logs, traffic, permissions, and tampering. | MASVS platform and privacy behavior requires a real/emulated device and runtime evidence. | Before release and after platform-sensitive changes. |
+
+### 7.2 Testing Techniques
+
+#### Static Application Security Testing (SAST)
+
+SAST examines source and configuration without running the deployed system. Bandit and focused code review cover Python security patterns; Trivy covers IaC/container configuration; Gitleaks covers repository secrets; and `pip-audit` covers known Python dependency vulnerabilities. Findings must be reviewed in context because static tools can produce false positives and cannot prove exploitability by themselves.
+
+#### Dynamic Application Security Testing (DAST)
+
+DAST exercises a running build in an authorized staging environment. OWASP ZAP provides repeatable API and header scanning from the deployed OpenAPI inventory. Burp Suite supports manual request interception, authorization manipulation, and business-logic testing. SQLMap is reserved for targeted confirmation after a plausible SQL injection sink is identified. DAST must follow the environment, data, rate, and stop conditions in Section 2.
+
+#### Manual Code Reviews
+
+Manual review examines authentication and authorization boundaries, profile ownership, repository query construction, schema validation, error handling, logging, Android permissions and exported components, local storage, accessibility behavior, Kubernetes manifests, and CI/CD permissions. Reviewers must record the files and commit examined, assumptions, evidence, and follow-up tests. At least one reviewer other than the author should review security-sensitive changes.
+
+#### Input Validation Checks
+
+Input validation testing combines schema/unit tests, direct API requests, client-side behavior, boundary analysis, and targeted fuzzing. The server is the authoritative enforcement point; client validation improves usability but must never be the only control. Checks cover types, lengths, ranges, encodings, Unicode, null/empty values, collection sizes, timestamps, time zones, identifiers, replay, duplicate and overlapping events, unexpected fields, and malformed bodies.
+
+### 7.3 Execution Order
 
 Recommended CI order:
 
@@ -214,7 +255,9 @@ Do not install unpinned `latest` scanner versions inside each pipeline run. Pin 
 
 ## 8. Test Cases
 
-### 8.1 Authentication and authorization
+### 8.1 Authentication and Authorization Testing
+
+#### Weak or Missing Authentication Mechanisms
 
 Authentication tests marked **design-gated** become runnable only after SEC-DEC-002 has an approved identity/tenancy ADR.
 
@@ -226,11 +269,32 @@ Authentication tests marked **design-gated** become runnable only after SEC-DEC-
 | AUTH-04 | Modify object/profile identifiers in paths, bodies, and query parameters. | Server derives or verifies ownership rather than trusting the client. | Design-gated. |
 | AUTH-05 | Exercise login, recovery, refresh, logout, and credential-revocation abuse cases. | Rate controls, session invalidation, audit events, and non-enumerating responses match the approved design. | Design-gated. |
 
+#### Password Entropy
+
 If passwords are selected, follow the approved identity assurance target. At minimum, test adequate length, acceptance of password-manager/passphrase input, compromised/common-password blocking, secure password hashing, safe recovery, and rate limiting. Do not require arbitrary mixtures of uppercase, lowercase, numbers, and symbols merely as a complexity rule; see [NIST SP 800-63B](https://pages.nist.gov/800-63-4/sp800-63b.html).
 
-### 8.2 Input validation and injection
+Password testing must verify the approved minimum and maximum lengths, full-password processing without silent truncation, support for spaces and permitted Unicode, rejection of common or compromised values, resistance to online guessing through throttling, and secure storage using an approved password-hashing scheme. Entropy is assessed through length and resistance to known guessing strategies rather than a simplistic count of character classes.
+
+#### Access Privileges
+
+Access-privilege testing uses at least two synthetic users plus each supported role. For every read, create, update, delete, analytics, rebuild, and administrative operation, the tester verifies both horizontal access (another user's object) and vertical access (a higher-privilege operation). Ownership must be enforced in service/repository queries and supported by database constraints where practical; hiding controls in the client is not authorization. Results are recorded as an access-control matrix linked to AUTH-03 and AUTH-04.
+
+### 8.2 Input Validation and Injection Testing
 
 Build the endpoint inventory from the baseline OpenAPI document rather than using invented parameters.
+
+Validation must be tested independently at both boundaries:
+
+- **Client side:** verify the Flutter UI provides consistent constraints and safe error handling, while assuming the client can be bypassed or modified.
+- **Server side:** send the same valid, boundary, and malicious values directly to the API and verify authoritative rejection or safe processing with no partial write.
+
+| Attack class | Test approach | Pass condition |
+|---|---|---|
+| SQL injection | Submit SQL metacharacters and boolean/union/time-delay patterns only to real fields and parameters; review ORM/repository construction; use SQLMap only for a justified suspected sink. | Input is stored as data or rejected normally; query scope does not change; no SQL error or timing signal is exposed. |
+| Cross-site scripting (XSS) | Store and reflect HTML, script, event-handler, and encoded payloads through every current client/response type. | JSON remains correctly typed and no consuming client executes attacker-controlled content. |
+| Command injection | Review and probe values that could reach process execution, shell commands, platform channels, file paths, or build/deployment scripts. | No user-controlled value reaches a command interpreter; any necessary process call uses a fixed executable and separated arguments. |
+| Data manipulation | Alter identifiers, timestamps, time zones, counters, cursors, duplicate IDs, ordering, overlaps, and server-owned fields. | Server-side ownership, invariants, idempotency, and transaction boundaries prevent unauthorized or inconsistent state. |
+| Other input attacks | Test path traversal, malformed JSON, oversized/nested collections, unexpected fields, Unicode/control characters, and deserialization or template sinks where present. | Request fails safely within resource limits and does not disclose internals or access unintended resources. |
 
 | ID | Test | Expected result |
 |---|---|---|
@@ -240,6 +304,8 @@ Build the endpoint inventory from the baseline OpenAPI document rather than usin
 | INP-04 | Test maximum allowed events and modeled payload, then one unit above each limit. | Boundary accepted; over-limit rejected without resource exhaustion or partial write. |
 | INP-05 | Put HTML/script-like text into stored string fields and inspect all current clients/response content types. | JSON remains JSON and no client executes the content. |
 | INP-06 | Verify there are no unreviewed raw SQL, shell, file-path, template, or deserialization sinks. | No unsafe sink; any new sink has targeted tests. |
+| INP-07 | Submit the same boundary and malicious values through the Flutter client and directly to the API. | Client behavior is consistent, and bypassing client validation does not bypass server validation. |
+| INP-08 | Manipulate object IDs, upload cursors, timestamps, ordering, and server-owned fields during create/update/replay flows. | Unauthorized fields are ignored or rejected and stored state remains internally consistent. |
 
 ### 8.3 Availability and request controls
 
@@ -250,7 +316,16 @@ Build the endpoint inventory from the baseline OpenAPI document rather than usin
 | AVAIL-03 | Repeat aggregate rebuild and expensive analytics operations concurrently. | Protected by authorization and operation-specific limits; database remains responsive. |
 | AVAIL-04 | Exhaust worker timeouts/connections in isolated load testing. | Service degrades predictably, recovers, and produces actionable telemetry. |
 
-### 8.4 Configuration, network, and data protection
+### 8.4 Data Security and Privacy Checks
+
+This section covers secure transmission, encryption at rest and in transit, and leakage of sensitive information. Configuration cases remain here because debug behavior, CORS, documentation exposure, proxies, storage, and logging directly affect data protection.
+
+| Required area | Verification focus | Mapped tests |
+|---|---|---|
+| Secure transmission | HTTPS enforcement, certificate identity and validity, modern TLS configuration, HSTS at the real termination point, proxy scheme handling, and no release cleartext downgrade. | NET-01 through NET-04; MOB-NET-01 through MOB-NET-03. |
+| Encryption in transit | Confirm sensitive API, database, administrative, and CI/CD traffic is encrypted across every network hop where required. | NET-02 through NET-04; MOB-NET-01 and MOB-NET-02. |
+| Encryption at rest | Verify database volumes, backups, Kubernetes secret storage, device backup behavior, key ownership/rotation, and whether field-level encryption is justified by classification and threat model. | DATA-03; DEP-03; MOB-STOR-01 through MOB-STOR-04. |
+| Data leakage | Inspect API errors, debug/docs exposure, logs, analytics, notifications, backups, CI artifacts, APK contents, and cross-user queries for credentials, contact data, usage history, and identifiers. | CONF-01 through CONF-03; DATA-01 through DATA-05; MOB-NET-02; MOB-RES-01; PRIV-04 through PRIV-06. |
 
 | ID | Test | Expected result |
 |---|---|---|
@@ -350,9 +425,22 @@ Build the endpoint inventory from the baseline OpenAPI document rather than usin
 - High findings have an owner and approved treatment before release.
 - The exact image digest tested is the image selected for deployment.
 
-## 10. Finding, Retest, and Risk-Acceptance Workflow
+## 10. Reporting and Risk Mitigation Plan
 
 Do not label scanner output as a vulnerability until it is reproduced or otherwise validated.
+
+### 10.1 Vulnerability Documentation and Severity Ratings
+
+Every candidate finding is triaged against the tested build and recorded with reproducible evidence. Severity uses the project likelihood-impact method from Section 5. CVSS may be included separately for a confirmed technical vulnerability, with its version and vector, but it does not replace the project risk assessment.
+
+| Severity | Project score | Reporting and treatment expectation |
+|---|---:|---|
+| Critical | 20-25 | Notify the accountable owner immediately; block production release unless fixed or explicitly accepted with documented compensating controls. |
+| High | 12-19 | Assign an owner and target release; document interim controls and retest before the approved release decision. |
+| Medium | 6-11 | Track with an owner, planned treatment, and retest criteria based on exposure and release priority. |
+| Low | 1-5 | Record when useful and address through normal hardening or documented acceptance. |
+
+The report must include the affected commit/build and component, preconditions, reproduction steps, expected and actual results, impact and affected data, evidence location and redactions, mapped risk/test/standard, proposed treatment, owner, target, retest procedure, and final disposition.
 
 ```markdown
 # [FINDING-ID] Title
@@ -381,6 +469,16 @@ Do not label scanner output as a vulnerability until it is reproduced or otherwi
 ## Residual risk or acceptance
 ```
 
+### 10.2 Proposed Fixes and Accepted Risks
+
+The proposed fix must address the root cause, identify the control it adds or changes, describe alternatives and trade-offs when material, and define an objective verification method. The team should prefer controls that are enforceable on the server or deployment boundary and should add regression tests where practical.
+
+A risk may be accepted only by the accountable owner. Acceptance must record the justification, affected assets and users, exposure, compensating controls, residual likelihood and impact, owner, approval date, expiry/review date, and conditions that invalidate the acceptance. Cost or schedule alone does not close a finding; it supports a time-bound risk decision.
+
+Other valid treatments are mitigation, avoidance, transfer, or removal of the affected functionality. The selected treatment and rejected alternatives must be linked from the finding.
+
+### 10.3 Re-testing and Issue Closure
+
 Retest workflow:
 
 1. Developer links the fix and identifies the exact staging build.
@@ -388,6 +486,16 @@ Retest workflow:
 3. Tester records actual evidence and confirms no partial bypass remains.
 4. Finding is closed, reopened, or moved to documented risk acceptance.
 5. Any temporary diagnostic control or test credential is removed.
+
+A finding can be closed only when:
+
+- The original reproduction case no longer succeeds on the identified candidate build.
+- Relevant regression and bypass cases pass.
+- The fix is reviewed and deployed to the intended environment or explicitly scheduled behind an approved release gate.
+- Evidence is attached or linked with sensitive values redacted.
+- Documentation, tests, monitoring, and runbooks affected by the fix are updated.
+- Residual risk is recorded and accepted when it is not eliminated.
+- The finding status, closure date, tester, and deployed commit/image digest are recorded.
 
 ## 11. Prioritized Security Work
 
