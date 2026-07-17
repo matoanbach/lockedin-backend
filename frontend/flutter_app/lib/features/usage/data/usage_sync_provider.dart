@@ -391,7 +391,8 @@ class UsageSyncRepository {
     final savedWatermark = savedWatermarkMillis == null
         ? null
         : DateTime.fromMillisecondsSinceEpoch(savedWatermarkMillis);
-    final queryStart = savedWatermark != null && savedWatermark.isAfter(earliestStart)
+    final queryStart =
+        savedWatermark != null && savedWatermark.isAfter(earliestStart)
         ? savedWatermark
         : earliestStart;
 
@@ -402,15 +403,13 @@ class UsageSyncRepository {
     var duplicateCount = 0;
 
     for (var batchNumber = 0; batchNumber < _maximumBatches; batchNumber++) {
-      final rawBatch = await _channel.invokeMapMethod<String, dynamic>(
-        'collectUsageEventBatch',
-        {
-          'queryStartMillis': queryStart.millisecondsSinceEpoch,
-          'queryEndMillis': queryEnd.millisecondsSinceEpoch,
-          'afterEndedAtMillis': afterEndedAtMillis,
-          'afterSourceEventId': afterSourceEventId,
-        },
-      );
+      final rawBatch = await _channel
+          .invokeMapMethod<String, dynamic>('collectUsageEventBatch', {
+            'queryStartMillis': queryStart.millisecondsSinceEpoch,
+            'queryEndMillis': queryEnd.millisecondsSinceEpoch,
+            'afterEndedAtMillis': afterEndedAtMillis,
+            'afterSourceEventId': afterSourceEventId,
+          });
       final batch = rawBatch ?? const <String, dynamic>{};
       final rawEvents = batch['events'];
       final events = rawEvents is List
@@ -444,7 +443,9 @@ class UsageSyncRepository {
       final nextEndedAtMillis = (batch['nextEndedAtMillis'] as num?)?.toInt();
       final nextSourceEventId = batch['nextSourceEventId'] as String?;
       if (nextEndedAtMillis == null || nextSourceEventId == null) {
-        throw StateError('Android usage sync returned an invalid batch cursor.');
+        throw StateError(
+          'Android usage sync returned an invalid batch cursor.',
+        );
       }
       afterEndedAtMillis = nextEndedAtMillis;
       afterSourceEventId = nextSourceEventId;

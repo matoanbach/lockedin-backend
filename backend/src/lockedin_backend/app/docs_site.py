@@ -16,7 +16,7 @@ def mount_docs_site(app: FastAPI) -> None:
 
     @app.get("/docs", include_in_schema=False)
     def docs_redirect() -> RedirectResponse:
-        return RedirectResponse(url="docs/")
+        return RedirectResponse(url="/docs/")
 
     if site_dir.exists() and site_dir.is_dir():
         app.mount("/docs", StaticFiles(directory=str(site_dir), html=True), name="docs")
