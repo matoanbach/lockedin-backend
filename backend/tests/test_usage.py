@@ -1,5 +1,7 @@
 from lockedin_backend.models import UsageDailyAppAggregate, UsageDailyCategoryAggregate, UsageEvent
 
+from datetime import datetime, timedelta, timezone
+
 
 def test_usage_ingestion_persists_events_and_aggregates(client, db_session) -> None:
     response = client.post(
@@ -119,3 +121,118 @@ def test_usage_ingestion_validation_errors(client) -> None:
     )
 
     assert response.status_code == 422
+
+
+def _event_payload(
+    source_event_id: str,
+    started_at: datetime,
+    ended_at: datetime,
+    *,
+    app_id: str = "com.google.android.youtube",
+) -> dict:
+    return {
+        "sourceEventId": source_event_id,
+        "appId": app_id,
+        "appName": "YouTube",
+        "category": "Entertainment",
+        "startedAt": started_at.isoformat(),
+        "endedAt": ended_at.isoformat(),
+        "timezone": "UTC",
+    }
+
+
+def test_usage_ingestion_rejects_overlong_future_and_stale_events(client) -> None:
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    invalid_events = [
+        _event_payload("overlong", now - timedelta(hours=7), now),
+        _event_payload(
+            "future",
+            now + timedelta(minutes=10),
+            now + timedelta(minutes=11),
+        ),
+        _event_payload(
+            "stale",
+            now - timedelta(days=91, minutes=1),
+            now - timedelta(days=91),
+        ),
+    ]
+
+    for event in invalid_events:
+        response = client.post("/api/v1/usage/events", json={"events": [event]})
+        assert response.status_code == 422
+
+
+def test_usage_ingestion_rejects_batches_over_one_hundred_events(client) -> None:
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    events = [
+        _event_payload(
+            f"event-{index}",
+            now - timedelta(minutes=202 - index * 2),
+            now - timedelta(minutes=201 - index * 2),
+        )
+        for index in range(101)
+    ]
+
+    response = client.post("/api/v1/usage/events", json={"events": events})
+
+    assert response.status_code == 422
+
+
+def test_usage_ingestion_rejects_overlapping_same_app_intervals(client) -> None:
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    response = client.post(
+        "/api/v1/usage/events",
+        json={
+            "events": [
+                _event_payload("overlap-1", now - timedelta(minutes=10), now - timedelta(minutes=5)),
+                _event_payload("overlap-2", now - timedelta(minutes=7), now - timedelta(minutes=2)),
+            ]
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_usage_ingestion_rejects_overlap_with_stored_event(client, db_session) -> None:
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    first = _event_payload("stored-1", now - timedelta(minutes=10), now - timedelta(minutes=5))
+    overlapping = _event_payload("stored-2", now - timedelta(minutes=7), now - timedelta(minutes=2))
+
+    assert client.post("/api/v1/usage/events", json={"events": [first]}).status_code == 200
+    response = client.post("/api/v1/usage/events", json={"events": [overlapping]})
+
+    assert response.status_code == 409
+    assert db_session.query(UsageEvent).count() == 1
+
+
+def test_partial_events_round_once_after_exact_seconds_are_summed(client, db_session) -> None:
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    response = client.post(
+        "/api/v1/usage/events",
+        json={
+            "events": [
+                _event_payload("partial-1", now - timedelta(seconds=30), now - timedelta(seconds=20)),
+                _event_payload("partial-2", now - timedelta(seconds=20), now),
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    assert db_session.query(UsageDailyAppAggregate).one().total_minutes == 1
+    assert db_session.query(UsageDailyCategoryAggregate).one().total_minutes == 1
+
+
+def test_rebuild_repairs_derived_aggregates_without_deleting_raw_events(client, db_session) -> None:
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    event = _event_payload("repair-1", now - timedelta(minutes=30), now)
+    assert client.post("/api/v1/usage/events", json={"events": [event]}).status_code == 200
+    aggregate = db_session.query(UsageDailyAppAggregate).one()
+    aggregate.total_minutes = 999
+    db_session.commit()
+
+    response = client.post("/api/v1/usage/aggregates/rebuild")
+
+    assert response.status_code == 200
+    assert response.json()["eventCount"] == 1
+    assert db_session.query(UsageEvent).count() == 1
+    assert db_session.query(UsageDailyAppAggregate).one().total_minutes == 30

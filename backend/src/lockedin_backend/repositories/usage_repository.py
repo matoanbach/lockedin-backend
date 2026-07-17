@@ -72,3 +72,31 @@ class UsageRepository:
             .order_by(UsageEvent.started_at.desc())
             .limit(1)
         ).scalar_one_or_none()
+
+    def list_all_for_profile(self, db: Session, profile_id: str) -> list[UsageEvent]:
+        return list(
+            db.execute(
+                select(UsageEvent)
+                .where(UsageEvent.profile_id == profile_id)
+                .order_by(UsageEvent.started_at.asc())
+            ).scalars()
+        )
+
+    def list_overlapping_for_app(
+        self,
+        db: Session,
+        profile_id: str,
+        app_id: str,
+        started_at: datetime,
+        ended_at: datetime,
+    ) -> list[UsageEvent]:
+        return list(
+            db.execute(
+                select(UsageEvent).where(
+                    UsageEvent.profile_id == profile_id,
+                    UsageEvent.app_id == app_id,
+                    UsageEvent.started_at < ended_at,
+                    UsageEvent.ended_at > started_at,
+                )
+            ).scalars()
+        )

@@ -43,6 +43,30 @@ def split_minutes_by_local_date(
     )
 
 
+def split_seconds_by_local_date(
+    started_at: datetime, ended_at: datetime, timezone_name: str
+) -> list[tuple[date, float]]:
+    started_local = ensure_utc(started_at).astimezone(ZoneInfo(timezone_name))
+    ended_local = ensure_utc(ended_at).astimezone(ZoneInfo(timezone_name))
+    segments: list[tuple[date, float]] = []
+    cursor = started_local
+    while cursor < ended_local:
+        boundary = datetime.combine(
+            cursor.date() + timedelta(days=1),
+            time.min,
+            tzinfo=cursor.tzinfo,
+        )
+        segment_end = min(boundary, ended_local)
+        seconds = (
+            segment_end.astimezone(timezone.utc)
+            - cursor.astimezone(timezone.utc)
+        ).total_seconds()
+        if seconds > 0:
+            segments.append((cursor.date(), seconds))
+        cursor = segment_end
+    return segments
+
+
 def split_minutes_by_local_hour(
     started_at: datetime, ended_at: datetime, timezone_name: str
 ) -> list[tuple[int, int]]:
