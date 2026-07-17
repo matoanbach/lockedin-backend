@@ -82,6 +82,7 @@ File:
 Route:
 
 - `POST /api/v1/usage/events`
+- `POST /api/v1/usage/aggregates/rebuild`
 
 Purpose:
 
