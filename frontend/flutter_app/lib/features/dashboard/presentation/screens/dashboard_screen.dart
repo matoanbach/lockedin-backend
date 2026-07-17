@@ -121,7 +121,7 @@ class _UsageSyncPanel extends ConsumerWidget {
               return;
             }
 
-            final result = await syncController.syncRecentUsage(days: 14);
+            final result = await syncController.syncRecentUsage(days: 3);
             if (!context.mounted) {
               return;
             }
@@ -153,7 +153,7 @@ class _UsageSyncPanel extends ConsumerWidget {
           return PrimaryButton(
             onPressed: handlePrimaryAction,
             label: permissions.usageAccess
-                ? 'Sync Last 14 Days'
+                ? 'Sync Recent Usage'
                 : 'Grant Usage Access',
             icon: permissions.usageAccess ? Icons.sync : Icons.open_in_new,
             isLoading: isSyncing,
@@ -186,7 +186,7 @@ class _UsageSyncPanel extends ConsumerWidget {
               Spacing.verticalSm,
               Text(
                 permissions.usageAccess
-                    ? 'Usage Access is enabled. Sync the last 14 days of Android app sessions into the backend.'
+                    ? 'Usage Access is enabled. Sync up to three days of Android event history. Later syncs continue from the last successful watermark.'
                     : 'Grant Usage Access first so LockdIn can collect Android app sessions for analytics.',
                 style: AppTextStyles.bodySmall.copyWith(
                   color: AppColors.textTertiary,

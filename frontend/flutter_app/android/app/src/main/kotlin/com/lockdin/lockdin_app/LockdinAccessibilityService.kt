@@ -2,9 +2,15 @@ package com.lockdin.lockdin_app
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
+import android.app.KeyguardManager
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import java.time.Instant
@@ -30,6 +36,15 @@ class LockdinAccessibilityService : AccessibilityService() {
     private var activePackageStartedAtMillis: Long? = null
     private var activePackageUploadedUntilMillis: Long? = null
     private var isMonitoring = false
+    private var screenReceiverRegistered = false
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == Intent.ACTION_SCREEN_OFF) {
+                Log.d(tag, "Screen turned off; finalizing the active usage session")
+                finalizeActivePackageSession()
+            }
+        }
+    }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -38,7 +53,18 @@ class LockdinAccessibilityService : AccessibilityService() {
             eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or
                 AccessibilityEvent.TYPE_WINDOWS_CHANGED
             feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
+            flags = flags or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
             notificationTimeout = 100
+        }
+        if (!screenReceiverRegistered) {
+            val filter = IntentFilter(Intent.ACTION_SCREEN_OFF)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(screenReceiver, filter, RECEIVER_NOT_EXPORTED)
+            } else {
+                @Suppress("DEPRECATION")
+                registerReceiver(screenReceiver, filter)
+            }
+            screenReceiverRegistered = true
         }
     }
 
@@ -47,7 +73,12 @@ class LockdinAccessibilityService : AccessibilityService() {
             return
         }
 
-        val packageName = event.packageName?.toString()?.takeIf { it.isNotBlank() } ?: return
+        if (!isDeviceInteractiveAndUnlocked()) {
+            finalizeActivePackageSession()
+            return
+        }
+
+        val packageName = resolveActiveWindowPackage(event) ?: return
         Log.d(tag, "Foreground accessibility event for package=$packageName type=${event.eventType}")
         handleForegroundPackage(packageName)
     }
@@ -58,6 +89,10 @@ class LockdinAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         finalizeActivePackageSession()
+        if (screenReceiverRegistered) {
+            unregisterReceiver(screenReceiver)
+            screenReceiverRegistered = false
+        }
         super.onDestroy()
     }
 
@@ -92,6 +127,10 @@ class LockdinAccessibilityService : AccessibilityService() {
     }
 
     private fun evaluateActivePackage(forceUploadPartialSlice: Boolean = false): Boolean {
+        if (!isDeviceInteractiveAndUnlocked()) {
+            finalizeActivePackageSession()
+            return false
+        }
         val packageName = activePackageName ?: return false
         if (packageName == this.packageName) {
             return false
@@ -361,6 +400,28 @@ class LockdinAccessibilityService : AccessibilityService() {
     private fun isRelevantEvent(eventType: Int): Boolean {
         return eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
             eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED
+    }
+
+    private fun resolveActiveWindowPackage(event: AccessibilityEvent): String? {
+        val activeWindow = windows.firstOrNull { it.isActive && it.isFocused }
+            ?: windows.firstOrNull { it.isActive }
+        val activePackage = activeWindow?.root?.packageName?.toString()?.takeIf { it.isNotBlank() }
+        if (activePackage != null) {
+            return activePackage
+        }
+
+        // TYPE_WINDOW_STATE_CHANGED identifies the source window. TYPE_WINDOWS_CHANGED may be a
+        // bounds/layer/PiP change for a non-active window, so its package is not a safe fallback.
+        if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            return null
+        }
+        return event.packageName?.toString()?.takeIf { it.isNotBlank() }
+    }
+
+    private fun isDeviceInteractiveAndUnlocked(): Boolean {
+        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+        val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+        return powerManager.isInteractive && !keyguardManager.isKeyguardLocked
     }
 
     private fun resolveAppMetadata(packageName: String): AppMetadata {

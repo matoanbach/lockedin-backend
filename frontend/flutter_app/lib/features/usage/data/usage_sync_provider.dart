@@ -147,7 +147,7 @@ class UsageSyncController extends AsyncNotifier<UsageSyncResult?> {
   @override
   Future<UsageSyncResult?> build() async => null;
 
-  Future<UsageSyncResult> syncRecentUsage({int days = 14}) async {
+  Future<UsageSyncResult> syncRecentUsage({int days = 3}) async {
     if (_syncInFlight) {
       throw StateError('A usage sync is already in progress.');
     }
@@ -178,7 +178,7 @@ class UsageSyncController extends AsyncNotifier<UsageSyncResult?> {
   }
 
   Future<UsageSyncResult?> maybeAutoSync({
-    int days = 14,
+    int days = 3,
     Duration cooldown = const Duration(minutes: 1),
   }) async {
     if (_syncInFlight) {
@@ -362,36 +362,96 @@ class UsageSyncRepository {
       );
     }
 
-    final rawEvents =
-        await _channel.invokeListMethod<dynamic>('collectUsageEvents', {
-          'days': days,
-        }) ??
-        const <dynamic>[];
-    final events = rawEvents
-        .whereType<Map<dynamic, dynamic>>()
-        .map((item) => Map<String, dynamic>.from(item))
-        .toList();
+    if (permissions.accessibility) {
+      final rawSummary = await _channel.invokeMapMethod<String, dynamic>(
+        'flushPendingUsageUploads',
+      );
+      final summary = rawSummary ?? const <String, dynamic>{};
+      final uploadedCount = (summary['uploadedCount'] as num?)?.toInt() ?? 0;
+      final pendingCount = (summary['pendingCount'] as num?)?.toInt() ?? 0;
+      if (pendingCount > 0) {
+        throw StateError(
+          'Live usage uploads are still pending. Keep the backend online and try again.',
+        );
+      }
 
-    if (events.isEmpty) {
       return UsageSyncResult(
-        collectedCount: 0,
-        createdCount: 0,
+        collectedCount: uploadedCount,
+        createdCount: uploadedCount,
         duplicateCount: 0,
         syncedAt: DateTime.now(),
       );
     }
 
-    final response = await _dio.post(
-      '/api/v1/usage/events',
-      data: {'events': events},
-    );
-    final json = Map<String, dynamic>.from(response.data as Map);
+    final preferences = await SharedPreferences.getInstance();
+    final queryEnd = DateTime.now();
+    final requestedDays = days.clamp(1, _maximumQueryDays);
+    final earliestStart = queryEnd.subtract(Duration(days: requestedDays));
+    final savedWatermarkMillis = preferences.getInt(_lastSuccessfulSyncAtKey);
+    final savedWatermark = savedWatermarkMillis == null
+        ? null
+        : DateTime.fromMillisecondsSinceEpoch(savedWatermarkMillis);
+    final queryStart = savedWatermark != null && savedWatermark.isAfter(earliestStart)
+        ? savedWatermark
+        : earliestStart;
 
-    return UsageSyncResult(
-      collectedCount: (json['receivedCount'] as num?)?.toInt() ?? events.length,
-      createdCount: (json['createdCount'] as num?)?.toInt() ?? 0,
-      duplicateCount: (json['duplicateCount'] as num?)?.toInt() ?? 0,
-      syncedAt: DateTime.now(),
+    int? afterEndedAtMillis;
+    String? afterSourceEventId;
+    var collectedCount = 0;
+    var createdCount = 0;
+    var duplicateCount = 0;
+
+    for (var batchNumber = 0; batchNumber < _maximumBatches; batchNumber++) {
+      final rawBatch = await _channel.invokeMapMethod<String, dynamic>(
+        'collectUsageEventBatch',
+        {
+          'queryStartMillis': queryStart.millisecondsSinceEpoch,
+          'queryEndMillis': queryEnd.millisecondsSinceEpoch,
+          'afterEndedAtMillis': afterEndedAtMillis,
+          'afterSourceEventId': afterSourceEventId,
+        },
+      );
+      final batch = rawBatch ?? const <String, dynamic>{};
+      final rawEvents = batch['events'];
+      final events = rawEvents is List
+          ? rawEvents
+                .whereType<Map<dynamic, dynamic>>()
+                .map((item) => Map<String, dynamic>.from(item))
+                .toList()
+          : <Map<String, dynamic>>[];
+
+      if (events.isNotEmpty) {
+        final response = await _dio.post(
+          '/api/v1/usage/events',
+          data: {'events': events},
+        );
+        final json = Map<String, dynamic>.from(response.data as Map);
+        collectedCount +=
+            (json['receivedCount'] as num?)?.toInt() ?? events.length;
+        createdCount += (json['createdCount'] as num?)?.toInt() ?? 0;
+        duplicateCount += (json['duplicateCount'] as num?)?.toInt() ?? 0;
+      }
+
+      if (batch['hasMore'] != true) {
+        return UsageSyncResult(
+          collectedCount: collectedCount,
+          createdCount: createdCount,
+          duplicateCount: duplicateCount,
+          syncedAt: queryEnd,
+        );
+      }
+
+      final nextEndedAtMillis = (batch['nextEndedAtMillis'] as num?)?.toInt();
+      final nextSourceEventId = batch['nextSourceEventId'] as String?;
+      if (nextEndedAtMillis == null || nextSourceEventId == null) {
+        throw StateError('Android usage sync returned an invalid batch cursor.');
+      }
+      afterEndedAtMillis = nextEndedAtMillis;
+      afterSourceEventId = nextSourceEventId;
+    }
+
+    throw StateError(
+      'Android returned more than ${_maximumBatches * 100} sessions. No sync watermark was advanced.',
     );
   }
 
@@ -405,4 +465,7 @@ class UsageSyncRepository {
 
   bool get _isAndroid =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
+  static const int _maximumQueryDays = 3;
+  static const int _maximumBatches = 50;
 }
