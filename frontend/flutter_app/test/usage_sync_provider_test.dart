@@ -80,6 +80,12 @@ void main() {
     );
     final preferences = await SharedPreferences.getInstance();
     expect(preferences.getInt('usage_sync.last_successful_at'), isNotNull);
+    expect(
+      preferences.getInt('usage_sync.watermark_at'),
+      DateTime.parse(
+        usageEvent('expected-watermark')['endedAt']! as String,
+      ).millisecondsSinceEpoch,
+    );
   });
 
   test('uses only the live queue while accessibility is enabled', () async {
@@ -101,6 +107,84 @@ void main() {
     expect(result.createdCount, 2);
     expect(calledMethods, isNot(contains('collectUsageEventBatch')));
   });
+
+  test(
+    'keeps the session watermark when Android has not finalized an event',
+    () async {
+      final savedWatermark = DateTime.now().subtract(const Duration(hours: 2));
+      final delayedStart = savedWatermark.add(const Duration(seconds: 30));
+      final delayedEnd = savedWatermark.add(const Duration(minutes: 1));
+      SharedPreferences.setMockInitialValues({
+        'usage_sync.last_successful_at': savedWatermark.millisecondsSinceEpoch,
+        'usage_sync.watermark_at': savedWatermark.millisecondsSinceEpoch,
+      });
+      final queryStarts = <int>[];
+      var collectionCount = 0;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            if (call.method == 'getPermissionStatus') {
+              return permissionStatus(accessibility: false);
+            }
+            if (call.method == 'collectUsageEventBatch') {
+              final arguments = Map<String, dynamic>.from(
+                call.arguments as Map<dynamic, dynamic>,
+              );
+              queryStarts.add(arguments['queryStartMillis']! as int);
+              collectionCount += 1;
+              if (collectionCount == 1) {
+                return {'events': <Map<String, dynamic>>[], 'hasMore': false};
+              }
+              return {
+                'events': [
+                  usageEvent(
+                    'delayed-stop',
+                    startedAt: delayedStart,
+                    endedAt: delayedEnd,
+                  ),
+                ],
+                'hasMore': false,
+              };
+            }
+            fail('Unexpected native method ${call.method}');
+          });
+      final dio = Dio()
+        ..interceptors.add(
+          InterceptorsWrapper(
+            onRequest: (options, handler) => handler.resolve(
+              Response<Map<String, dynamic>>(
+                requestOptions: options,
+                statusCode: 200,
+                data: const {
+                  'receivedCount': 1,
+                  'createdCount': 1,
+                  'duplicateCount': 0,
+                },
+              ),
+            ),
+          ),
+        );
+
+      await UsageSyncRepository(dio).syncRecentUsage(days: 3);
+      var preferences = await SharedPreferences.getInstance();
+      expect(
+        preferences.getInt('usage_sync.watermark_at'),
+        savedWatermark.millisecondsSinceEpoch,
+      );
+
+      final recovered = await UsageSyncRepository(dio).syncRecentUsage(days: 3);
+      preferences = await SharedPreferences.getInstance();
+
+      expect(recovered.createdCount, 1);
+      expect(queryStarts, [
+        savedWatermark.millisecondsSinceEpoch,
+        savedWatermark.millisecondsSinceEpoch,
+      ]);
+      expect(
+        preferences.getInt('usage_sync.watermark_at'),
+        delayedEnd.millisecondsSinceEpoch,
+      );
+    },
+  );
 
   test('does not advance watermark when an upload fails', () async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -146,12 +230,16 @@ Map<String, dynamic> permissionStatus({required bool accessibility}) => {
   'notificationDiagnostics': <String, dynamic>{},
 };
 
-Map<String, dynamic> usageEvent(String sourceEventId) => {
+Map<String, dynamic> usageEvent(
+  String sourceEventId, {
+  DateTime? startedAt,
+  DateTime? endedAt,
+}) => {
   'sourceEventId': sourceEventId,
   'appId': 'com.google.android.youtube',
   'appName': 'YouTube',
   'category': 'Entertainment',
-  'startedAt': '2026-07-16T12:00:00Z',
-  'endedAt': '2026-07-16T12:01:00Z',
+  'startedAt': (startedAt ?? DateTime.utc(2026, 7, 16, 12)).toIso8601String(),
+  'endedAt': (endedAt ?? DateTime.utc(2026, 7, 16, 12, 1)).toIso8601String(),
   'timezone': 'UTC',
 };

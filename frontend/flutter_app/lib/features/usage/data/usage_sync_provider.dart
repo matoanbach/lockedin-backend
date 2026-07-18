@@ -82,12 +82,14 @@ class UsageSyncResult {
     required this.createdCount,
     required this.duplicateCount,
     required this.syncedAt,
+    this.usageWatermark,
   });
 
   final int collectedCount;
   final int createdCount;
   final int duplicateCount;
   final DateTime syncedAt;
+  final DateTime? usageWatermark;
 
   bool get hasNewEvents => createdCount > 0;
 }
@@ -317,7 +319,7 @@ class UsageSyncRepository {
 
   Future<UsageSyncResult> syncRecentUsage({int days = 14}) async {
     final result = await _performUsageSync(days: days);
-    await _storeLastSuccessfulSyncAt(result.syncedAt);
+    await _storeSuccessfulSync(result);
     return result;
   }
 
@@ -344,7 +346,7 @@ class UsageSyncRepository {
     }
 
     final result = await _performUsageSync(days: days);
-    await _storeLastSuccessfulSyncAt(result.syncedAt);
+    await _storeSuccessfulSync(result);
     return result;
   }
 
@@ -387,7 +389,9 @@ class UsageSyncRepository {
     final queryEnd = DateTime.now();
     final requestedDays = days.clamp(1, _maximumQueryDays);
     final earliestStart = queryEnd.subtract(Duration(days: requestedDays));
-    final savedWatermarkMillis = preferences.getInt(_lastSuccessfulSyncAtKey);
+    final savedWatermarkMillis =
+        preferences.getInt(_usageWatermarkAtKey) ??
+        preferences.getInt(_lastSuccessfulSyncAtKey);
     final savedWatermark = savedWatermarkMillis == null
         ? null
         : DateTime.fromMillisecondsSinceEpoch(savedWatermarkMillis);
@@ -401,6 +405,7 @@ class UsageSyncRepository {
     var collectedCount = 0;
     var createdCount = 0;
     var duplicateCount = 0;
+    var latestCompletedEndMillis = savedWatermarkMillis;
 
     for (var batchNumber = 0; batchNumber < _maximumBatches; batchNumber++) {
       final rawBatch = await _channel
@@ -429,6 +434,14 @@ class UsageSyncRepository {
             (json['receivedCount'] as num?)?.toInt() ?? events.length;
         createdCount += (json['createdCount'] as num?)?.toInt() ?? 0;
         duplicateCount += (json['duplicateCount'] as num?)?.toInt() ?? 0;
+        for (final event in events) {
+          final endedAt = DateTime.tryParse(event['endedAt'] as String? ?? '');
+          if (endedAt != null &&
+              (latestCompletedEndMillis == null ||
+                  endedAt.millisecondsSinceEpoch > latestCompletedEndMillis)) {
+            latestCompletedEndMillis = endedAt.millisecondsSinceEpoch;
+          }
+        }
       }
 
       if (batch['hasMore'] != true) {
@@ -437,6 +450,9 @@ class UsageSyncRepository {
           createdCount: createdCount,
           duplicateCount: duplicateCount,
           syncedAt: queryEnd,
+          usageWatermark: latestCompletedEndMillis == null
+              ? null
+              : DateTime.fromMillisecondsSinceEpoch(latestCompletedEndMillis),
         );
       }
 
@@ -456,12 +472,19 @@ class UsageSyncRepository {
     );
   }
 
-  Future<void> _storeLastSuccessfulSyncAt(DateTime syncedAt) async {
+  Future<void> _storeSuccessfulSync(UsageSyncResult result) async {
     final preferences = await SharedPreferences.getInstance();
     await preferences.setInt(
       _lastSuccessfulSyncAtKey,
-      syncedAt.millisecondsSinceEpoch,
+      result.syncedAt.millisecondsSinceEpoch,
     );
+    final usageWatermark = result.usageWatermark;
+    if (usageWatermark != null) {
+      await preferences.setInt(
+        _usageWatermarkAtKey,
+        usageWatermark.millisecondsSinceEpoch,
+      );
+    }
   }
 
   bool get _isAndroid =>
@@ -469,4 +492,5 @@ class UsageSyncRepository {
 
   static const int _maximumQueryDays = 3;
   static const int _maximumBatches = 50;
+  static const String _usageWatermarkAtKey = 'usage_sync.watermark_at';
 }
