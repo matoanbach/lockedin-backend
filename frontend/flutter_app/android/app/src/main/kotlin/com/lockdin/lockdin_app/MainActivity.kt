@@ -205,10 +205,14 @@ class MainActivity : FlutterActivity() {
             if (session.endedAtMillis <= clippedStart) {
                 continue
             }
-            for ((segmentStart, segmentEnd) in subtractUploadedIntervals(
-                session.packageName,
+            for ((segmentStart, segmentEnd) in subtractCoveredIntervals(
                 clippedStart,
                 session.endedAtMillis,
+                RuleEnforcementStore.uploadedIntervalsForWindow(
+                    context = this,
+                    startMillis = clippedStart,
+                    endMillis = session.endedAtMillis,
+                ),
             )) {
                 val metadata = resolveAppMetadata(session.packageName)
                 payloads += UsageSessionPayload(
@@ -244,42 +248,6 @@ class MainActivity : FlutterActivity() {
             "queryStartMillis" to startTimeMillis,
             "queryEndMillis" to endTimeMillis,
         )
-    }
-
-    private fun subtractUploadedIntervals(
-        packageName: String,
-        startedAtMillis: Long,
-        endedAtMillis: Long,
-    ): List<Pair<Long, Long>> {
-        val intervals = RuleEnforcementStore.uploadedIntervalsForPackage(
-            context = this,
-            appId = packageName,
-            startMillis = startedAtMillis,
-            endMillis = endedAtMillis,
-        ).sortedBy { it.startMillis }
-        if (intervals.isEmpty()) {
-            return listOf(startedAtMillis to endedAtMillis)
-        }
-
-        val remaining = mutableListOf<Pair<Long, Long>>()
-        var cursor = startedAtMillis
-        for (interval in intervals) {
-            val intervalStart = maxOf(startedAtMillis, interval.startMillis)
-            val intervalEnd = minOf(endedAtMillis, interval.endMillis)
-            if (intervalStart > cursor) {
-                remaining += cursor to intervalStart
-            }
-            cursor = maxOf(cursor, intervalEnd)
-            if (cursor >= endedAtMillis) {
-                break
-            }
-        }
-
-        if (cursor < endedAtMillis) {
-            remaining += cursor to endedAtMillis
-        }
-
-        return remaining.filter { (start, end) -> end > start }
     }
 
     private fun resolveAppMetadata(packageName: String): AppMetadata {

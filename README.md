@@ -206,9 +206,13 @@ Debug builds permit cleartext HTTP for local Wi-Fi development. Release builds d
 that exception and should connect to an HTTPS backend.
 
 Android keeps event-level usage history for only a few days. LockdIn therefore syncs at most the
-last three days on the first run and advances an incremental watermark after every completely
-successful sync. When the Accessibility service is enabled, its live upload queue is the only
-usage source; the UsageStats fallback is paused to prevent double counting.
+last three days on the first run. After a completely successful sync, its UsageStats watermark
+advances only to the latest completed session rather than the wall-clock query time. This lets a
+later `ACTIVITY_STOPPED` event complete a session that Android had not finalized during the prior
+sync without replaying already stored history. When the Accessibility service is enabled, its live
+upload queue is the only usage source; the UsageStats fallback is paused to prevent double counting.
+When UsageStats resumes, it subtracts live intervals from every package so cross-package window
+transitions cannot count the same wall-clock time twice.
 
 ### Repair or clear development usage data
 
