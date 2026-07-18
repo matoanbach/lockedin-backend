@@ -13,6 +13,39 @@ data class ReconstructedUsageSession(
     val endedAtMillis: Long,
 )
 
+data class UploadedUsageInterval(
+    val startMillis: Long,
+    val endMillis: Long,
+)
+
+fun subtractCoveredIntervals(
+    startedAtMillis: Long,
+    endedAtMillis: Long,
+    coveredIntervals: Iterable<UploadedUsageInterval>,
+): List<Pair<Long, Long>> {
+    val remaining = mutableListOf<Pair<Long, Long>>()
+    var cursor = startedAtMillis
+    for (interval in coveredIntervals.sortedBy { it.startMillis }) {
+        if (interval.endMillis <= startedAtMillis || interval.startMillis >= endedAtMillis) {
+            continue
+        }
+        val intervalStart = maxOf(startedAtMillis, interval.startMillis)
+        val intervalEnd = minOf(endedAtMillis, interval.endMillis)
+        if (intervalStart > cursor) {
+            remaining += cursor to intervalStart
+        }
+        cursor = maxOf(cursor, intervalEnd)
+        if (cursor >= endedAtMillis) {
+            break
+        }
+    }
+
+    if (cursor < endedAtMillis) {
+        remaining += cursor to endedAtMillis
+    }
+    return remaining.filter { (start, end) -> end > start }
+}
+
 /**
  * Reconstructs a single visible-app timeline from Android usage events.
  *

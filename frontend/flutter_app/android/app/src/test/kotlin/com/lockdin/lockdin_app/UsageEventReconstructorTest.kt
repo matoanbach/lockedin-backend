@@ -167,6 +167,24 @@ class UsageEventReconstructorTest {
         assertTrue(sessions.isEmpty())
     }
 
+    @Test
+    fun subtractsLiveIntervalsAcrossPackageBoundaries() {
+        val remaining = subtractCoveredIntervals(
+            startedAtMillis = 1_000,
+            endedAtMillis = 8_000,
+            coveredIntervals = listOf(
+                UploadedUsageInterval(4_000, 5_000),
+                UploadedUsageInterval(500, 2_000),
+                UploadedUsageInterval(4_500, 6_000),
+            ),
+        )
+
+        assertEquals(
+            listOf(2_000L to 4_000L, 6_000L to 8_000L),
+            remaining,
+        )
+    }
+
     private fun event(
         packageName: String,
         className: String,

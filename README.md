@@ -211,6 +211,8 @@ advances only to the latest completed session rather than the wall-clock query t
 later `ACTIVITY_STOPPED` event complete a session that Android had not finalized during the prior
 sync without replaying already stored history. When the Accessibility service is enabled, its live
 upload queue is the only usage source; the UsageStats fallback is paused to prevent double counting.
+When UsageStats resumes, it subtracts live intervals from every package so cross-package window
+transitions cannot count the same wall-clock time twice.
 
 ### Repair or clear development usage data
 

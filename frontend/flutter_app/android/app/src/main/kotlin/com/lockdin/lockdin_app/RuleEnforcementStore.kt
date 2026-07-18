@@ -40,11 +40,6 @@ data class PendingEnforcementEvent(
     val source: String,
 )
 
-data class UploadedUsageInterval(
-    val startMillis: Long,
-    val endMillis: Long,
-)
-
 object RuleEnforcementStore {
     private const val PREFS_NAME = "lockdin_enforcement"
     private const val KEY_RULE_STATUSES = "rule_statuses_json"
@@ -177,27 +172,29 @@ object RuleEnforcementStore {
         prefs(context).edit().putString(KEY_LIVE_UPLOADED_INTERVALS, root.toString()).apply()
     }
 
-    fun uploadedIntervalsForPackage(
+    fun uploadedIntervalsForWindow(
         context: Context,
-        appId: String,
         startMillis: Long,
         endMillis: Long,
     ): List<UploadedUsageInterval> {
-        val canonicalAppId = canonicalizeAppId(appId)
-        val intervals = loadUploadedIntervalsRoot(context).optJSONArray(canonicalAppId) ?: return emptyList()
+        val root = loadUploadedIntervalsRoot(context)
         val matches = mutableListOf<UploadedUsageInterval>()
+        val packageKeys = root.keys()
 
-        for (index in 0 until intervals.length()) {
-            val item = intervals.optJSONObject(index) ?: continue
-            val interval = UploadedUsageInterval(
-                startMillis = item.optLong("startMillis"),
-                endMillis = item.optLong("endMillis"),
-            )
-            if (interval.endMillis <= startMillis || interval.startMillis >= endMillis) {
-                continue
+        while (packageKeys.hasNext()) {
+            val intervals = root.optJSONArray(packageKeys.next()) ?: continue
+            for (index in 0 until intervals.length()) {
+                val item = intervals.optJSONObject(index) ?: continue
+                val interval = UploadedUsageInterval(
+                    startMillis = item.optLong("startMillis"),
+                    endMillis = item.optLong("endMillis"),
+                )
+                if (interval.endMillis <= startMillis || interval.startMillis >= endMillis) {
+                    continue
+                }
+
+                matches += interval
             }
-
-            matches += interval
         }
 
         return matches
