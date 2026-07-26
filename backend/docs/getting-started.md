@@ -129,7 +129,13 @@ cp backend/.env.example backend/.env
 
 ### Backend starts but data looks empty or wrong
 
-The backend assumes the database is already initialized. Recreate the database stack if needed:
+The backend assumes the database is already initialized. First inspect container health, logs,
+configured database URL, row counts, and seed/schema state. Do not reset the database as routine
+troubleshooting.
+
+The following reset is destructive and deletes the named PostgreSQL volume, including profiles,
+rules, preferences, contacts, raw usage, aggregates, and enforcement events. Run it only after
+showing the exact target and obtaining approval from the data owner:
 
 ```bash
 docker compose -f database/docker-compose.yml --env-file backend/.env down -v

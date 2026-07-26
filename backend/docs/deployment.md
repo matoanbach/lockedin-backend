@@ -22,9 +22,10 @@ File:
 
 Current behavior:
 
-- uses `python:3.12-slim`
+- uses a multi-stage `python:3.12-slim` build
+- builds the MkDocs site in the first stage
 - installs the backend package from `pyproject.toml`
-- copies `conf/` and `src/`
+- copies `conf/`, `src/`, and the built static documentation
 - starts Gunicorn with a Uvicorn worker
 
 Container command:
@@ -103,6 +104,29 @@ In practice that means:
 - backend-only Docker uses `DOCKER_DATABASE_URL`
 - full root compose uses the internal compose Postgres service URL
 
+## Kubernetes and Argo CD Templates
+
+The repository includes manifests under top-level `k8s/`, but they are deployment templates rather
+than a complete production release:
+
+- `k8s/database/db-secret.yaml` contains placeholder/empty secret values;
+- `k8s/ghcr/ghcr-secret.yaml` contains empty registry credentials;
+- the ingress has no production host or TLS configuration;
+- the Argo CD application syncs only `k8s/backend`;
+- database, namespace, secrets, initialization, ingress controller, DNS, and certificates must be
+  prepared separately.
+
+Do not apply these files unchanged to a real cluster and do not commit real credentials into the
+template files.
+
+Useful read-only checks after an operator has prepared a deployment:
+
+```bash
+kubectl -n lockedin get deployments,pods,services,ingresses,pvc,jobs
+kubectl -n lockedin rollout status deployment/lockedin-backend
+kubectl -n lockedin logs deployment/lockedin-backend
+```
+
 ## Current Production Gaps
 
 The backend is deployable locally in Docker, but not fully production-hardened yet.
@@ -116,9 +140,10 @@ Current gaps include:
 
 Also note:
 
-- `/docs/` only serves the built static docs site if `make build-docs` has been run
+- local source runs serve `/docs/` after `make build-docs`
+- the Docker image builds and embeds the static docs site automatically
 - `/api/docs` is still available separately for Swagger UI
-- the current Docker image does not build the docs site into the image automatically
+- OpenAPI, Swagger UI, and ReDoc exposure is not restricted in production mode
 
 Those gaps are tracked more fully in `PHASE5.md`.
 

@@ -16,6 +16,8 @@ Useful local URLs once the backend is running:
 
 - static docs site: `http://127.0.0.1:8000/docs/`
 - Swagger UI: `http://127.0.0.1:8000/api/docs`
+- ReDoc: `http://127.0.0.1:8000/api/redoc`
+- OpenAPI JSON: `http://127.0.0.1:8000/openapi.json`
 - health: `http://127.0.0.1:8000/api/v1/health`
 
 Important note:
@@ -84,6 +86,15 @@ Build the static docs site from `backend/` with:
 ```bash
 make build-docs
 ```
+
+Export a reviewable OpenAPI document for Postman or other API tools:
+
+```bash
+make export-openapi
+```
+
+Project-wide user, evaluator, testing, and thesis-defense guides are indexed in the repository file
+`docs/README.md`.
 
 ## Important Current Assumptions
 
