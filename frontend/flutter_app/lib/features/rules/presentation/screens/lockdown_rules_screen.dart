@@ -44,7 +44,7 @@ class _LockdownRulesScreenState extends ConsumerState<LockdownRulesScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _RuleFormSheet(
+      builder: (_) => RuleFormSheet(
         initialRule: initialRule,
         onSubmit: (value) async {
           if (initialRule == null) {
@@ -322,8 +322,8 @@ class _RulesLoadingState extends StatelessWidget {
   }
 }
 
-class _RuleFormValue {
-  const _RuleFormValue({
+class RuleFormValue {
+  const RuleFormValue({
     required this.appId,
     required this.appName,
     required this.limitMinutes,
@@ -336,22 +336,23 @@ class _RuleFormValue {
   final bool enabled;
 }
 
-class _RuleFormSheet extends StatefulWidget {
-  const _RuleFormSheet({
+class RuleFormSheet extends StatefulWidget {
+  const RuleFormSheet({
+    super.key,
     required this.onSubmit,
     this.initialRule,
     this.onDelete,
   });
 
   final LockdownRule? initialRule;
-  final Future<void> Function(_RuleFormValue value) onSubmit;
+  final Future<void> Function(RuleFormValue value) onSubmit;
   final Future<void> Function()? onDelete;
 
   @override
-  State<_RuleFormSheet> createState() => _RuleFormSheetState();
+  State<RuleFormSheet> createState() => _RuleFormSheetState();
 }
 
-class _RuleFormSheetState extends State<_RuleFormSheet> {
+class _RuleFormSheetState extends State<RuleFormSheet> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _appNameController;
   late final TextEditingController _appIdController;
@@ -361,6 +362,7 @@ class _RuleFormSheetState extends State<_RuleFormSheet> {
   bool _isDeleting = false;
   bool _showAdvancedAppId = false;
   String? _selectedKnownAppId;
+  String? _submissionError;
 
   bool get _isEditing => widget.initialRule != null;
 
@@ -464,11 +466,14 @@ class _RuleFormSheetState extends State<_RuleFormSheet> {
       return;
     }
 
-    setState(() => _isSubmitting = true);
+    setState(() {
+      _isSubmitting = true;
+      _submissionError = null;
+    });
 
     try {
       await widget.onSubmit(
-        _RuleFormValue(
+        RuleFormValue(
           appId: appId,
           appName: _appNameController.text.trim(),
           limitMinutes: limitMinutes,
@@ -486,12 +491,7 @@ class _RuleFormSheetState extends State<_RuleFormSheet> {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(describeApiError(error)),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      setState(() => _submissionError = describeApiError(error));
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
@@ -795,6 +795,40 @@ class _RuleFormSheetState extends State<_RuleFormSheet> {
                               setState(() => _enabled = value);
                             },
                           ),
+                          if (_submissionError != null) ...[
+                            Spacing.verticalLg,
+                            Semantics(
+                              liveRegion: true,
+                              child: Container(
+                                key: const ValueKey('rule-form-error'),
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: AppColors.errorLight,
+                                  borderRadius: Spacing.borderRadiusMd,
+                                  border: Border.all(color: AppColors.error),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Icon(
+                                      Icons.error_outline,
+                                      color: AppColors.error,
+                                    ),
+                                    Spacing.horizontalSm,
+                                    Expanded(
+                                      child: Text(
+                                        _submissionError!,
+                                        style: AppTextStyles.bodySmall.copyWith(
+                                          color: AppColors.textPrimary,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                           Spacing.verticalXxl,
                           PrimaryButton(
                             onPressed: _isSubmitting || _isDeleting
