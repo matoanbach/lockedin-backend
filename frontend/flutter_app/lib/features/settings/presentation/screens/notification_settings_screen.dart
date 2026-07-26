@@ -7,6 +7,7 @@ import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../../shared/models/models.dart';
 import '../../../../shared/widgets/widgets.dart';
+import '../../../enforcement/data/live_intervention_provider.dart';
 import '../../../preferences/data/preferences_provider.dart';
 
 /// Notification settings screen.
@@ -107,10 +108,15 @@ class _NotificationSettingsScreenState
                             setState(() => _isSaving = true);
 
                             try {
-                              await ref
+                              final updatedPreferences = await ref
                                   .read(preferencesControllerProvider.notifier)
                                   .updatePreferences(
                                     notificationTone: selectedTone,
+                                  );
+                              await ref
+                                  .read(liveEnforcementRepositoryProvider)
+                                  .cacheNotificationTone(
+                                    updatedPreferences.notificationTone.name,
                                   );
 
                               if (!mounted) {
