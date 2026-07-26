@@ -187,9 +187,9 @@ void main() {
           enabled: true,
           limitMinutes: 300,
           status: _status(
-            usedMinutes: 250,
+            usedMinutes: 230,
             limitMinutes: 300,
-            remainingMinutes: 50,
+            remainingMinutes: 70,
           ),
           reminderThresholdMinutes: 30,
           onToggle: () {},
@@ -198,9 +198,40 @@ void main() {
       ),
     );
 
-    expect(find.text('50 minutes left'), findsNothing);
+    expect(find.text('70 minutes left'), findsNothing);
     expect(find.text('Under Limit'), findsOneWidget);
   });
+
+  testWidgets(
+    'short rule stays under limit before backend approaching threshold',
+    (tester) async {
+      await tester.pumpWidget(
+        _TestHost(
+          child: AppLimitUsageCard(
+            appName: 'Messages',
+            icon: Icons.message,
+            color: AppColors.instagram,
+            enabled: true,
+            limitMinutes: 10,
+            status: _status(
+              appName: 'Messages',
+              appId: 'com.google.android.apps.messaging',
+              usedMinutes: 0,
+              limitMinutes: 10,
+              remainingMinutes: 10,
+            ),
+            reminderThresholdMinutes: 30,
+            onToggle: () {},
+            onEdit: () {},
+          ),
+        ),
+      );
+
+      expect(find.text('Under Limit'), findsOneWidget);
+      expect(find.text('Approaching'), findsNothing);
+      expect(find.text('10 minutes left'), findsNothing);
+    },
+  );
 
   test(
     'top reminder status is selected only for daily limits near threshold',
@@ -215,9 +246,9 @@ void main() {
         ),
         _status(
           appName: 'Instagram',
-          usedMinutes: 60,
+          usedMinutes: 75,
           limitMinutes: 90,
-          remainingMinutes: 30,
+          remainingMinutes: 15,
         ),
       ], 30);
 
@@ -228,17 +259,29 @@ void main() {
         ], 30),
         isNull,
       );
+      expect(
+        firstReminderStatusFor([
+          _status(
+            appName: 'Messages',
+            appId: 'com.google.android.apps.messaging',
+            usedMinutes: 0,
+            limitMinutes: 10,
+            remainingMinutes: 10,
+          ),
+        ], 30),
+        isNull,
+      );
     },
   );
 
-  testWidgets('top reminder banner displays app name and 30 minutes left', (
+  testWidgets('top reminder banner displays app name and remaining time', (
     tester,
   ) async {
     final status = _status(
       appName: 'Instagram',
-      usedMinutes: 60,
+      usedMinutes: 75,
       limitMinutes: 90,
-      remainingMinutes: 30,
+      remainingMinutes: 15,
     );
 
     await tester.pumpWidget(
@@ -248,11 +291,11 @@ void main() {
     );
 
     expect(
-      find.text('Reminder: You have 30 minutes left on Instagram.'),
+      find.text('Reminder: You have 15 minutes left on Instagram.'),
       findsOneWidget,
     );
     expect(reminderPopupText(status), contains('Instagram'));
-    expect(reminderPopupText(status), contains('30 minutes left'));
+    expect(reminderPopupText(status), contains('15 minutes left'));
   });
 }
 
@@ -287,7 +330,9 @@ RuleStatusData _status({
     usedMinutes: usedMinutes,
     remainingMinutes: remainingMinutes,
     progressPercent: ((usedMinutes / limitMinutes) * 100).round(),
-    status: remainingMinutes <= 30 ? 'approaching_limit' : 'under_limit',
+    status: usedMinutes * 5 >= limitMinutes * 4
+        ? 'approaching_limit'
+        : 'under_limit',
     isBlockedNow: false,
   );
 }

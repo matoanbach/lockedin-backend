@@ -36,11 +36,10 @@ class AppLimitUsageCard extends StatelessWidget {
     final showReminderWarning =
         enabled &&
         hasStatus &&
+        status!.status == 'approaching_limit' &&
         remainingMinutes > 0 &&
         remainingMinutes <= reminderThresholdMinutes;
-    final effectiveStatus = showReminderWarning
-        ? 'approaching_limit'
-        : status?.status;
+    final effectiveStatus = status?.status;
     final statusColor = statusColorFor(effectiveStatus, color);
     final statusLabel = statusLabelFor(effectiveStatus, enabled);
 
@@ -399,7 +398,9 @@ RuleStatusData? firstReminderStatusFor(
   int reminderThresholdMinutes,
 ) {
   for (final status in statuses) {
-    if (!status.enabled || status.remainingMinutes <= 0) {
+    if (!status.enabled ||
+        status.status != 'approaching_limit' ||
+        status.remainingMinutes <= 0) {
       continue;
     }
     if (status.remainingMinutes <= reminderThresholdMinutes) {

@@ -254,3 +254,63 @@ def test_rule_status_matches_legacy_youtube_rule_alias(client, monkeypatch) -> N
             "isBlockedNow": True,
         }
     ]
+
+
+def test_rule_status_does_not_round_small_limit_below_eighty_percent(
+    client, monkeypatch
+) -> None:
+    monkeypatch.setattr(
+        rule_status_service_module,
+        "current_utc_now",
+        lambda: rule_status_service_module.datetime(
+            2026, 6, 8, 12, 0, tzinfo=rule_status_service_module.timezone.utc
+        ),
+    )
+
+    rule = client.post(
+        "/api/v1/rules",
+        json={
+            "appId": "com.google.android.apps.messaging",
+            "appName": "Messages",
+            "limitMinutes": 3,
+            "enabled": True,
+        },
+    ).json()
+
+    ingestion_response = client.post(
+        "/api/v1/usage/events",
+        json={
+            "events": [
+                {
+                    "sourceEventId": "messages-two-of-three-minutes",
+                    "appId": "com.google.android.apps.messaging",
+                    "appName": "Messages",
+                    "category": "Social",
+                    "startedAt": "2026-06-08T12:00:00Z",
+                    "endedAt": "2026-06-08T12:02:00Z",
+                    "timezone": "UTC",
+                }
+            ]
+        },
+    )
+
+    assert ingestion_response.status_code == 200
+
+    response = client.get("/api/v1/rules/status")
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {
+            "ruleId": rule["id"],
+            "appId": "com.google.android.apps.messaging",
+            "appName": "Messages",
+            "usageDate": "2026-06-08",
+            "enabled": True,
+            "limitMinutes": 3,
+            "usedMinutes": 2,
+            "remainingMinutes": 1,
+            "progressPercent": 67,
+            "status": "under_limit",
+            "isBlockedNow": False,
+        }
+    ]

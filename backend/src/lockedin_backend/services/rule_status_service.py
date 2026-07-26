@@ -92,7 +92,7 @@ class RuleStatusService:
             return "over_limit"
         if used_minutes == limit_minutes:
             return "at_limit"
-        if used_minutes >= round(limit_minutes * 0.8):
+        if used_minutes * 5 >= limit_minutes * 4:
             return "approaching_limit"
         return "under_limit"
 
