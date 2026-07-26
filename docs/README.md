@@ -13,6 +13,7 @@ report disagrees with the current implementation.
 | Live evaluator | [Demo Walkthrough](DEMO_WALKTHROUGH.md) |
 | Thesis team | [Thesis Defense Guide](THESIS_DEFENSE_GUIDE.md) |
 | QA or reviewer | [Testing and Evidence](TESTING.md) |
+| Requirements reviewer | [Requirements Implementation Status](IMPLEMENTATION_STATUS.md) |
 | API consumer | [API Reference](../backend/docs/api.md) |
 | Security reviewer | [Security Testing Plan](security/security-testing-plan.md) |
 
