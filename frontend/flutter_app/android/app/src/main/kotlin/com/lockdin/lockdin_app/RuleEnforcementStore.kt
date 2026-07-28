@@ -54,6 +54,13 @@ object RuleEnforcementStore {
 
     fun cacheRuleStatuses(context: Context, rawStatuses: List<Map<String, Any?>>) {
         val statuses = rawStatuses.mapNotNull(::cachedRuleStatusFromMap)
+        val previousStatuses = loadRuleStatuses(context)
+        val localUsageMillis = reconcileLocalUsageMillis(
+            existing = loadLocalUsageMillis(context),
+            previousStatuses = previousStatuses,
+            refreshedStatuses = statuses,
+            usageDate = currentUsageDate(),
+        )
         val json = JSONArray()
 
         for (status in statuses) {
@@ -74,7 +81,7 @@ object RuleEnforcementStore {
         prefs(context)
             .edit()
             .putString(KEY_RULE_STATUSES, json.toString())
-            .putString(KEY_LOCAL_USAGE_MILLIS, JSONObject().toString())
+            .putString(KEY_LOCAL_USAGE_MILLIS, localUsageMillis.toString())
             .apply()
     }
 
@@ -96,7 +103,11 @@ object RuleEnforcementStore {
             localUsageKey(rule.appId, usageDate),
             0L,
         )
-        return baseMinutes + ((localMillis + currentSessionMillis) / MINUTE_MILLIS).toInt()
+        return LiveUsageAccounting.liveUsedMinutes(
+            baseMinutes = baseMinutes,
+            localMillis = localMillis,
+            currentSessionMillis = currentSessionMillis,
+        )
     }
 
     fun addLocalUsageMillis(context: Context, appId: String, usageDate: String, durationMillis: Long) {
@@ -386,6 +397,49 @@ object RuleEnforcementStore {
         }
     }
 
+    private fun reconcileLocalUsageMillis(
+        existing: JSONObject,
+        previousStatuses: List<CachedRuleStatus>,
+        refreshedStatuses: List<CachedRuleStatus>,
+        usageDate: String,
+    ): JSONObject {
+        val reconciled = JSONObject()
+        val keys = existing.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            val localUsageDate = key.substringBefore('|', missingDelimiterValue = "")
+            if (localUsageDate == usageDate) {
+                reconciled.put(key, existing.optLong(key, 0L).coerceAtLeast(0L))
+            }
+        }
+
+        for (refreshed in refreshedStatuses) {
+            val key = localUsageKey(refreshed.appId, usageDate)
+            if (!reconciled.has(key)) {
+                continue
+            }
+
+            val previous = previousStatuses.firstOrNull {
+                canonicalizeAppId(it.appId) == canonicalizeAppId(refreshed.appId)
+            }
+            val retainedMillis = LiveUsageAccounting.reconcileLocalUsageMillis(
+                localUsageDate = usageDate,
+                localUsageMillis = reconciled.optLong(key, 0L),
+                previousBackendUsageDate = previous?.usageDate,
+                previousBackendUsedMinutes = previous?.usedMinutes,
+                refreshedBackendUsageDate = refreshed.usageDate,
+                refreshedBackendUsedMinutes = refreshed.usedMinutes,
+                currentUsageDate = usageDate,
+            )
+            if (retainedMillis > 0L) {
+                reconciled.put(key, retainedMillis)
+            } else {
+                reconciled.remove(key)
+            }
+        }
+        return reconciled
+    }
+
     private fun loadUploadedIntervalsRoot(context: Context): JSONObject {
         val raw = prefs(context).getString(KEY_LIVE_UPLOADED_INTERVALS, null)
         return if (raw.isNullOrBlank()) {
@@ -445,5 +499,4 @@ object RuleEnforcementStore {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     private const val LIVE_INTERVAL_RETENTION_MILLIS = 14L * 24L * 60L * 60L * 1000L
-    private const val MINUTE_MILLIS = 60_000L
 }

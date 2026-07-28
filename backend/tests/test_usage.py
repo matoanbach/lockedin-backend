@@ -222,6 +222,29 @@ def test_partial_events_round_once_after_exact_seconds_are_summed(client, db_ses
     assert db_session.query(UsageDailyCategoryAggregate).one().total_minutes == 1
 
 
+def test_two_hundred_seconds_rounds_daily_aggregate_up_to_four_minutes(
+    client, db_session
+) -> None:
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    response = client.post(
+        "/api/v1/usage/events",
+        json={
+            "events": [
+                _event_payload(
+                    "two-hundred-seconds",
+                    now - timedelta(seconds=200),
+                    now,
+                )
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    assert db_session.query(UsageEvent).one().duration_minutes == 4
+    assert db_session.query(UsageDailyAppAggregate).one().total_minutes == 4
+    assert db_session.query(UsageDailyCategoryAggregate).one().total_minutes == 4
+
+
 def test_rebuild_repairs_derived_aggregates_without_deleting_raw_events(client, db_session) -> None:
     now = datetime.now(timezone.utc).replace(microsecond=0)
     event = _event_payload("repair-1", now - timedelta(minutes=30), now)

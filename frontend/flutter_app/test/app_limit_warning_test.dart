@@ -175,6 +175,43 @@ void main() {
     expect(find.text('Approaching'), findsOneWidget);
   });
 
+  testWidgets('warning label uses singular and plural minute copy', (
+    tester,
+  ) async {
+    for (final fixture in [
+      (limitMinutes: 5, usedMinutes: 4, remainingMinutes: 1),
+      (limitMinutes: 10, usedMinutes: 8, remainingMinutes: 2),
+    ]) {
+      await tester.pumpWidget(
+        _TestHost(
+          child: AppLimitUsageCard(
+            appName: 'Messages',
+            icon: Icons.message,
+            color: AppColors.instagram,
+            enabled: true,
+            limitMinutes: fixture.limitMinutes,
+            status: _status(
+              appName: 'Messages',
+              appId: 'com.google.android.apps.messaging',
+              usedMinutes: fixture.usedMinutes,
+              limitMinutes: fixture.limitMinutes,
+              remainingMinutes: fixture.remainingMinutes,
+            ),
+            reminderThresholdMinutes: 30,
+            onToggle: () {},
+            onEdit: () {},
+          ),
+        ),
+      );
+
+      final unit = fixture.remainingMinutes == 1 ? 'minute' : 'minutes';
+      expect(
+        find.text('${fixture.remainingMinutes} $unit left'),
+        findsOneWidget,
+      );
+    }
+  });
+
   testWidgets('warning label stays hidden when enough time remains', (
     tester,
   ) async {
@@ -296,6 +333,28 @@ void main() {
     );
     expect(reminderPopupText(status), contains('Instagram'));
     expect(reminderPopupText(status), contains('15 minutes left'));
+  });
+
+  testWidgets('top reminder banner uses singular minute copy', (tester) async {
+    final status = _status(
+      appName: 'Messages',
+      appId: 'com.google.android.apps.messaging',
+      usedMinutes: 4,
+      limitMinutes: 5,
+      remainingMinutes: 1,
+    );
+
+    await tester.pumpWidget(
+      _TestHost(
+        child: ReminderBanner(status: status, onShowPopup: () {}),
+      ),
+    );
+
+    expect(
+      find.text('Reminder: You have 1 minute left on Messages.'),
+      findsOneWidget,
+    );
+    expect(reminderPopupText(status), contains('1 minute left'));
   });
 }
 

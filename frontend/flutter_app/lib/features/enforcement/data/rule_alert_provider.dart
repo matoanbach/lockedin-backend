@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/formatters/minute_copy.dart';
 import '../../../core/notifications/local_notification_service.dart';
 import '../../../core/router/app_router.dart';
 import '../../../shared/models/models.dart';
@@ -71,7 +72,7 @@ class RuleAlertController extends Notifier<RuleAlert?> {
               ?.value
               .notificationTone ??
           NotificationTone.professional;
-      final alert = _buildAlert(status, tone);
+      final alert = buildRuleAlert(status, tone);
 
       try {
         await ref
@@ -147,59 +148,62 @@ class RuleAlertController extends Notifier<RuleAlert?> {
     return 'rule_alert.${status.ruleId}.${status.usageDate}.$eventType';
   }
 
-  RuleAlert _buildAlert(RuleStatusData status, NotificationTone tone) {
-    final message = _messageForTone(status, tone);
+}
 
-    return switch (status.status) {
-      'over_limit' => RuleAlert(
-        ruleId: status.ruleId,
-        appName: status.appName,
-        status: status.status,
-        title: '${status.appName} is over limit',
-        message: message,
-        isCritical: true,
-      ),
-      'at_limit' => RuleAlert(
-        ruleId: status.ruleId,
-        appName: status.appName,
-        status: status.status,
-        title: '${status.appName} reached its limit',
-        message: message,
-        isCritical: true,
-      ),
-      _ => RuleAlert(
-        ruleId: status.ruleId,
-        appName: status.appName,
-        status: status.status,
-        title: '${status.appName} is approaching its limit',
-        message: message,
-        isCritical: false,
-      ),
-    };
-  }
+RuleAlert buildRuleAlert(RuleStatusData status, NotificationTone tone) {
+  final message = ruleAlertMessageFor(status, tone);
 
-  String _messageForTone(RuleStatusData status, NotificationTone tone) {
-    return switch ((status.status, tone)) {
-      ('approaching_limit', NotificationTone.fun) =>
-        'Heads up: only ${status.remainingMinutes} minutes left before ${status.appName} hits today\'s limit.',
-      ('approaching_limit', NotificationTone.edgy) =>
-        '${status.remainingMinutes} minutes left. ${status.appName} is almost out of runway.',
-      ('approaching_limit', _) =>
-        '${status.remainingMinutes} minutes remain before you hit today\'s ${status.limitMinutes}-minute limit for ${status.appName}.',
-      ('at_limit', NotificationTone.fun) =>
-        'You just hit today\'s ${status.limitMinutes}-minute limit for ${status.appName}. Time to step out for a reset.',
-      ('at_limit', NotificationTone.edgy) =>
-        'Limit reached. Close ${status.appName} before it steals more of your day.',
-      ('at_limit', _) =>
-        'You have hit today\'s ${status.limitMinutes}-minute limit for ${status.appName}.',
-      ('over_limit', NotificationTone.fun) =>
-        'You\'re already at ${status.usedMinutes} minutes on ${status.appName}. Take the win by putting it down now.',
-      ('over_limit', NotificationTone.edgy) =>
-        '${status.appName} is already over the line at ${status.usedMinutes} minutes. Stop scrolling.',
-      _ =>
-        'You have used ${status.usedMinutes} minutes today against a ${status.limitMinutes}-minute rule for ${status.appName}.',
-    };
-  }
+  return switch (status.status) {
+    'over_limit' => RuleAlert(
+      ruleId: status.ruleId,
+      appName: status.appName,
+      status: status.status,
+      title: '${status.appName} is over limit',
+      message: message,
+      isCritical: true,
+    ),
+    'at_limit' => RuleAlert(
+      ruleId: status.ruleId,
+      appName: status.appName,
+      status: status.status,
+      title: '${status.appName} reached its limit',
+      message: message,
+      isCritical: true,
+    ),
+    _ => RuleAlert(
+      ruleId: status.ruleId,
+      appName: status.appName,
+      status: status.status,
+      title: '${status.appName} is approaching its limit',
+      message: message,
+      isCritical: false,
+    ),
+  };
+}
+
+String ruleAlertMessageFor(RuleStatusData status, NotificationTone tone) {
+  final remaining = formatMinuteCount(status.remainingMinutes);
+  final used = formatMinuteCount(status.usedMinutes);
+  return switch ((status.status, tone)) {
+    ('approaching_limit', NotificationTone.fun) =>
+      'Heads up: only $remaining left before ${status.appName} hits today\'s limit.',
+    ('approaching_limit', NotificationTone.edgy) =>
+      '$remaining left. ${status.appName} is almost out of runway.',
+    ('approaching_limit', _) =>
+      '${formatMinutesRemaining(status.remainingMinutes)} before you hit today\'s ${status.limitMinutes}-minute limit for ${status.appName}.',
+    ('at_limit', NotificationTone.fun) =>
+      'You just hit today\'s ${status.limitMinutes}-minute limit for ${status.appName}. Time to step out for a reset.',
+    ('at_limit', NotificationTone.edgy) =>
+      'Limit reached. Close ${status.appName} before it steals more of your day.',
+    ('at_limit', _) =>
+      'You have hit today\'s ${status.limitMinutes}-minute limit for ${status.appName}.',
+    ('over_limit', NotificationTone.fun) =>
+      'You\'re already at $used on ${status.appName}. Take the win by putting it down now.',
+    ('over_limit', NotificationTone.edgy) =>
+      '${status.appName} is already over the line at $used. Stop scrolling.',
+    _ =>
+      'You have used $used today against a ${status.limitMinutes}-minute rule for ${status.appName}.',
+  };
 }
 
 class EnforcementRepository {
