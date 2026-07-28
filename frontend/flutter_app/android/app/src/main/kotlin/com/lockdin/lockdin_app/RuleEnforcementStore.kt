@@ -51,8 +51,10 @@ object RuleEnforcementStore {
     private const val KEY_WARNING_EMISSIONS = "warning_emissions_json"
     private const val KEY_PENDING_ENFORCEMENT_EVENTS = "pending_enforcement_events_json"
     private const val KEY_NOTIFICATION_TONE = "notification_tone"
+    private const val FLUTTER_PREFS_NAME = "FlutterSharedPreferences"
 
     fun cacheRuleStatuses(context: Context, rawStatuses: List<Map<String, Any?>>) {
+        syncWarningEmissionsToFlutterPreferences(context)
         val statuses = rawStatuses.mapNotNull(::cachedRuleStatusFromMap)
         val previousStatuses = loadRuleStatuses(context)
         val localUsageMillis = reconcileLocalUsageMillis(
@@ -306,7 +308,7 @@ object RuleEnforcementStore {
         eventType: String,
     ): Boolean {
         return loadWarningEmissions(context).optBoolean(
-            warningEmissionKey(ruleId, usageDate, eventType),
+            WarningDedupeKeys.native(ruleId, usageDate, eventType),
             false,
         )
     }
@@ -318,8 +320,12 @@ object RuleEnforcementStore {
         eventType: String,
     ) {
         val emissions = loadWarningEmissions(context)
-        emissions.put(warningEmissionKey(ruleId, usageDate, eventType), true)
+        emissions.put(WarningDedupeKeys.native(ruleId, usageDate, eventType), true)
         prefs(context).edit().putString(KEY_WARNING_EMISSIONS, emissions.toString()).apply()
+        flutterPrefs(context)
+            .edit()
+            .putBoolean(WarningDedupeKeys.flutter(ruleId, usageDate, eventType), true)
+            .apply()
     }
 
     fun queuePendingEnforcementEvent(context: Context, event: PendingEnforcementEvent) {
@@ -458,6 +464,26 @@ object RuleEnforcementStore {
         }
     }
 
+    private fun syncWarningEmissionsToFlutterPreferences(context: Context) {
+        val emissions = loadWarningEmissions(context)
+        val flutterEditor = flutterPrefs(context).edit()
+        var changed = false
+        val keys = emissions.keys()
+        while (keys.hasNext()) {
+            val nativeKey = keys.next()
+            if (!emissions.optBoolean(nativeKey, false)) {
+                continue
+            }
+
+            val flutterKey = WarningDedupeKeys.flutterFromNative(nativeKey) ?: continue
+            flutterEditor.putBoolean(flutterKey, true)
+            changed = true
+        }
+        if (changed) {
+            flutterEditor.apply()
+        }
+    }
+
     private fun loadPendingEnforcementEvents(context: Context): JSONArray {
         val raw = prefs(context).getString(KEY_PENDING_ENFORCEMENT_EVENTS, null)
         return if (raw.isNullOrBlank()) {
@@ -492,11 +518,11 @@ object RuleEnforcementStore {
     private fun localUsageKey(appId: String, usageDate: String): String =
         "$usageDate|${canonicalizeAppId(appId)}"
 
-    private fun warningEmissionKey(ruleId: String, usageDate: String, eventType: String): String =
-        "$usageDate|$ruleId|$eventType"
-
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    private fun flutterPrefs(context: Context) =
+        context.getSharedPreferences(FLUTTER_PREFS_NAME, Context.MODE_PRIVATE)
 
     private const val LIVE_INTERVAL_RETENTION_MILLIS = 14L * 24L * 60L * 60L * 1000L
 }
