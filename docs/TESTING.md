@@ -129,6 +129,39 @@ Final cross-source verification:
 Six historical diagnostic overlap pairs were intentionally preserved. They predate the fix and
 must not be presented as newly created failures.
 
+## Physical Soft-Enforcement Boundary Evidence — July 28, 2026
+
+The boundary policy was exercised on the Samsung SM-A528B with preserved app data and the local
+backend. The installed debug APK was built with `--dart-define-from-file=.env`; its local and
+on-device SHA-256 values matched.
+
+Observed native and backend evidence:
+
+| Boundary | Observed result |
+| --- | --- |
+| `4/5` minutes | One `warning_approaching_limit` notification and backend event |
+| `5/5` minutes | One `warning_limit_reached` notification and backend event |
+| Exact limit | Soft intervention queued in the same native evaluation tick and removed Messages from the foreground |
+| Dismissal | `stay_in_lockdin` recorded as `intervention_dismissed` |
+| Final device state | Accessibility disabled and unbound; Usage Access allowed; no crashed service |
+
+Disabling Accessibility after the first run exposed one `warning_limit_reached` duplicate from
+`app_sync` at `6/5`. The row and notification were preserved as diagnostic evidence. The cause was
+the legacy Dart `SharedPreferences` cache not observing a marker written directly by native
+Android code. The alert path now reloads preferences before dedupe reads, and a regression test
+simulates a native marker arriving after Dart cached the store. The final APK resume smoke check
+created no additional notification or enforcement event.
+
+The `6/5` value did not show another minute of Messages usage after intervention. The preserved
+July 28 raw events total 315.400 seconds for Messages, and the current daily aggregate policy uses
+`ceil(total_seconds / 60)`, producing six displayed minutes. The stale-cache fix prevents the
+duplicate post-disable notification, but the product's whole-minute display and rounding policy
+still requires reconciliation across rule status, dashboard, and analytics views.
+
+This evidence verifies the implemented user-revocable soft intervention. It does not verify or
+claim non-bypassable Device Owner, LockTask, backend lock-command, PIN/wait, or tamper-resistant
+enforcement.
+
 ## Edge Cases Covered in Code
 
 - duplicate source IDs and replay;
