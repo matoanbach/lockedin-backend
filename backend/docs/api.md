@@ -1,199 +1,445 @@
-# API Surface
+# API Reference
 
-This page is the human-oriented map of the current backend API.
+This page documents the API implemented by the current backend. Runtime behavior and the generated
+OpenAPI schema remain the source of truth.
 
-Base path:
+## Interactive and Exportable References
 
-- `/api/v1`
+With the backend running locally:
 
-App root path:
+- Swagger UI: `http://127.0.0.1:8000/api/docs`
+- ReDoc: `http://127.0.0.1:8000/api/redoc`
+- OpenAPI JSON: `http://127.0.0.1:8000/openapi.json`
+- Static backend guide: `http://127.0.0.1:8000/docs/`
 
-- `/`
+Export a versioned OpenAPI file from the code:
 
-Interactive API docs:
+```bash
+cd backend
+make export-openapi
+```
 
-- Swagger UI: `/api/docs`
-- ReDoc: `/api/redoc`
-- OpenAPI JSON: `/openapi.json`
+The output is `backend/docs/openapi.json`. Postman can import either that file or the running
+`/openapi.json` URL.
 
-Static backend docs site:
+## Conventions
 
-- `/docs/`
+| Item | Current behavior |
+| --- | --- |
+| API base path | `/api/v1` |
+| Content type | `application/json` |
+| Field naming | camelCase over HTTP; snake_case internally |
+| Authentication | None |
+| Identity | Every request operates on the seeded/default profile |
+| Query parameters | None in the current API |
+| Validation errors | HTTP `422` with FastAPI/Pydantic error details |
+| Application errors | JSON shaped as `{"detail": "message"}` |
 
-## Root
+There are no admin, user, or guest credentials in the current build. Do not expose this API to an
+untrusted network until authentication, authorization, production secrets, and transport security
+are implemented.
 
-File:
+## Endpoint Summary
 
-- `src/lockedin_backend/app/main.py`
+| Method | Path | Request | Success | Other documented responses |
+| --- | --- | --- | --- | --- |
+| `GET` | `/` | None | `200` service message | — |
+| `GET` | `/api/v1/health` | None | `200` health payload | — |
+| `GET` | `/api/v1/rules` | None | `200` rule list | — |
+| `GET` | `/api/v1/rules/status` | None | `200` computed rule statuses | — |
+| `POST` | `/api/v1/rules` | `RuleCreate` | `201` rule | `409`, `422` |
+| `PATCH` | `/api/v1/rules/{rule_id}` | `RuleUpdate` | `200` rule | `404`, `422` |
+| `DELETE` | `/api/v1/rules/{rule_id}` | None | `204` | `404`, `422` |
+| `POST` | `/api/v1/usage/events` | `UsageIngestionRequest` | `200` counts | `409`, `422` |
+| `POST` | `/api/v1/usage/aggregates/rebuild` | None | `200` counts | — |
+| `GET` | `/api/v1/analytics/dashboard` | None | `200` dashboard metrics | — |
+| `GET` | `/api/v1/analytics/trends` | None | `200` trend metrics | — |
+| `GET` | `/api/v1/analytics/weekly-summary` | None | `200` weekly summary | — |
+| `POST` | `/api/v1/enforcement/events` | `EnforcementEventCreate` | `201` event | `404`, `422` |
+| `GET` | `/api/v1/accountability/contacts` | None | `200` contact list | — |
+| `POST` | `/api/v1/accountability/contacts` | `AccountabilityContactCreate` | `201` contact | `409`, `422` |
+| `DELETE` | `/api/v1/accountability/contacts/{contact_id}` | None | `204` | `404`, `422` |
+| `GET` | `/api/v1/me/preferences` | None | `200` preferences | — |
+| `PUT` | `/api/v1/me/preferences` | `PreferencesUpdate` | `200` preferences | `422` |
 
-Route:
+`rule_id` and `contact_id` are string identifiers supplied as path parameters.
 
-- `GET /`
+## Root and Health
 
-Purpose:
+### `GET /`
 
-- simple service message proving the app is running
+Example response:
 
-## Health
+```json
+{
+  "message": "LockdIn Backend is running"
+}
+```
 
-File:
+### `GET /api/v1/health`
 
-- `src/lockedin_backend/api/routes/health.py`
+Example response:
 
-Route:
+```json
+{
+  "status": "ok",
+  "service": "LockdIn Backend",
+  "version": "0.1.0"
+}
+```
 
-- `GET /api/v1/health`
-
-Purpose:
-
-- lightweight liveness check
-
-Current behavior:
-
-- returns `status`, `service`, and `version`
-- does not currently verify database connectivity
+This is a liveness check only. It does not verify PostgreSQL connectivity.
 
 ## Rules
 
-File:
+### Rule object
 
-- `src/lockedin_backend/api/routes/rules.py`
+```json
+{
+  "id": "00000000-0000-0000-0000-000000000102",
+  "appId": "com.google.android.youtube",
+  "appName": "YouTube",
+  "limitMinutes": 45,
+  "enabled": true
+}
+```
 
-Routes:
+### `GET /api/v1/rules`
 
-- `GET /api/v1/rules`
-- `GET /api/v1/rules/status`
-- `POST /api/v1/rules`
-- `PATCH /api/v1/rules/{rule_id}`
-- `DELETE /api/v1/rules/{rule_id}`
+Returns an array of rule objects.
 
-Related code:
+### `GET /api/v1/rules/status`
 
-- schemas: `schemas/rules.py`, `schemas/rule_status.py`
-- services: `services/rules_service.py`, `services/rule_status_service.py`
-- repository: `repositories/rule_repository.py`
+Returns computed usage status for each rule:
 
-## Usage
+```json
+[
+  {
+    "ruleId": "00000000-0000-0000-0000-000000000102",
+    "appId": "com.google.android.youtube",
+    "appName": "YouTube",
+    "usageDate": "2026-07-25",
+    "enabled": true,
+    "limitMinutes": 45,
+    "usedMinutes": 38,
+    "remainingMinutes": 7,
+    "progressPercent": 84,
+    "status": "approaching_limit",
+    "isBlockedNow": false
+  }
+]
+```
 
-File:
+Values depend on current data; the example shows the response shape.
 
-- `src/lockedin_backend/api/routes/usage.py`
+### `POST /api/v1/rules`
 
-Route:
+Required fields are `appId`, `appName`, and a positive `limitMinutes`. `enabled` defaults to `true`.
 
-- `POST /api/v1/usage/events`
-- `POST /api/v1/usage/aggregates/rebuild`
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/rules \
+  -H "Content-Type: application/json" \
+  -d '{
+    "appId": "com.example.reading",
+    "appName": "Reading App",
+    "limitMinutes": 30,
+    "enabled": true
+  }'
+```
 
-Purpose:
+Returns `409` if the default profile already has a rule for the canonicalized app ID.
 
-- ingest client usage events
-- dedupe by `source_event_id`
-- update daily aggregates
+### `PATCH /api/v1/rules/{rule_id}`
 
-Related code:
+All body fields are optional, but supplied values must remain valid:
 
-- schemas: `schemas/usage.py`
-- service: `services/usage_service.py`
-- repositories: `repositories/usage_repository.py`, aggregate repositories
+```json
+{
+  "limitMinutes": 60,
+  "enabled": false
+}
+```
+
+Returns `404` when the rule does not exist.
+
+### `DELETE /api/v1/rules/{rule_id}`
+
+Returns `204` with no response body, or `404` when the rule does not exist.
+
+## Usage Events
+
+### `POST /api/v1/usage/events`
+
+Replace the example timestamps with a current interval before executing it; events older than
+90 days are rejected.
+
+Example request:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/usage/events \
+  -H "Content-Type: application/json" \
+  -d '{
+    "events": [
+      {
+        "sourceEventId": "demo:reading:2026-07-25T14:00:00Z",
+        "appId": "com.example.reading",
+        "appName": "Reading App",
+        "category": "Productivity",
+        "startedAt": "2026-07-25T14:00:00Z",
+        "endedAt": "2026-07-25T14:20:00Z",
+        "timezone": "America/Toronto"
+      }
+    ]
+  }'
+```
+
+Example response:
+
+```json
+{
+  "receivedCount": 1,
+  "createdCount": 1,
+  "duplicateCount": 0
+}
+```
+
+Validation and integrity rules:
+
+- 1–100 events per request
+- encoded request model no larger than 128 KiB
+- required strings cannot be blank
+- `sourceEventId`, `appId`, and `appName` are limited to 255 characters
+- `category` is optional and limited to 100 characters
+- `timezone` must be a valid IANA time-zone name
+- timestamps must include UTC offsets
+- `endedAt` must be later than `startedAt`
+- one event may not exceed six hours
+- an event may not be older than 90 days
+- timestamps may not be more than five minutes in the future
+- distinct events for the same app may not overlap within one request
+- an event may not overlap an already stored event for the same app
+- replaying an existing `sourceEventId` is idempotent and increments `duplicateCount`
+- stored-overlap conflicts return `409`
+
+The backend calculates persisted duration from the timestamps; clients do not submit a duration.
+
+### `POST /api/v1/usage/aggregates/rebuild`
+
+Recalculates daily app and category aggregates from accepted raw usage events.
+
+```json
+{
+  "eventCount": 42,
+  "appAggregateCount": 12,
+  "categoryAggregateCount": 8
+}
+```
+
+This endpoint does not delete raw usage events, but it rewrites derived aggregate rows. Treat it as
+an administrative maintenance operation. It is currently unauthenticated, which is a known
+production gap.
 
 ## Analytics
 
-File:
+### `GET /api/v1/analytics/dashboard`
 
-- `src/lockedin_backend/api/routes/analytics.py`
+```json
+{
+  "todayTotalMinutes": 120,
+  "categoryBreakdown": [
+    {
+      "name": "Entertainment",
+      "minutes": 60
+    }
+  ],
+  "weeklyUsageHours": [1.0, 0.5, 2.0, 1.25, 0.75, 0.0, 2.0],
+  "deltaFromYesterdayPercent": -10
+}
+```
 
-Routes:
+### `GET /api/v1/analytics/trends`
 
-- `GET /api/v1/analytics/dashboard`
-- `GET /api/v1/analytics/trends`
-- `GET /api/v1/analytics/weekly-summary`
+```json
+{
+  "hourlyUsage": [
+    {
+      "hour": "14:00",
+      "minutes": 20
+    }
+  ],
+  "weeklyUsage": [
+    {
+      "day": "Fri",
+      "hours": 2.0
+    }
+  ],
+  "topApps": [
+    {
+      "appId": "com.google.android.youtube",
+      "appName": "YouTube",
+      "minutes": 55
+    }
+  ],
+  "peakUsageWindow": "7 PM - 9 PM"
+}
+```
 
-Purpose:
+### `GET /api/v1/analytics/weekly-summary`
 
-- serve dashboard and trends views
-- serve weekly summary metrics
+```json
+{
+  "screenTimeReductionPercent": 10,
+  "totalWeekHours": 8.5,
+  "dailyAverageHours": 1.2,
+  "goalsMetDays": 5,
+  "longestStreakDays": 3
+}
+```
 
-Related code:
-
-- schemas: `schemas/analytics.py`
-- service: `services/analytics_service.py`
+Analytics examples show shapes, not guaranteed seeded values.
 
 ## Enforcement
 
-File:
+### `POST /api/v1/enforcement/events`
 
-- `src/lockedin_backend/api/routes/enforcement.py`
+Allowed `eventType` values:
 
-Route:
+- `warning_approaching_limit`
+- `warning_limit_reached`
+- `intervention_blocked`
+- `intervention_dismissed`
 
-- `POST /api/v1/enforcement/events`
+Request:
 
-Purpose:
+```json
+{
+  "ruleId": "00000000-0000-0000-0000-000000000102",
+  "appId": "com.google.android.youtube",
+  "eventType": "warning_approaching_limit",
+  "usageDate": "2026-07-25",
+  "usedMinutes": 38,
+  "limitMinutes": 45,
+  "metadata": {
+    "source": "demo"
+  }
+}
+```
 
-- persist enforcement and warning events linked to usage and rules
+`ruleId` and `metadata` are optional. `usedMinutes` must be zero or greater and `limitMinutes` must
+be positive. A supplied but unknown rule ID returns `404`.
 
-Related code:
+## Accountability Contacts
 
-- schema: `schemas/enforcement.py`
-- service: `services/enforcement_service.py`
-- repository: `repositories/enforcement_event_repository.py`
+### Contact object
 
-## Accountability
+```json
+{
+  "id": "00000000-0000-0000-0000-000000000201",
+  "name": "Demo Accountability Partner",
+  "email": "partner@example.com",
+  "consentConfirmed": true
+}
+```
 
-File:
+### `GET /api/v1/accountability/contacts`
 
-- `src/lockedin_backend/api/routes/accountability.py`
+Returns the contacts associated with the default profile.
 
-Routes:
+### `POST /api/v1/accountability/contacts`
 
-- `GET /api/v1/accountability/contacts`
-- `POST /api/v1/accountability/contacts`
-- `DELETE /api/v1/accountability/contacts/{contact_id}`
+```json
+{
+  "email": "reviewer@example.com",
+  "name": "Demo Reviewer",
+  "consentConfirmed": true
+}
+```
 
-Related code:
+`email` must be valid. `name` is optional. A duplicate normalized email returns `409`.
 
-- schema: `schemas/accountability.py`
-- service: `services/accountability_service.py`
-- repository: `repositories/accountability_repository.py`
+### `DELETE /api/v1/accountability/contacts/{contact_id}`
+
+Returns `204`, or `404` when the contact does not exist.
 
 ## Preferences
 
-File:
+### `GET /api/v1/me/preferences`
 
-- `src/lockedin_backend/api/routes/preferences.py`
+```json
+{
+  "hasCompletedOnboarding": true,
+  "defaultDailyLimitMinutes": 180,
+  "notificationTone": "professional",
+  "accessibility": {
+    "textSizePercent": 100,
+    "highContrast": false,
+    "largeTapTargets": false
+  }
+}
+```
 
-Routes:
+### `PUT /api/v1/me/preferences`
 
-- `GET /api/v1/me/preferences`
-- `PUT /api/v1/me/preferences`
+This is a partial update even though the method is `PUT`; omitted values remain unchanged.
 
-Purpose:
+```json
+{
+  "notificationTone": "professional",
+  "textSizePercent": 120,
+  "highContrast": true,
+  "largeTapTargets": true
+}
+```
 
-- fetch and update the current profile's preferences
+Constraints:
 
-Related code:
+- `defaultDailyLimitMinutes` must be positive
+- `notificationTone`: `fun`, `edgy`, or `professional`
+- `textSizePercent`: 80–150
 
-- schema: `schemas/preferences.py`
-- service: `services/preferences_service.py`
-- repository: `repositories/preferences_repository.py`
+## Error Examples
 
-## Current API Characteristics
+Validation error (`422`):
 
-- no auth yet
-- APIs currently operate against the default profile model
-- request and response fields are exposed as camelCase through `APIModel`
+```json
+{
+  "detail": [
+    {
+      "type": "greater_than",
+      "loc": ["body", "limitMinutes"],
+      "msg": "Input should be greater than 0",
+      "input": 0
+    }
+  ]
+}
+```
 
-## Where To Start When Changing An Endpoint
+Application conflict (`409`):
 
-1. route module in `api/routes/`
-2. request/response schema in `schemas/`
-3. business logic in `services/`
-4. persistence helpers in `repositories/`
-5. ORM model shape in `models/`
-6. if table shape changes, align top-level `database/initdb/10-schema.sql`
+```json
+{
+  "detail": "Rule already exists for app_id 'com.google.android.youtube'"
+}
+```
 
-## Related Pages
+Not found (`404`):
 
-- [Layers](layers.md)
-- [Data model](data-model.md)
-- [Testing](testing.md)
+```json
+{
+  "detail": "Rule 'missing-id' was not found"
+}
+```
+
+Exact Pydantic validation details can vary by dependency version; clients should rely on the HTTP
+status and `detail` field rather than matching complete error text.
+
+## API Change Checklist
+
+When changing the API:
+
+1. Update route, schema, service, repository, and database definitions as applicable.
+2. Add or update backend tests.
+3. Run `make test` and, for persistence changes, `make test-postgres`.
+4. Run `make export-openapi`.
+5. Review the OpenAPI diff and this page.
+6. Verify Swagger UI against a running local stack.

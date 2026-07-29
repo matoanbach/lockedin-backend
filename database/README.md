@@ -1,64 +1,63 @@
-# Database
+# LockdIn Database
 
-This folder owns local Postgres initialization for LockdIn.
-
-The backend should treat this database as already initialized and only connect to it through `DATABASE_URL`.
+This directory owns the PostgreSQL schema snapshot and repeatable development seed data.
 
 ## Files
 
-- `docker-compose.yml`: starts the Postgres container
-- `.env.example`: example Postgres container settings
-- `initdb/00-extensions.sql`: optional Postgres extensions
-- `initdb/10-schema.sql`: backend-compatible schema snapshot
-- `initdb/20-seed.sql`: fake development data
+- `docker-compose.yml`: database-only container stack
+- `.env.example`: database defaults
+- `initdb/00-extensions.sql`: required extensions
+- `initdb/10-schema.sql`: tables, constraints, and indexes
+- `initdb/20-seed.sql`: synthetic default-profile, rule, usage, contact, and enforcement data
 
-## First-Time Setup
+Backend ORM changes and `initdb/10-schema.sql` must stay aligned. The project does not currently use
+a migration framework.
 
-1. Optional: copy the env template if you want to override the default Postgres settings:
+## Start Without Deleting Data
+
+From the repository root:
 
 ```bash
-cp .env.example .env
+docker compose -f database/docker-compose.yml --env-file backend/.env up -d
+docker compose -f database/docker-compose.yml --env-file backend/.env ps
 ```
 
-If you skip that step, `docker compose` uses these defaults:
+Defaults:
+
 - database: `lockedin`
 - user: `postgres`
-- password: `postgres`
 - host port: `5433`
 - container port: `5432`
 
-2. Start Postgres:
-
-```bash
-docker compose --env-file backend/.env up -d postgres
-```
-
-3. Point the backend at the database:
+The local backend URL is:
 
 ```text
 postgresql+psycopg://postgres:postgres@localhost:5433/lockedin
 ```
 
-Use that as `DATABASE_URL` unless you changed `.env`.
+Change development credentials before any non-local deployment.
 
-For the full local stack from the repo root:
+## Seed Behavior
+
+The SQL under `initdb/` runs only when PostgreSQL initializes a new, empty data directory. Seed
+inserts use stable IDs or conflict handling so a controlled re-execution does not duplicate the
+main demo entities.
+
+## Destructive Reinitialization
+
+Removing the Docker volume deletes every LockdIn profile, preference, rule, contact, raw usage
+event, aggregate, and enforcement event stored there.
+
+Do not run a volume reset as routine troubleshooting. First inspect the exact compose project,
+volume, container health, logs, connection settings, and row counts. Show what will be deleted and
+obtain approval from the data owner immediately before a reset.
+
+Only after that approval, the database-only reset is:
 
 ```bash
-docker compose --env-file backend/.env up -d
+docker compose -f database/docker-compose.yml --env-file backend/.env down -v
+docker compose -f database/docker-compose.yml --env-file backend/.env up -d
 ```
 
-## Reinitialize The Database
-
-The SQL files under `initdb/` only run when Postgres initializes a fresh data directory.
-
-To rebuild from scratch:
-
-```bash
-docker compose down -v
-docker compose up -d
-```
-
-## Notes
-
-- schema changes in the backend must be reflected in `initdb/10-schema.sql`
-- fake data changes should go in `initdb/20-seed.sql`
+For non-destructive aggregate recovery, use the documented backend rebuild endpoint only after
+reviewing its impact. It rewrites derived aggregates but preserves raw usage events.

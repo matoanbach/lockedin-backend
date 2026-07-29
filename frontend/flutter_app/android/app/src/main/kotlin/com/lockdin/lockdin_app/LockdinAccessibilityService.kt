@@ -35,6 +35,7 @@ class LockdinAccessibilityService : AccessibilityService() {
     private var activePackageCategory: String? = null
     private var activePackageStartedAtMillis: Long? = null
     private var activePackageUploadedUntilMillis: Long? = null
+    private var activePackagePersistedUntilMillis: Long? = null
     private var isMonitoring = false
     private var screenReceiverRegistered = false
     private val screenReceiver = object : BroadcastReceiver() {
@@ -110,6 +111,7 @@ class LockdinAccessibilityService : AccessibilityService() {
             activePackageCategory = metadata.category
             activePackageStartedAtMillis = startedAtMillis
             activePackageUploadedUntilMillis = startedAtMillis
+            activePackagePersistedUntilMillis = startedAtMillis
         }
 
         if (packageName != activePackageName) {
@@ -169,7 +171,7 @@ class LockdinAccessibilityService : AccessibilityService() {
         }
 
         flushUsageSlices(nowMillis, forcePartial = true)
-        persistActivePackageUsage(elapsedMillis)
+        persistActivePackageUsage(nowMillis)
         RuleEnforcementStore.markIntervened(this, packageName, System.currentTimeMillis())
         RuleEnforcementStore.queuePendingIntervention(
             context = this,
@@ -244,30 +246,37 @@ class LockdinAccessibilityService : AccessibilityService() {
         activePackageUploadedUntilMillis = sliceStart
     }
 
-    private fun persistActivePackageUsage(elapsedMillis: Long) {
+    private fun persistActivePackageUsage(nowMillis: Long) {
         val packageName = activePackageName ?: return
-        val uploadedUntil = activePackageUploadedUntilMillis ?: return
-        val sessionStart = activePackageStartedAtMillis ?: return
-        val accountedMillis = (uploadedUntil - sessionStart).coerceAtLeast(0L)
-        val unaccountedMillis = elapsedMillis - accountedMillis
-        if (unaccountedMillis <= 0L) {
+        val persistedUntilMillis = activePackagePersistedUntilMillis ?: return
+        val update = LiveUsageAccounting.persistenceUpdate(
+            persistedUntilMillis = persistedUntilMillis,
+            nowMillis = nowMillis,
+        )
+        activePackagePersistedUntilMillis = update.persistedUntilMillis
+        if (update.deltaMillis <= 0L) {
+            return
+        }
+
+        val rule = RuleEnforcementStore.findRuleForPackage(this, packageName) ?: run {
+            Log.d(tag, "Not persisting local usage without an enabled cached rule for package=$packageName")
             return
         }
 
         RuleEnforcementStore.addLocalUsageMillis(
             context = this,
-            appId = packageName,
+            appId = rule.appId,
             usageDate = RuleEnforcementStore.currentUsageDate(),
-            durationMillis = unaccountedMillis,
+            durationMillis = update.deltaMillis,
         )
     }
 
     private fun finalizeActivePackageSession() {
         val sessionStart = activePackageStartedAtMillis
         if (sessionStart != null && activePackageName != null && activePackageName != this.packageName) {
-            val elapsedMillis = (System.currentTimeMillis() - sessionStart).coerceAtLeast(0L)
-            flushUsageSlices(System.currentTimeMillis(), forcePartial = true)
-            persistActivePackageUsage(elapsedMillis)
+            val nowMillis = System.currentTimeMillis()
+            flushUsageSlices(nowMillis, forcePartial = true)
+            persistActivePackageUsage(nowMillis)
         }
 
         activePackageName = null
@@ -275,6 +284,7 @@ class LockdinAccessibilityService : AccessibilityService() {
         activePackageCategory = null
         activePackageStartedAtMillis = null
         activePackageUploadedUntilMillis = null
+        activePackagePersistedUntilMillis = null
         stopMonitoring()
     }
 
@@ -349,35 +359,14 @@ class LockdinAccessibilityService : AccessibilityService() {
         liveUsedMinutes: Int,
         eventType: String,
     ): Pair<String, String>? {
-        val tone = RuleEnforcementStore.notificationTone(this)
-        return when (eventType) {
-            "warning_approaching_limit" -> {
-                val remainingMinutes = (rule.limitMinutes - liveUsedMinutes).coerceAtLeast(0)
-                val title = "${rule.appName} is approaching its limit"
-                val body = when (tone) {
-                    "fun" -> "Heads up: only $remainingMinutes minutes left before ${rule.appName} hits today's limit."
-                    "edgy" -> "$remainingMinutes minutes left. ${rule.appName} is almost out of runway."
-                    else -> "$remainingMinutes minutes remain before you hit today's ${rule.limitMinutes}-minute limit for ${rule.appName}."
-                }
-                title to body
-            }
-
-            "warning_limit_reached" -> {
-                val title = if (liveUsedMinutes > rule.limitMinutes) {
-                    "${rule.appName} is over limit"
-                } else {
-                    "${rule.appName} reached its limit"
-                }
-                val body = when (tone) {
-                    "fun" -> "You just hit today's ${rule.limitMinutes}-minute limit for ${rule.appName}. Time to step out for a reset."
-                    "edgy" -> "Limit reached. Close ${rule.appName} before it steals more of your day."
-                    else -> "You have hit today's ${rule.limitMinutes}-minute limit for ${rule.appName}."
-                }
-                title to body
-            }
-
-            else -> null
-        }
+        val content = RuleWarningCopy.content(
+            appName = rule.appName,
+            limitMinutes = rule.limitMinutes,
+            usedMinutes = liveUsedMinutes,
+            eventType = eventType,
+            tone = RuleEnforcementStore.notificationTone(this),
+        ) ?: return null
+        return content.title to content.body
     }
 
     private fun launchLockdinIntervention() {

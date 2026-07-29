@@ -51,9 +51,18 @@ object RuleEnforcementStore {
     private const val KEY_WARNING_EMISSIONS = "warning_emissions_json"
     private const val KEY_PENDING_ENFORCEMENT_EVENTS = "pending_enforcement_events_json"
     private const val KEY_NOTIFICATION_TONE = "notification_tone"
+    private const val FLUTTER_PREFS_NAME = "FlutterSharedPreferences"
 
     fun cacheRuleStatuses(context: Context, rawStatuses: List<Map<String, Any?>>) {
+        syncWarningEmissionsToFlutterPreferences(context)
         val statuses = rawStatuses.mapNotNull(::cachedRuleStatusFromMap)
+        val previousStatuses = loadRuleStatuses(context)
+        val localUsageMillis = reconcileLocalUsageMillis(
+            existing = loadLocalUsageMillis(context),
+            previousStatuses = previousStatuses,
+            refreshedStatuses = statuses,
+            usageDate = currentUsageDate(),
+        )
         val json = JSONArray()
 
         for (status in statuses) {
@@ -74,7 +83,7 @@ object RuleEnforcementStore {
         prefs(context)
             .edit()
             .putString(KEY_RULE_STATUSES, json.toString())
-            .putString(KEY_LOCAL_USAGE_MILLIS, JSONObject().toString())
+            .putString(KEY_LOCAL_USAGE_MILLIS, localUsageMillis.toString())
             .apply()
     }
 
@@ -96,7 +105,11 @@ object RuleEnforcementStore {
             localUsageKey(rule.appId, usageDate),
             0L,
         )
-        return baseMinutes + ((localMillis + currentSessionMillis) / MINUTE_MILLIS).toInt()
+        return LiveUsageAccounting.liveUsedMinutes(
+            baseMinutes = baseMinutes,
+            localMillis = localMillis,
+            currentSessionMillis = currentSessionMillis,
+        )
     }
 
     fun addLocalUsageMillis(context: Context, appId: String, usageDate: String, durationMillis: Long) {
@@ -295,7 +308,7 @@ object RuleEnforcementStore {
         eventType: String,
     ): Boolean {
         return loadWarningEmissions(context).optBoolean(
-            warningEmissionKey(ruleId, usageDate, eventType),
+            WarningDedupeKeys.native(ruleId, usageDate, eventType),
             false,
         )
     }
@@ -307,8 +320,12 @@ object RuleEnforcementStore {
         eventType: String,
     ) {
         val emissions = loadWarningEmissions(context)
-        emissions.put(warningEmissionKey(ruleId, usageDate, eventType), true)
+        emissions.put(WarningDedupeKeys.native(ruleId, usageDate, eventType), true)
         prefs(context).edit().putString(KEY_WARNING_EMISSIONS, emissions.toString()).apply()
+        flutterPrefs(context)
+            .edit()
+            .putBoolean(WarningDedupeKeys.flutter(ruleId, usageDate, eventType), true)
+            .apply()
     }
 
     fun queuePendingEnforcementEvent(context: Context, event: PendingEnforcementEvent) {
@@ -386,6 +403,49 @@ object RuleEnforcementStore {
         }
     }
 
+    private fun reconcileLocalUsageMillis(
+        existing: JSONObject,
+        previousStatuses: List<CachedRuleStatus>,
+        refreshedStatuses: List<CachedRuleStatus>,
+        usageDate: String,
+    ): JSONObject {
+        val reconciled = JSONObject()
+        val keys = existing.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            val localUsageDate = key.substringBefore('|', missingDelimiterValue = "")
+            if (localUsageDate == usageDate) {
+                reconciled.put(key, existing.optLong(key, 0L).coerceAtLeast(0L))
+            }
+        }
+
+        for (refreshed in refreshedStatuses) {
+            val key = localUsageKey(refreshed.appId, usageDate)
+            if (!reconciled.has(key)) {
+                continue
+            }
+
+            val previous = previousStatuses.firstOrNull {
+                canonicalizeAppId(it.appId) == canonicalizeAppId(refreshed.appId)
+            }
+            val retainedMillis = LiveUsageAccounting.reconcileLocalUsageMillis(
+                localUsageDate = usageDate,
+                localUsageMillis = reconciled.optLong(key, 0L),
+                previousBackendUsageDate = previous?.usageDate,
+                previousBackendUsedMinutes = previous?.usedMinutes,
+                refreshedBackendUsageDate = refreshed.usageDate,
+                refreshedBackendUsedMinutes = refreshed.usedMinutes,
+                currentUsageDate = usageDate,
+            )
+            if (retainedMillis > 0L) {
+                reconciled.put(key, retainedMillis)
+            } else {
+                reconciled.remove(key)
+            }
+        }
+        return reconciled
+    }
+
     private fun loadUploadedIntervalsRoot(context: Context): JSONObject {
         val raw = prefs(context).getString(KEY_LIVE_UPLOADED_INTERVALS, null)
         return if (raw.isNullOrBlank()) {
@@ -401,6 +461,26 @@ object RuleEnforcementStore {
             JSONObject()
         } else {
             JSONObject(raw)
+        }
+    }
+
+    private fun syncWarningEmissionsToFlutterPreferences(context: Context) {
+        val emissions = loadWarningEmissions(context)
+        val flutterEditor = flutterPrefs(context).edit()
+        var changed = false
+        val keys = emissions.keys()
+        while (keys.hasNext()) {
+            val nativeKey = keys.next()
+            if (!emissions.optBoolean(nativeKey, false)) {
+                continue
+            }
+
+            val flutterKey = WarningDedupeKeys.flutterFromNative(nativeKey) ?: continue
+            flutterEditor.putBoolean(flutterKey, true)
+            changed = true
+        }
+        if (changed) {
+            flutterEditor.apply()
         }
     }
 
@@ -438,12 +518,11 @@ object RuleEnforcementStore {
     private fun localUsageKey(appId: String, usageDate: String): String =
         "$usageDate|${canonicalizeAppId(appId)}"
 
-    private fun warningEmissionKey(ruleId: String, usageDate: String, eventType: String): String =
-        "$usageDate|$ruleId|$eventType"
-
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
+    private fun flutterPrefs(context: Context) =
+        context.getSharedPreferences(FLUTTER_PREFS_NAME, Context.MODE_PRIVATE)
+
     private const val LIVE_INTERVAL_RETENTION_MILLIS = 14L * 24L * 60L * 60L * 1000L
-    private const val MINUTE_MILLIS = 60_000L
 }

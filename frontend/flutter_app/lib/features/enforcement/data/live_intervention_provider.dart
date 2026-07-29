@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_config.dart';
+import '../../../core/formatters/minute_copy.dart';
 import '../../rules/data/rules_provider.dart';
 import 'rule_alert_provider.dart';
 
@@ -39,7 +40,7 @@ class PendingIntervention {
   String get title => '$appName is locked right now';
 
   String get message =>
-      'You hit today\'s $limitMinutes-minute limit for $appName and are already at $usedMinutes minutes. Step away before jumping back in.';
+      'You hit today\'s $limitMinutes-minute limit for $appName and are already at ${formatMinuteCount(usedMinutes)}. Step away before jumping back in.';
 }
 
 class PendingEnforcementEvent {

@@ -1,4 +1,4 @@
-.PHONY: install-venv init-env run build-docs docs-build docs-serve test test-postgres clean
+.PHONY: install-venv init-env run build-docs docs-build docs-serve export-openapi test test-postgres clean
 
 PROJECT_DIR := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 PY ?= python
@@ -37,6 +37,9 @@ docs-build: build-docs
 
 docs-serve: ensure-venv
 	cd "$(PROJECT_DIR)" && "$(VENV_PY)" -m mkdocs serve -f "$(PROJECT_DIR)/conf/mkdocs.yml" --dev-addr $(HOST):9001
+
+export-openapi: ensure-venv
+	cd "$(PROJECT_DIR)" && "$(VENV_PY)" scripts/export_openapi.py
 
 test: ensure-venv
 	cd "$(PROJECT_DIR)" && "$(VENV_PY)" -m pytest

@@ -1,24 +1,31 @@
-# LockdIn
+# LockdIn Frontend
+
+The active client is the Flutter application under [`flutter_app`](flutter_app/README.md).
+
+It provides:
+
+- onboarding and Android permission guidance;
+- usage dashboard and manual synchronization;
+- daily app-limit rule management;
+- trends and weekly analytics;
+- notification and display accessibility settings;
+- accountability contact management;
+- native Android UsageStats and Accessibility integration.
+
+LockdIn uses soft enforcement. It does not claim non-bypassable device control, and the
+accountability feature currently stores contacts without sending messages.
+
+For full-stack setup, project documentation, and evaluator guidance, start with the
+[repository README](../README.md).
 
 ## Team
 
-| Name | Email | Role |
+| Name | Email | Project role |
 | --- | --- | --- |
-| Crissha Salaritan | <csalaritan@myseneca.ca> | Front-end Developer & Data Engineer|
-| Jasleen Kaur | <jasleen-kaur13@myseneca.ca> | Project Manager and ML Developer |
-| Kasra Bina | <kbina@myseneca.ca> | Project Manager & Back-end Developer |
-| Ma Toan Bach | <mbach@myseneca.ca> | Back-end Developer & QA  |
+| Crissha Salaritan | <csalaritan@myseneca.ca> | Frontend development and data |
+| Jasleen Kaur | <jasleen-kaur13@myseneca.ca> | Project management |
+| Kasra Bina | <kbina@myseneca.ca> | Project management and backend development |
+| Ma Toan Bach | <mbach@myseneca.ca> | Backend development and QA |
 
----
-
-## Introduction - LockdIn
-
-LockdIn is a mobile application designed to help users reduce unhealthy screen time by enforcing strict, non-bypassable app lockdowns once time limits are reached. 
-
-The app is intended for college students, working professionals, and people with attention challenges who want stronger support to stay focused. It can also help anyone trying to build healthier phone habits and reduce doomscrolling.
-
-The app combines behavioral tracking, customizable notifications (ranging from friendly nudges to humorous/edgy motivation), and accountability features that notify selected partners when limits are exceeded. 
-
-Additional analytics will help users understand their digital habits, such as when, where, and why they tend to doomscroll.
-
-Compared to last semester's original project direction, the team has pivoted to a simpler backend architecture to reduce implementation risk, improve maintainability, and ensure reliable delivery within the capstone timeline.
+These project roles are team responsibilities, not application authorization roles. The current
+application has no admin/user login system.

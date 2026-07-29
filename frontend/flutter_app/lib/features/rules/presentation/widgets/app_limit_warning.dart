@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/formatters/minute_copy.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../../data/rules_provider.dart';
@@ -36,11 +37,10 @@ class AppLimitUsageCard extends StatelessWidget {
     final showReminderWarning =
         enabled &&
         hasStatus &&
+        status!.status == 'approaching_limit' &&
         remainingMinutes > 0 &&
         remainingMinutes <= reminderThresholdMinutes;
-    final effectiveStatus = showReminderWarning
-        ? 'approaching_limit'
-        : status?.status;
+    final effectiveStatus = status?.status;
     final statusColor = statusColorFor(effectiveStatus, color);
     final statusLabel = statusLabelFor(effectiveStatus, enabled);
 
@@ -186,7 +186,7 @@ class ReminderThresholdCard extends StatelessWidget {
           Text('Reminder Threshold', style: AppTextStyles.titleMedium),
           Spacing.verticalXs,
           Text(
-            'Notify me when I have $thresholdMinutes minutes left',
+            'Notify me when I have ${formatMinuteCount(thresholdMinutes)} left',
             style: AppTextStyles.bodySmall.copyWith(
               color: AppColors.textTertiary,
             ),
@@ -345,7 +345,7 @@ class _ReminderWarningLabel extends StatelessWidget {
           ),
           Spacing.horizontalXs,
           Text(
-            '$minutes minutes left',
+            '${formatMinuteCount(minutes)} left',
             style: AppTextStyles.labelSmall.copyWith(color: AppColors.warning),
           ),
         ],
@@ -391,7 +391,7 @@ String formatLimitMinutes(int minutes) {
 }
 
 String reminderPopupText(RuleStatusData status) {
-  return 'Reminder: You have ${status.remainingMinutes} minutes left on ${status.appName}.';
+  return 'Reminder: You have ${formatMinuteCount(status.remainingMinutes)} left on ${status.appName}.';
 }
 
 RuleStatusData? firstReminderStatusFor(
@@ -399,7 +399,9 @@ RuleStatusData? firstReminderStatusFor(
   int reminderThresholdMinutes,
 ) {
   for (final status in statuses) {
-    if (!status.enabled || status.remainingMinutes <= 0) {
+    if (!status.enabled ||
+        status.status != 'approaching_limit' ||
+        status.remainingMinutes <= 0) {
       continue;
     }
     if (status.remainingMinutes <= reminderThresholdMinutes) {

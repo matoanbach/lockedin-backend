@@ -175,6 +175,43 @@ void main() {
     expect(find.text('Approaching'), findsOneWidget);
   });
 
+  testWidgets('warning label uses singular and plural minute copy', (
+    tester,
+  ) async {
+    for (final fixture in [
+      (limitMinutes: 5, usedMinutes: 4, remainingMinutes: 1),
+      (limitMinutes: 10, usedMinutes: 8, remainingMinutes: 2),
+    ]) {
+      await tester.pumpWidget(
+        _TestHost(
+          child: AppLimitUsageCard(
+            appName: 'Messages',
+            icon: Icons.message,
+            color: AppColors.instagram,
+            enabled: true,
+            limitMinutes: fixture.limitMinutes,
+            status: _status(
+              appName: 'Messages',
+              appId: 'com.google.android.apps.messaging',
+              usedMinutes: fixture.usedMinutes,
+              limitMinutes: fixture.limitMinutes,
+              remainingMinutes: fixture.remainingMinutes,
+            ),
+            reminderThresholdMinutes: 30,
+            onToggle: () {},
+            onEdit: () {},
+          ),
+        ),
+      );
+
+      final unit = fixture.remainingMinutes == 1 ? 'minute' : 'minutes';
+      expect(
+        find.text('${fixture.remainingMinutes} $unit left'),
+        findsOneWidget,
+      );
+    }
+  });
+
   testWidgets('warning label stays hidden when enough time remains', (
     tester,
   ) async {
@@ -187,9 +224,9 @@ void main() {
           enabled: true,
           limitMinutes: 300,
           status: _status(
-            usedMinutes: 250,
+            usedMinutes: 230,
             limitMinutes: 300,
-            remainingMinutes: 50,
+            remainingMinutes: 70,
           ),
           reminderThresholdMinutes: 30,
           onToggle: () {},
@@ -198,9 +235,40 @@ void main() {
       ),
     );
 
-    expect(find.text('50 minutes left'), findsNothing);
+    expect(find.text('70 minutes left'), findsNothing);
     expect(find.text('Under Limit'), findsOneWidget);
   });
+
+  testWidgets(
+    'short rule stays under limit before backend approaching threshold',
+    (tester) async {
+      await tester.pumpWidget(
+        _TestHost(
+          child: AppLimitUsageCard(
+            appName: 'Messages',
+            icon: Icons.message,
+            color: AppColors.instagram,
+            enabled: true,
+            limitMinutes: 10,
+            status: _status(
+              appName: 'Messages',
+              appId: 'com.google.android.apps.messaging',
+              usedMinutes: 0,
+              limitMinutes: 10,
+              remainingMinutes: 10,
+            ),
+            reminderThresholdMinutes: 30,
+            onToggle: () {},
+            onEdit: () {},
+          ),
+        ),
+      );
+
+      expect(find.text('Under Limit'), findsOneWidget);
+      expect(find.text('Approaching'), findsNothing);
+      expect(find.text('10 minutes left'), findsNothing);
+    },
+  );
 
   test(
     'top reminder status is selected only for daily limits near threshold',
@@ -215,9 +283,9 @@ void main() {
         ),
         _status(
           appName: 'Instagram',
-          usedMinutes: 60,
+          usedMinutes: 75,
           limitMinutes: 90,
-          remainingMinutes: 30,
+          remainingMinutes: 15,
         ),
       ], 30);
 
@@ -228,17 +296,29 @@ void main() {
         ], 30),
         isNull,
       );
+      expect(
+        firstReminderStatusFor([
+          _status(
+            appName: 'Messages',
+            appId: 'com.google.android.apps.messaging',
+            usedMinutes: 0,
+            limitMinutes: 10,
+            remainingMinutes: 10,
+          ),
+        ], 30),
+        isNull,
+      );
     },
   );
 
-  testWidgets('top reminder banner displays app name and 30 minutes left', (
+  testWidgets('top reminder banner displays app name and remaining time', (
     tester,
   ) async {
     final status = _status(
       appName: 'Instagram',
-      usedMinutes: 60,
+      usedMinutes: 75,
       limitMinutes: 90,
-      remainingMinutes: 30,
+      remainingMinutes: 15,
     );
 
     await tester.pumpWidget(
@@ -248,11 +328,33 @@ void main() {
     );
 
     expect(
-      find.text('Reminder: You have 30 minutes left on Instagram.'),
+      find.text('Reminder: You have 15 minutes left on Instagram.'),
       findsOneWidget,
     );
     expect(reminderPopupText(status), contains('Instagram'));
-    expect(reminderPopupText(status), contains('30 minutes left'));
+    expect(reminderPopupText(status), contains('15 minutes left'));
+  });
+
+  testWidgets('top reminder banner uses singular minute copy', (tester) async {
+    final status = _status(
+      appName: 'Messages',
+      appId: 'com.google.android.apps.messaging',
+      usedMinutes: 4,
+      limitMinutes: 5,
+      remainingMinutes: 1,
+    );
+
+    await tester.pumpWidget(
+      _TestHost(
+        child: ReminderBanner(status: status, onShowPopup: () {}),
+      ),
+    );
+
+    expect(
+      find.text('Reminder: You have 1 minute left on Messages.'),
+      findsOneWidget,
+    );
+    expect(reminderPopupText(status), contains('1 minute left'));
   });
 }
 
@@ -287,7 +389,9 @@ RuleStatusData _status({
     usedMinutes: usedMinutes,
     remainingMinutes: remainingMinutes,
     progressPercent: ((usedMinutes / limitMinutes) * 100).round(),
-    status: remainingMinutes <= 30 ? 'approaching_limit' : 'under_limit',
+    status: usedMinutes * 5 >= limitMinutes * 4
+        ? 'approaching_limit'
+        : 'under_limit',
     isBlockedNow: false,
   );
 }

@@ -48,9 +48,11 @@ Main planning/context files in this directory:
 
 These are useful context, but they are not the best first docs for onboarding. Start with the docs under `backend/docs/` first.
 
-## Historical Docs Note
+## Project-Wide Docs Note
 
-The broader repo-level `docs/` folder is historical/reference material and should not be treated as the current backend source of truth.
+The broader repo-level `docs/` folder contains current user, evaluator, testing, defense, and
+security guides alongside older academic requirement/design reports. Start with `docs/README.md`
+to distinguish current operational guidance from historical material.
 
 For active backend development, prefer:
 

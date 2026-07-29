@@ -75,6 +75,8 @@ cd backend
 make install-venv
 make init-env
 make run
+make export-openapi
+make build-docs
 make test
 make test-postgres
 ```
@@ -86,6 +88,8 @@ make test-postgres
 - rules: `http://127.0.0.1:8000/api/v1/rules`
 - docs site: `http://127.0.0.1:8000/docs/`
 - Swagger UI: `http://127.0.0.1:8000/api/docs`
+- ReDoc: `http://127.0.0.1:8000/api/redoc`
+- OpenAPI JSON: `http://127.0.0.1:8000/openapi.json`
 
 `/docs/` serves the backend onboarding site. `/api/docs` serves FastAPI Swagger UI.
 
@@ -94,6 +98,12 @@ Build the docs site before using `/docs/`:
 ```bash
 cd backend
 make build-docs
+```
+
+Export the API schema for review or Postman import:
+
+```bash
+make export-openapi
 ```
 
 ## Important Current Constraints
