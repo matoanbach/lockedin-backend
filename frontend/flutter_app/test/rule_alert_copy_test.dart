@@ -62,7 +62,10 @@ void main() {
 
     for (final tone in NotificationTone.values) {
       expect(ruleAlertMessageFor(atLimit, tone), isNot(contains('1 minutes')));
-      expect(ruleAlertMessageFor(overLimit, tone), isNot(contains('1 minutes')));
+      expect(
+        ruleAlertMessageFor(overLimit, tone),
+        isNot(contains('1 minutes')),
+      );
       expect(ruleAlertMessageFor(overLimit, tone), contains('1 minute'));
     }
   });

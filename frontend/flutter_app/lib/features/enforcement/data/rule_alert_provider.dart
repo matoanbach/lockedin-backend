@@ -147,7 +147,6 @@ class RuleAlertController extends Notifier<RuleAlert?> {
   String _alertDedupeKey(RuleStatusData status, String eventType) {
     return 'rule_alert.${status.ruleId}.${status.usageDate}.$eventType';
   }
-
 }
 
 RuleAlert buildRuleAlert(RuleStatusData status, NotificationTone tone) {

@@ -141,6 +141,12 @@ def _event_payload(
     }
 
 
+def _recent_midday_utc() -> datetime:
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    midday = now.replace(hour=12, minute=0, second=0)
+    return midday if midday <= now else midday - timedelta(days=1)
+
+
 def test_usage_ingestion_rejects_overlong_future_and_stale_events(client) -> None:
     now = datetime.now(timezone.utc).replace(microsecond=0)
     invalid_events = [
@@ -206,7 +212,7 @@ def test_usage_ingestion_rejects_overlap_with_stored_event(client, db_session) -
 
 
 def test_partial_events_round_once_after_exact_seconds_are_summed(client, db_session) -> None:
-    now = datetime.now(timezone.utc).replace(microsecond=0)
+    now = _recent_midday_utc()
     response = client.post(
         "/api/v1/usage/events",
         json={
@@ -225,7 +231,7 @@ def test_partial_events_round_once_after_exact_seconds_are_summed(client, db_ses
 def test_two_hundred_seconds_rounds_daily_aggregate_up_to_four_minutes(
     client, db_session
 ) -> None:
-    now = datetime.now(timezone.utc).replace(microsecond=0)
+    now = _recent_midday_utc()
     response = client.post(
         "/api/v1/usage/events",
         json={
@@ -246,7 +252,7 @@ def test_two_hundred_seconds_rounds_daily_aggregate_up_to_four_minutes(
 
 
 def test_rebuild_repairs_derived_aggregates_without_deleting_raw_events(client, db_session) -> None:
-    now = datetime.now(timezone.utc).replace(microsecond=0)
+    now = _recent_midday_utc()
     event = _event_payload("repair-1", now - timedelta(minutes=30), now)
     assert client.post("/api/v1/usage/events", json={"events": [event]}).status_code == 200
     aggregate = db_session.query(UsageDailyAppAggregate).one()
