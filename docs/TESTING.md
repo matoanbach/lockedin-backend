@@ -152,6 +152,12 @@ Android code. The alert path now reloads preferences before dedupe reads, and a 
 simulates a native marker arriving after Dart cached the store. The final APK resume smoke check
 created no additional notification or enforcement event.
 
+The `6/5` value did not show another minute of Messages usage after intervention. The preserved
+July 28 raw events total 315.400 seconds for Messages, and the current daily aggregate policy uses
+`ceil(total_seconds / 60)`, producing six displayed minutes. The stale-cache fix prevents the
+duplicate post-disable notification, but the product's whole-minute display and rounding policy
+still requires reconciliation across rule status, dashboard, and analytics views.
+
 This evidence verifies the implemented user-revocable soft intervention. It does not verify or
 claim non-bypassable Device Owner, LockTask, backend lock-command, PIN/wait, or tamper-resistant
 enforcement.
