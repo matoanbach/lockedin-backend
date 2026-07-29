@@ -1,17 +1,12 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
 from lockedin_backend.repositories.preferences_repository import PreferencesRepository
-from lockedin_backend.repositories.usage_daily_app_aggregate_repository import (
-    UsageDailyAppAggregateRepository,
-)
-from lockedin_backend.repositories.usage_daily_category_aggregate_repository import (
-    UsageDailyCategoryAggregateRepository,
-)
 from lockedin_backend.repositories.usage_repository import UsageRepository
 from lockedin_backend.schemas.analytics import (
     CategoryBreakdownItem,
@@ -23,7 +18,13 @@ from lockedin_backend.schemas.analytics import (
     WeeklyUsagePoint,
 )
 from lockedin_backend.services.profile_context import profile_context_service
-from lockedin_backend.services.usage_time import ensure_utc, split_minutes_by_local_hour
+from lockedin_backend.services.usage_time import (
+    MILLISECONDS_PER_MINUTE,
+    completed_minutes,
+    ensure_utc,
+    split_milliseconds_by_local_date,
+    split_milliseconds_by_local_hour,
+)
 
 
 def current_utc_now() -> datetime:
@@ -34,31 +35,39 @@ class AnalyticsService:
     def __init__(self) -> None:
         self.preferences_repository = PreferencesRepository()
         self.usage_repository = UsageRepository()
-        self.app_aggregate_repository = UsageDailyAppAggregateRepository()
-        self.category_aggregate_repository = UsageDailyCategoryAggregateRepository()
 
     def get_dashboard(self, db: Session) -> DashboardAnalyticsResponse:
         profile = profile_context_service.ensure_default_profile(db)
         effective_timezone = self._get_effective_timezone(db, profile.id)
         today = self._today_in_timezone(effective_timezone)
         week_dates = self._build_day_range(today, 7)
-        daily_totals = self.category_aggregate_repository.get_daily_totals_for_date_range(
-            db,
-            profile.id,
-            week_dates[0],
-            week_dates[-1],
+        daily_totals, category_totals, _, _ = self._collect_daily_usage(
+            db, profile.id
         )
-        today_categories = self.category_aggregate_repository.list_by_date(db, profile.id, today)
+        today_categories = sorted(
+            (
+                (category, milliseconds)
+                for (usage_date, category), milliseconds in category_totals.items()
+                if usage_date == today
+            ),
+            key=lambda item: (-item[1], item[0]),
+        )
         today_total = daily_totals.get(today, 0)
         yesterday_total = daily_totals.get(today - timedelta(days=1), 0)
 
         return DashboardAnalyticsResponse(
-            today_total_minutes=today_total,
+            today_total_minutes=completed_minutes(today_total),
             category_breakdown=[
-                CategoryBreakdownItem(name=row.category, minutes=row.total_minutes)
-                for row in today_categories
+                CategoryBreakdownItem(
+                    name=category,
+                    minutes=completed_minutes(milliseconds),
+                )
+                for category, milliseconds in today_categories
             ],
-            weekly_usage_hours=[self._minutes_to_hours(daily_totals.get(day, 0)) for day in week_dates],
+            weekly_usage_hours=[
+                self._milliseconds_to_hours(daily_totals.get(day, 0))
+                for day in week_dates
+            ],
             delta_from_yesterday_percent=self._calculate_delta_percent(
                 current_total=today_total,
                 previous_total=yesterday_total,
@@ -71,11 +80,8 @@ class AnalyticsService:
         timezone_value = ZoneInfo(effective_timezone)
         today = self._today_in_timezone(effective_timezone)
         week_dates = self._build_day_range(today, 7)
-        daily_totals = self.category_aggregate_repository.get_daily_totals_for_date_range(
-            db,
-            profile.id,
-            week_dates[0],
-            week_dates[-1],
+        daily_totals, _, app_totals, app_names = self._collect_daily_usage(
+            db, profile.id
         )
         range_start = datetime.combine(week_dates[0], time.min, tzinfo=timezone_value).astimezone(
             timezone.utc
@@ -95,33 +101,45 @@ class AnalyticsService:
         ):
             clipped_start = max(ensure_utc(event.started_at), range_start)
             clipped_end = min(ensure_utc(event.ended_at), range_end)
-            for hour_index, minutes in split_minutes_by_local_hour(
+            for hour_index, milliseconds in split_milliseconds_by_local_hour(
                 clipped_start,
                 clipped_end,
                 effective_timezone,
             ):
-                hourly_totals[hour_index] += minutes
+                hourly_totals[hour_index] += milliseconds
 
-        top_apps = self.app_aggregate_repository.list_top_apps_for_date_range(
-            db,
-            profile.id,
-            week_dates[0],
-            week_dates[-1],
-            limit=5,
-        )
+        top_app_totals: dict[str, int] = defaultdict(int)
+        for (usage_date, app_id), milliseconds in app_totals.items():
+            if week_dates[0] <= usage_date <= week_dates[-1]:
+                top_app_totals[app_id] += milliseconds
+        top_apps = sorted(
+            top_app_totals.items(),
+            key=lambda item: (-item[1], app_names[item[0]]),
+        )[:5]
+
+        hourly_minutes = [
+            completed_minutes(milliseconds) for milliseconds in hourly_totals
+        ]
 
         return TrendsAnalyticsResponse(
             hourly_usage=[
                 HourlyUsagePoint(hour=self._format_hour_label(hour), minutes=minutes)
-                for hour, minutes in enumerate(hourly_totals)
+                for hour, minutes in enumerate(hourly_minutes)
             ],
             weekly_usage=[
-                WeeklyUsagePoint(day=day.strftime("%a"), hours=self._minutes_to_hours(daily_totals.get(day, 0)))
+                WeeklyUsagePoint(
+                    day=day.strftime("%a"),
+                    hours=self._milliseconds_to_hours(daily_totals.get(day, 0)),
+                )
                 for day in week_dates
             ],
             top_apps=[
-                TopAppUsagePoint(app_id=app_id, app_name=app_name, minutes=minutes)
-                for app_id, app_name, minutes in top_apps
+                TopAppUsagePoint(
+                    app_id=app_id,
+                    app_name=app_names[app_id],
+                    minutes=completed_minutes(milliseconds),
+                )
+                for app_id, milliseconds in top_apps
             ],
             peak_usage_window=self._build_peak_usage_window(hourly_totals),
         )
@@ -133,23 +151,23 @@ class AnalyticsService:
         current_week_dates = self._build_day_range(today, 7)
         previous_week_end = current_week_dates[0] - timedelta(days=1)
         previous_week_dates = self._build_day_range(previous_week_end, 7)
-        current_totals = self.category_aggregate_repository.get_daily_totals_for_date_range(
-            db,
-            profile.id,
-            current_week_dates[0],
-            current_week_dates[-1],
-        )
-        previous_totals = self.category_aggregate_repository.get_daily_totals_for_date_range(
-            db,
-            profile.id,
-            previous_week_dates[0],
-            previous_week_dates[-1],
-        )
+        daily_totals, _, _, _ = self._collect_daily_usage(db, profile.id)
+        current_totals = {
+            day: daily_totals.get(day, 0) for day in current_week_dates
+        }
+        previous_totals = {
+            day: daily_totals.get(day, 0) for day in previous_week_dates
+        }
         preferences = self.preferences_repository.get_by_profile_id(db, profile.id)
         daily_limit = preferences.default_daily_limit_minutes if preferences is not None else 0
-        current_total_minutes = sum(current_totals.get(day, 0) for day in current_week_dates)
-        previous_total_minutes = sum(previous_totals.get(day, 0) for day in previous_week_dates)
-        all_daily_totals = self.category_aggregate_repository.list_all_daily_totals(db, profile.id)
+        daily_limit_milliseconds = daily_limit * MILLISECONDS_PER_MINUTE
+        current_total_milliseconds = sum(
+            current_totals.get(day, 0) for day in current_week_dates
+        )
+        previous_total_milliseconds = sum(
+            previous_totals.get(day, 0) for day in previous_week_dates
+        )
+        all_daily_totals = sorted(daily_totals.items())
         has_usage_history = bool(all_daily_totals)
 
         goals_met_days = 0
@@ -158,24 +176,54 @@ class AnalyticsService:
             goals_met_days = sum(
                 1
                 for day in current_week_dates
-                if current_totals.get(day, 0) <= daily_limit
+                if current_totals.get(day, 0) <= daily_limit_milliseconds
             )
             longest_streak_days = self._calculate_longest_streak(
                 all_daily_totals,
                 today=today,
-                daily_limit=daily_limit,
+                daily_limit=daily_limit_milliseconds,
             )
 
         return WeeklySummaryResponse(
             screen_time_reduction_percent=self._calculate_reduction_percent(
-                current_total=current_total_minutes,
-                previous_total=previous_total_minutes,
+                current_total=current_total_milliseconds,
+                previous_total=previous_total_milliseconds,
             ),
-            total_week_hours=self._minutes_to_hours(current_total_minutes),
-            daily_average_hours=self._minutes_to_hours(current_total_minutes / 7),
+            total_week_hours=self._milliseconds_to_hours(
+                current_total_milliseconds
+            ),
+            daily_average_hours=self._milliseconds_to_hours(
+                current_total_milliseconds / 7
+            ),
             goals_met_days=goals_met_days,
             longest_streak_days=longest_streak_days,
         )
+
+    def _collect_daily_usage(
+        self, db: Session, profile_id: str
+    ) -> tuple[
+        dict[date, int],
+        dict[tuple[date, str], int],
+        dict[tuple[date, str], int],
+        dict[str, str],
+    ]:
+        daily_totals: dict[date, int] = defaultdict(int)
+        category_totals: dict[tuple[date, str], int] = defaultdict(int)
+        app_totals: dict[tuple[date, str], int] = defaultdict(int)
+        app_names: dict[str, str] = {}
+
+        for event in self.usage_repository.list_all_for_profile(db, profile_id):
+            app_names[event.app_id] = event.app_name
+            for usage_date, milliseconds in split_milliseconds_by_local_date(
+                event.started_at,
+                event.ended_at,
+                event.timezone,
+            ):
+                daily_totals[usage_date] += milliseconds
+                category_totals[(usage_date, event.category)] += milliseconds
+                app_totals[(usage_date, event.app_id)] += milliseconds
+
+        return daily_totals, category_totals, app_totals, app_names
 
     def _get_effective_timezone(self, db: Session, profile_id: str) -> str:
         return self.usage_repository.get_latest_timezone(db, profile_id) or "UTC"
@@ -187,8 +235,8 @@ class AnalyticsService:
         start_day = end_day - timedelta(days=days - 1)
         return [start_day + timedelta(days=offset) for offset in range(days)]
 
-    def _minutes_to_hours(self, minutes: float) -> float:
-        return round(minutes / 60, 1)
+    def _milliseconds_to_hours(self, milliseconds: float) -> float:
+        return round(milliseconds / 3_600_000, 1)
 
     def _calculate_delta_percent(self, *, current_total: int, previous_total: int) -> int:
         if previous_total == 0:
@@ -239,7 +287,10 @@ class AnalyticsService:
         today: date,
         daily_limit: int,
     ) -> int:
-        totals_by_day = {usage_date: total_minutes for usage_date, total_minutes in all_daily_totals}
+        totals_by_day = {
+            usage_date: total_milliseconds
+            for usage_date, total_milliseconds in all_daily_totals
+        }
         first_day = all_daily_totals[0][0]
         streak = 0
         longest_streak = 0

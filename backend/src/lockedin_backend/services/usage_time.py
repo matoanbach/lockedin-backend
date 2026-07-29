@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 
 
 DEFAULT_CATEGORY = "Other"
+MILLISECONDS_PER_MINUTE = 60_000
 
 
 def normalize_category(category: str | None) -> str:
@@ -25,6 +26,22 @@ def ensure_utc(value: datetime) -> datetime:
 def derive_duration_minutes(started_at: datetime, ended_at: datetime) -> int:
     total_seconds = (ensure_utc(ended_at) - ensure_utc(started_at)).total_seconds()
     return max(1, math.ceil(total_seconds / 60))
+
+
+def duration_milliseconds(started_at: datetime, ended_at: datetime) -> int:
+    delta = ensure_utc(ended_at) - ensure_utc(started_at)
+    return max(
+        0,
+        (
+            delta.days * 86_400_000
+            + delta.seconds * 1_000
+            + delta.microseconds // 1_000
+        ),
+    )
+
+
+def completed_minutes(milliseconds: int) -> int:
+    return max(0, milliseconds) // MILLISECONDS_PER_MINUTE
 
 
 def split_minutes_by_local_date(
@@ -67,6 +84,22 @@ def split_seconds_by_local_date(
     return segments
 
 
+def split_milliseconds_by_local_date(
+    started_at: datetime, ended_at: datetime, timezone_name: str
+) -> list[tuple[date, int]]:
+    return _split_milliseconds_by_boundary(
+        started_at,
+        ended_at,
+        timezone_name,
+        key_fn=lambda current: current.date(),
+        next_boundary_fn=lambda current, tz: datetime.combine(
+            current.date() + timedelta(days=1),
+            time.min,
+            tzinfo=tz,
+        ),
+    )
+
+
 def split_minutes_by_local_hour(
     started_at: datetime, ended_at: datetime, timezone_name: str
 ) -> list[tuple[int, int]]:
@@ -82,6 +115,48 @@ def split_minutes_by_local_hour(
         )
         + timedelta(hours=1),
     )
+
+
+def split_milliseconds_by_local_hour(
+    started_at: datetime, ended_at: datetime, timezone_name: str
+) -> list[tuple[int, int]]:
+    return _split_milliseconds_by_boundary(
+        started_at,
+        ended_at,
+        timezone_name,
+        key_fn=lambda current: current.hour,
+        next_boundary_fn=lambda current, _tz: current.replace(
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+        + timedelta(hours=1),
+    )
+
+
+def _split_milliseconds_by_boundary(
+    started_at: datetime,
+    ended_at: datetime,
+    timezone_name: str,
+    *,
+    key_fn,
+    next_boundary_fn,
+) -> list[tuple[object, int]]:
+    timezone_value = ZoneInfo(timezone_name)
+    started_local = ensure_utc(started_at).astimezone(timezone_value)
+    ended_local = ensure_utc(ended_at).astimezone(timezone_value)
+    segments: list[tuple[object, int]] = []
+    cursor = started_local
+
+    while cursor < ended_local:
+        boundary = next_boundary_fn(cursor, timezone_value)
+        segment_end = min(boundary, ended_local)
+        milliseconds = duration_milliseconds(cursor, segment_end)
+        if milliseconds > 0:
+            segments.append((key_fn(cursor), milliseconds))
+        cursor = segment_end
+
+    return segments
 
 
 def _split_minutes_by_boundary(

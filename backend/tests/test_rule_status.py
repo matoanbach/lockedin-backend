@@ -1,3 +1,5 @@
+import pytest
+
 import lockedin_backend.services.rule_status_service as rule_status_service_module
 
 
@@ -139,6 +141,8 @@ def test_rule_status_evaluates_enabled_and_disabled_rules(client, monkeypatch) -
             "limitMinutes": 45,
             "usedMinutes": 45,
             "remainingMinutes": 0,
+            "usedMilliseconds": 2_700_000,
+            "remainingMilliseconds": 0,
             "progressPercent": 100,
             "status": "at_limit",
             "isBlockedNow": True,
@@ -152,6 +156,8 @@ def test_rule_status_evaluates_enabled_and_disabled_rules(client, monkeypatch) -
             "limitMinutes": 20,
             "usedMinutes": 8,
             "remainingMinutes": 12,
+            "usedMilliseconds": 480_000,
+            "remainingMilliseconds": 720_000,
             "progressPercent": 40,
             "status": "disabled",
             "isBlockedNow": False,
@@ -165,6 +171,8 @@ def test_rule_status_evaluates_enabled_and_disabled_rules(client, monkeypatch) -
             "limitMinutes": 60,
             "usedMinutes": 20,
             "remainingMinutes": 40,
+            "usedMilliseconds": 1_200_000,
+            "remainingMilliseconds": 2_400_000,
             "progressPercent": 33,
             "status": "under_limit",
             "isBlockedNow": False,
@@ -178,6 +186,8 @@ def test_rule_status_evaluates_enabled_and_disabled_rules(client, monkeypatch) -
             "limitMinutes": 10,
             "usedMinutes": 14,
             "remainingMinutes": 0,
+            "usedMilliseconds": 840_000,
+            "remainingMilliseconds": 0,
             "progressPercent": 140,
             "status": "over_limit",
             "isBlockedNow": True,
@@ -191,6 +201,8 @@ def test_rule_status_evaluates_enabled_and_disabled_rules(client, monkeypatch) -
             "limitMinutes": 30,
             "usedMinutes": 24,
             "remainingMinutes": 6,
+            "usedMilliseconds": 1_440_000,
+            "remainingMilliseconds": 360_000,
             "progressPercent": 80,
             "status": "approaching_limit",
             "isBlockedNow": False,
@@ -249,6 +261,8 @@ def test_rule_status_matches_legacy_youtube_rule_alias(client, monkeypatch) -> N
             "limitMinutes": 10,
             "usedMinutes": 11,
             "remainingMinutes": 0,
+            "usedMilliseconds": 660_000,
+            "remainingMilliseconds": 0,
             "progressPercent": 110,
             "status": "over_limit",
             "isBlockedNow": True,
@@ -309,8 +323,92 @@ def test_rule_status_does_not_round_small_limit_below_eighty_percent(
             "limitMinutes": 3,
             "usedMinutes": 2,
             "remainingMinutes": 1,
+            "usedMilliseconds": 120_000,
+            "remainingMilliseconds": 60_000,
             "progressPercent": 67,
             "status": "under_limit",
             "isBlockedNow": False,
+        }
+    ]
+
+
+@pytest.mark.parametrize(
+    (
+        "ended_at",
+        "used_milliseconds",
+        "used_minutes",
+        "remaining_milliseconds",
+        "progress_percent",
+        "expected_status",
+        "is_blocked_now",
+    ),
+    [
+        ("2026-06-08T12:04:59.900Z", 299_900, 4, 100, 99, "approaching_limit", False),
+        ("2026-06-08T12:05:00.000Z", 300_000, 5, 0, 100, "at_limit", True),
+        ("2026-06-08T12:05:00.100Z", 300_100, 5, 0, 100, "over_limit", True),
+        ("2026-06-08T12:05:15.400Z", 315_400, 5, 0, 105, "over_limit", True),
+        ("2026-06-08T12:05:59.900Z", 359_900, 5, 0, 120, "over_limit", True),
+    ],
+)
+def test_rule_status_uses_exact_time_and_completed_minutes(
+    client,
+    monkeypatch,
+    ended_at,
+    used_milliseconds,
+    used_minutes,
+    remaining_milliseconds,
+    progress_percent,
+    expected_status,
+    is_blocked_now,
+) -> None:
+    monkeypatch.setattr(
+        rule_status_service_module,
+        "current_utc_now",
+        lambda: rule_status_service_module.datetime(
+            2026, 6, 8, 12, 10, tzinfo=rule_status_service_module.timezone.utc
+        ),
+    )
+    rule = client.post(
+        "/api/v1/rules",
+        json={
+            "appId": "com.google.android.apps.messaging",
+            "appName": "Messages",
+            "limitMinutes": 5,
+            "enabled": True,
+        },
+    ).json()
+    ingestion_response = client.post(
+        "/api/v1/usage/events",
+        json={
+            "events": [
+                {
+                    "sourceEventId": f"messages-{used_milliseconds}",
+                    "appId": "com.google.android.apps.messaging",
+                    "appName": "Messages",
+                    "category": "Social",
+                    "startedAt": "2026-06-08T12:00:00.000Z",
+                    "endedAt": ended_at,
+                    "timezone": "UTC",
+                }
+            ]
+        },
+    )
+
+    assert ingestion_response.status_code == 200
+    assert client.get("/api/v1/rules/status").json() == [
+        {
+            "ruleId": rule["id"],
+            "appId": "com.google.android.apps.messaging",
+            "appName": "Messages",
+            "usageDate": "2026-06-08",
+            "enabled": True,
+            "limitMinutes": 5,
+            "usedMinutes": used_minutes,
+            "remainingMinutes": 0,
+            "usedMilliseconds": used_milliseconds,
+            "remainingMilliseconds": remaining_milliseconds,
+            "progressPercent": progress_percent,
+            "status": expected_status,
+            "isBlockedNow": is_blocked_now,
         }
     ]

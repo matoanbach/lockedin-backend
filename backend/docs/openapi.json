@@ -489,6 +489,10 @@
             "title": "Progresspercent",
             "type": "integer"
           },
+          "remainingMilliseconds": {
+            "title": "Remainingmilliseconds",
+            "type": "integer"
+          },
           "remainingMinutes": {
             "title": "Remainingminutes",
             "type": "integer"
@@ -505,6 +509,10 @@
             "title": "Usagedate",
             "type": "string"
           },
+          "usedMilliseconds": {
+            "title": "Usedmilliseconds",
+            "type": "integer"
+          },
           "usedMinutes": {
             "title": "Usedminutes",
             "type": "integer"
@@ -519,6 +527,8 @@
           "limitMinutes",
           "usedMinutes",
           "remainingMinutes",
+          "usedMilliseconds",
+          "remainingMilliseconds",
           "progressPercent",
           "status",
           "isBlockedNow"

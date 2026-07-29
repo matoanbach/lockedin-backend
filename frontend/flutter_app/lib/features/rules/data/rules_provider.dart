@@ -79,6 +79,8 @@ class RuleStatusData {
     required this.limitMinutes,
     required this.usedMinutes,
     required this.remainingMinutes,
+    required this.usedMilliseconds,
+    required this.remainingMilliseconds,
     required this.progressPercent,
     required this.status,
     required this.isBlockedNow,
@@ -92,6 +94,8 @@ class RuleStatusData {
   final int limitMinutes;
   final int usedMinutes;
   final int remainingMinutes;
+  final int usedMilliseconds;
+  final int remainingMilliseconds;
   final int progressPercent;
   final String status;
   final bool isBlockedNow;
@@ -114,7 +118,10 @@ class RuleStatusData {
       return '${hours}h ${minutes}m';
     }
 
-    return '${formatTime(usedHours, usedRemainderMinutes)} / ${formatTime(limitHours, limitRemainderMinutes)}';
+    final usedTime = usedMinutes == 0 && usedMilliseconds > 0
+        ? '<1m'
+        : formatTime(usedHours, usedRemainderMinutes);
+    return '$usedTime / ${formatTime(limitHours, limitRemainderMinutes)}';
   }
 }
 
@@ -258,6 +265,12 @@ RuleStatusData _ruleStatusFromJson(Map<String, dynamic> json) {
     limitMinutes: json['limitMinutes'] as int,
     usedMinutes: json['usedMinutes'] as int,
     remainingMinutes: json['remainingMinutes'] as int,
+    usedMilliseconds:
+        (json['usedMilliseconds'] as num?)?.toInt() ??
+        (json['usedMinutes'] as int) * 60 * 1000,
+    remainingMilliseconds:
+        (json['remainingMilliseconds'] as num?)?.toInt() ??
+        (json['remainingMinutes'] as int) * 60 * 1000,
     progressPercent: json['progressPercent'] as int,
     status: json['status'] as String,
     isBlockedNow: json['isBlockedNow'] as bool,

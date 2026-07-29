@@ -16,6 +16,7 @@ data class CachedRuleStatus(
     val enabled: Boolean,
     val limitMinutes: Int,
     val usedMinutes: Int,
+    val usedMilliseconds: Long,
     val status: String,
 )
 
@@ -75,6 +76,7 @@ object RuleEnforcementStore {
                     put("enabled", status.enabled)
                     put("limitMinutes", status.limitMinutes)
                     put("usedMinutes", status.usedMinutes)
+                    put("usedMilliseconds", status.usedMilliseconds)
                     put("status", status.status)
                 },
             )
@@ -94,19 +96,20 @@ object RuleEnforcementStore {
         }
     }
 
-    fun calculateLiveUsedMinutes(
+    fun calculateLiveUsedMilliseconds(
         context: Context,
         rule: CachedRuleStatus,
         currentSessionMillis: Long,
-    ): Int {
+    ): Long {
         val usageDate = currentUsageDate()
-        val baseMinutes = if (rule.usageDate == usageDate) rule.usedMinutes else 0
+        val baseMilliseconds =
+            if (rule.usageDate == usageDate) rule.usedMilliseconds else 0L
         val localMillis = loadLocalUsageMillis(context).optLong(
             localUsageKey(rule.appId, usageDate),
             0L,
         )
-        return LiveUsageAccounting.liveUsedMinutes(
-            baseMinutes = baseMinutes,
+        return LiveUsageAccounting.liveUsedMilliseconds(
+            baseMilliseconds = baseMilliseconds,
             localMillis = localMillis,
             currentSessionMillis = currentSessionMillis,
         )
@@ -387,6 +390,10 @@ object RuleEnforcementStore {
                 enabled = item.optBoolean("enabled"),
                 limitMinutes = item.optInt("limitMinutes"),
                 usedMinutes = item.optInt("usedMinutes"),
+                usedMilliseconds = item.optLong(
+                    "usedMilliseconds",
+                    item.optInt("usedMinutes").toLong() * 60_000L,
+                ),
                 status = item.optString("status"),
             )
         }
@@ -432,9 +439,9 @@ object RuleEnforcementStore {
                 localUsageDate = usageDate,
                 localUsageMillis = reconciled.optLong(key, 0L),
                 previousBackendUsageDate = previous?.usageDate,
-                previousBackendUsedMinutes = previous?.usedMinutes,
+                previousBackendUsedMilliseconds = previous?.usedMilliseconds,
                 refreshedBackendUsageDate = refreshed.usageDate,
-                refreshedBackendUsedMinutes = refreshed.usedMinutes,
+                refreshedBackendUsedMilliseconds = refreshed.usedMilliseconds,
                 currentUsageDate = usageDate,
             )
             if (retainedMillis > 0L) {
@@ -501,6 +508,9 @@ object RuleEnforcementStore {
         val enabled = raw["enabled"] as? Boolean ?: false
         val limitMinutes = (raw["limitMinutes"] as? Number)?.toInt() ?: return null
         val usedMinutes = (raw["usedMinutes"] as? Number)?.toInt() ?: 0
+        val usedMilliseconds =
+            (raw["usedMilliseconds"] as? Number)?.toLong()
+                ?: usedMinutes.toLong() * 60_000L
         val status = raw["status"] as? String ?: "under_limit"
 
         return CachedRuleStatus(
@@ -511,6 +521,7 @@ object RuleEnforcementStore {
             enabled = enabled,
             limitMinutes = limitMinutes,
             usedMinutes = usedMinutes,
+            usedMilliseconds = usedMilliseconds,
             status = status,
         )
     }

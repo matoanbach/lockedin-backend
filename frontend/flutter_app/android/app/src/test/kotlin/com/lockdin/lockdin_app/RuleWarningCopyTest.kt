@@ -38,6 +38,20 @@ class RuleWarningCopyTest {
     }
 
     @Test
+    fun approachingWarningDescribesSubMinuteRemainderWithoutRoundingUpUsage() {
+        val warning = content(
+            eventType = "warning_approaching_limit",
+            tone = "professional",
+            usedMilliseconds = 299_900L,
+        )
+
+        assertEquals(
+            "less than 1 minute remains before you hit today's 5-minute limit for Messages.",
+            warning.body,
+        )
+    }
+
+    @Test
     fun limitReachedCopyCoversEveryToneAtAndOverTheLimit() {
         for (tone in listOf("fun", "edgy", "professional")) {
             val atLimit = content(
@@ -48,7 +62,7 @@ class RuleWarningCopyTest {
             val overLimit = content(
                 eventType = "warning_limit_reached",
                 tone = tone,
-                usedMinutes = 6,
+                usedMilliseconds = 300_100L,
             )
 
             assertEquals("Messages reached its limit", atLimit.title)
@@ -62,20 +76,21 @@ class RuleWarningCopyTest {
         return content(
             eventType = "warning_approaching_limit",
             tone = tone,
-            usedMinutes = usedMinutes,
+            usedMilliseconds = usedMinutes.toLong() * 60_000L,
         ).body
     }
 
     private fun content(
         eventType: String,
         tone: String,
-        usedMinutes: Int,
+        usedMinutes: Int = 0,
+        usedMilliseconds: Long = usedMinutes.toLong() * 60_000L,
     ): RuleWarningContent {
         return requireNotNull(
             RuleWarningCopy.content(
                 appName = "Messages",
                 limitMinutes = 5,
-                usedMinutes = usedMinutes,
+                usedMilliseconds = usedMilliseconds,
                 eventType = eventType,
                 tone = tone,
             ),

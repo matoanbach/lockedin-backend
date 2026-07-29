@@ -10,7 +10,7 @@ claim unmeasured coverage or tests that have not been run.
 | Backend route/service tests | pytest, FastAPI TestClient, SQLAlchemy, SQLite fixtures | validation, status codes, services, repositories, serialization |
 | PostgreSQL smoke test | pytest, psycopg, Docker PostgreSQL | initialized schema and runtime connectivity |
 | Flutter unit/widget tests | `flutter_test` | app rendering, usage-sync controller behavior, rule warning widgets |
-| Android native unit tests | JUnit 4, Gradle | UsageStats reconstruction and interval subtraction |
+| Android native unit tests | JUnit 4, Gradle | UsageStats reconstruction, interval subtraction, exact-time enforcement, and warning copy |
 | Static analysis | Flutter analyzer, Dart formatter | frontend correctness and style |
 | CI build checks | GitHub Actions | Android debug APK and Windows debug build |
 | Physical system tests | Samsung SM-A528B, Android 14 | usage lifecycle, permissions, PiP, lock, offline recovery, rapid switching |
@@ -153,10 +153,34 @@ simulates a native marker arriving after Dart cached the store. The final APK re
 created no additional notification or enforcement event.
 
 The `6/5` value did not show another minute of Messages usage after intervention. The preserved
-July 28 raw events total 315.400 seconds for Messages, and the current daily aggregate policy uses
-`ceil(total_seconds / 60)`, producing six displayed minutes. The stale-cache fix prevents the
-duplicate post-disable notification, but the product's whole-minute display and rounding policy
-still requires reconciliation across rule status, dashboard, and analytics views.
+July 28 raw events total 315.400 seconds for Messages. The code at the time used
+`ceil(total_seconds / 60)`, producing six displayed minutes. That event remains preserved as
+historical diagnostic evidence.
+
+## Automated Exact-Time Policy Evidence — July 28, 2026
+
+The approved replacement policy uses raw elapsed milliseconds for rule status, warnings,
+intervention, analytics comparisons, and Android backend-plus-live accounting. Whole-minute
+fields and UI totals represent only completed minutes. A positive remainder below one minute is
+rendered as “less than 1 minute” where the distinction matters.
+
+| Exact usage | Completed minutes | Rule status | Blocked |
+| ---: | ---: | --- | --- |
+| 299.9 seconds | 4 | `approaching_limit` | No |
+| 300.0 seconds | 5 | `at_limit` | Yes |
+| 300.1 seconds | 5 | `over_limit` | Yes |
+| 315.4 seconds | 5 | `over_limit` | Yes |
+| 359.9 seconds | 5 | `over_limit` | Yes |
+
+Backend tests confirm the status contract, exact analytics percentages, completed-minute
+dashboard values, and aggregate flooring. Android JVM tests confirm that exact backend
+milliseconds and the live local remainder reach the limit without delay. Flutter tests confirm
+sub-minute remaining copy and completed-minute rendering. No aggregate rebuild, raw-event edit,
+or diagnostic-event edit was performed.
+
+This implementation has not yet been installed on the physical Samsung. The device still contains
+the previously verified APK, so the table above is automated evidence rather than a new physical
+claim.
 
 This evidence verifies the implemented user-revocable soft intervention. It does not verify or
 claim non-bypassable Device Owner, LockTask, backend lock-command, PIN/wait, or tamper-resistant

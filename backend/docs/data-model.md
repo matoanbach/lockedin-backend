@@ -124,6 +124,8 @@ Service behavior:
 
 - `UsageService` dedupes by `source_event_id`
 - events are normalized to UTC for storage
+- raw timestamps are authoritative for exact elapsed-time calculations; `duration_minutes` is a
+  legacy compatibility field and is not used for enforcement or exact analytics
 
 ## Daily Aggregates
 
@@ -134,7 +136,7 @@ Files:
 
 Purpose:
 
-- precomputed day-level totals used by analytics
+- precomputed completed-minute day-level totals retained as a cache/compatibility projection
 
 Important details:
 
@@ -145,7 +147,10 @@ Important details:
 Service behavior:
 
 - `UsageService` updates these during usage ingestion
-- event time is split by local date before minutes are applied
+- event time is split by local date and exact milliseconds are summed before completed minutes are
+  stored
+- rule status and analytics derive exact elapsed time from raw timestamps so sub-minute remainder
+  is preserved until the final display projection
 
 ## Enforcement Events
 

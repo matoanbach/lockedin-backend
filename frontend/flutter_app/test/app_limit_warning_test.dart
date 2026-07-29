@@ -9,6 +9,33 @@ import 'package:lockdin_app/features/rules/presentation/widgets/app_limit_warnin
 
 void main() {
   test(
+    'exact milliseconds floor completed usage without hiding a remainder',
+    () {
+      final status = _status(
+        usedMinutes: 5,
+        limitMinutes: 5,
+        remainingMinutes: 0,
+        usedMilliseconds: 315400,
+        remainingMilliseconds: 0,
+      );
+      final approaching = _status(
+        usedMinutes: 4,
+        limitMinutes: 5,
+        remainingMinutes: 0,
+        usedMilliseconds: 299900,
+        remainingMilliseconds: 100,
+      );
+
+      expect(formatLimitMilliseconds(status.usedMilliseconds), '5m');
+      expect(formatLimitMilliseconds(approaching.remainingMilliseconds), '<1m');
+      expect(
+        reminderPopupText(approaching),
+        'Reminder: You have less than 1 minute left on Instagram.',
+      );
+    },
+  );
+
+  test(
     'usage dashboard top apps use weekly totals from analytics payload',
     () async {
       final dio = Dio();
@@ -378,6 +405,8 @@ RuleStatusData _status({
   required int usedMinutes,
   required int limitMinutes,
   required int remainingMinutes,
+  int? usedMilliseconds,
+  int? remainingMilliseconds,
 }) {
   return RuleStatusData(
     ruleId: 'rule-$appId',
@@ -388,6 +417,8 @@ RuleStatusData _status({
     limitMinutes: limitMinutes,
     usedMinutes: usedMinutes,
     remainingMinutes: remainingMinutes,
+    usedMilliseconds: usedMilliseconds ?? usedMinutes * 60000,
+    remainingMilliseconds: remainingMilliseconds ?? remainingMinutes * 60000,
     progressPercent: ((usedMinutes / limitMinutes) * 100).round(),
     status: usedMinutes * 5 >= limitMinutes * 4
         ? 'approaching_limit'

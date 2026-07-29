@@ -46,6 +46,21 @@ void main() {
     );
   });
 
+  test('approaching warning describes a positive sub-minute remainder', () {
+    final status = _status(
+      status: 'approaching_limit',
+      usedMinutes: 4,
+      remainingMinutes: 0,
+      usedMilliseconds: 299900,
+      remainingMilliseconds: 100,
+    );
+
+    expect(
+      ruleAlertMessageFor(status, NotificationTone.professional),
+      "less than 1 minute remains before you hit today's 5-minute limit for Messages.",
+    );
+  });
+
   test('limit and over-limit copy handles a one-minute count', () {
     final atLimit = _status(
       status: 'at_limit',
@@ -66,7 +81,7 @@ void main() {
         ruleAlertMessageFor(overLimit, tone),
         isNot(contains('1 minutes')),
       );
-      expect(ruleAlertMessageFor(overLimit, tone), contains('1 minute'));
+      expect(ruleAlertMessageFor(overLimit, tone), contains('1-minute'));
     }
   });
 }
@@ -76,6 +91,8 @@ RuleStatusData _status({
   required int usedMinutes,
   required int remainingMinutes,
   int limitMinutes = 5,
+  int? usedMilliseconds,
+  int? remainingMilliseconds,
 }) {
   return RuleStatusData(
     ruleId: 'messages-rule',
@@ -86,6 +103,8 @@ RuleStatusData _status({
     limitMinutes: limitMinutes,
     usedMinutes: usedMinutes,
     remainingMinutes: remainingMinutes,
+    usedMilliseconds: usedMilliseconds ?? usedMinutes * 60000,
+    remainingMilliseconds: remainingMilliseconds ?? remainingMinutes * 60000,
     progressPercent: 80,
     status: status,
     isBlockedNow: status == 'over_limit',
