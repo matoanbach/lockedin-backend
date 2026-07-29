@@ -141,7 +141,7 @@ def test_rule_status_evaluates_enabled_and_disabled_rules(client, monkeypatch) -
             "remainingMinutes": 0,
             "progressPercent": 100,
             "status": "at_limit",
-            "isBlockedNow": False,
+            "isBlockedNow": True,
         },
         {
             "ruleId": disabled_rule["id"],

@@ -16,7 +16,6 @@ import android.view.accessibility.AccessibilityEvent
 import java.time.Instant
 import java.time.ZoneId
 import kotlin.math.absoluteValue
-import kotlin.math.roundToInt
 
 class LockdinAccessibilityService : AccessibilityService() {
     private val tag = "LockdInAccessibility"
@@ -155,7 +154,7 @@ class LockdinAccessibilityService : AccessibilityService() {
 
         maybeIssueNativeWarning(rule, liveUsedMinutes)
 
-        if (liveUsedMinutes <= rule.limitMinutes) {
+        if (!RuleEnforcementPolicy.shouldIntervene(rule.limitMinutes, liveUsedMinutes)) {
             return true
         }
 
@@ -307,7 +306,10 @@ class LockdinAccessibilityService : AccessibilityService() {
     }
 
     private fun maybeIssueNativeWarning(rule: CachedRuleStatus, liveUsedMinutes: Int) {
-        val eventType = warningEventType(rule.limitMinutes, liveUsedMinutes) ?: return
+        val eventType = RuleEnforcementPolicy.warningEventType(
+            rule.limitMinutes,
+            liveUsedMinutes,
+        ) ?: return
         val usageDate = RuleEnforcementStore.currentUsageDate()
         if (RuleEnforcementStore.hasIssuedWarning(this, rule.ruleId, usageDate, eventType)) {
             Log.d(tag, "Skipping $eventType warning for rule=${rule.ruleId} because it already fired today")
@@ -340,18 +342,6 @@ class LockdinAccessibilityService : AccessibilityService() {
                 source = "android_accessibility",
             ),
         )
-    }
-
-    private fun warningEventType(limitMinutes: Int, liveUsedMinutes: Int): String? {
-        if (liveUsedMinutes >= limitMinutes) {
-            return "warning_limit_reached"
-        }
-
-        if (liveUsedMinutes >= (limitMinutes * 0.8).roundToInt()) {
-            return "warning_approaching_limit"
-        }
-
-        return null
     }
 
     private fun warningContent(

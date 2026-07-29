@@ -81,7 +81,7 @@ class RuleStatusService:
             remaining_minutes=max(0, rule.limit_minutes - used_minutes),
             progress_percent=self._progress_percent(used_minutes, rule.limit_minutes),
             status=status,
-            is_blocked_now=status == "over_limit",
+            is_blocked_now=status in {"at_limit", "over_limit"},
         )
 
     def _progress_percent(self, used_minutes: int, limit_minutes: int) -> int:
