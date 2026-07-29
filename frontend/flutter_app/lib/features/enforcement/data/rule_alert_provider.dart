@@ -48,6 +48,8 @@ class RuleAlertController extends Notifier<RuleAlert?> {
     final ruleStatuses =
         statuses ?? await ref.read(rulesRepositoryProvider).listRuleStatuses();
     final preferences = await SharedPreferences.getInstance();
+    final dedupePreferences = RuleAlertDedupePreferences(preferences);
+    await dedupePreferences.reload();
     final sortedStatuses = [...ruleStatuses]..sort(_comparePriority);
 
     for (final status in sortedStatuses) {
@@ -61,7 +63,7 @@ class RuleAlertController extends Notifier<RuleAlert?> {
       }
 
       final dedupeKey = _alertDedupeKey(status, eventType);
-      if (preferences.getBool(dedupeKey) == true) {
+      if (dedupePreferences.wasIssued(dedupeKey)) {
         continue;
       }
 
@@ -90,7 +92,7 @@ class RuleAlertController extends Notifier<RuleAlert?> {
         // Keep the user-facing alert path working even if event logging fails.
       }
 
-      await preferences.setBool(dedupeKey, true);
+      await dedupePreferences.markIssued(dedupeKey);
       final notificationShown = await ref
           .read(localNotificationsProvider)
           .showWarning(
@@ -147,6 +149,19 @@ class RuleAlertController extends Notifier<RuleAlert?> {
   String _alertDedupeKey(RuleStatusData status, String eventType) {
     return 'rule_alert.${status.ruleId}.${status.usageDate}.$eventType';
   }
+}
+
+class RuleAlertDedupePreferences {
+  const RuleAlertDedupePreferences(this._preferences);
+
+  final SharedPreferences _preferences;
+
+  Future<void> reload() => _preferences.reload();
+
+  bool wasIssued(String dedupeKey) => _preferences.getBool(dedupeKey) == true;
+
+  Future<bool> markIssued(String dedupeKey) =>
+      _preferences.setBool(dedupeKey, true);
 }
 
 RuleAlert buildRuleAlert(RuleStatusData status, NotificationTone tone) {
