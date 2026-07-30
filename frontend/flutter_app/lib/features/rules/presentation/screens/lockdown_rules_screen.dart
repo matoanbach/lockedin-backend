@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../../core/api/api_error.dart';
+import '../../../../core/router/app_router.dart';
+import '../../../../core/router/route_back_fallback.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../../shared/models/models.dart';
 import '../../../../shared/widgets/widgets.dart';
@@ -123,7 +124,10 @@ class _LockdownRulesScreenState extends ConsumerState<LockdownRulesScreen> {
                   ScreenHeader(
                     title: 'Lockdown Rules',
                     subtitle: 'Set limits for individual apps',
-                    onBack: () => context.pop(),
+                    onBack: () => RouteBackFallback.navigate(
+                      context,
+                      AppRoutes.dashboard,
+                    ),
                     label: 'HLR-2',
                   ),
                   Spacing.verticalXxl,

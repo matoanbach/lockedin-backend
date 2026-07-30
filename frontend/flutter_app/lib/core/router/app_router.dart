@@ -15,6 +15,7 @@ import 'package:lockdin_app/features/accountability/presentation/screens/account
 import 'package:lockdin_app/features/settings/presentation/screens/accessibility_settings_screen.dart';
 import 'package:lockdin_app/features/analytics/presentation/screens/analytics_summary_screen.dart';
 import 'package:lockdin_app/features/settings/presentation/screens/privacy_policy_screen.dart';
+import 'package:lockdin_app/core/router/route_back_fallback.dart';
 
 /// Route names for type-safe navigation.
 abstract class AppRoutes {
@@ -106,7 +107,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'lockdown-rules',
         pageBuilder: (context, state) => CustomTransitionPage(
           key: state.pageKey,
-          child: const LockdownRulesScreen(),
+          child: const RouteBackFallback(
+            fallbackLocation: AppRoutes.dashboard,
+            child: LockdownRulesScreen(),
+          ),
           transitionsBuilder: _slideTransition,
         ),
       ),
