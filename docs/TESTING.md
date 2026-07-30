@@ -220,6 +220,28 @@ This evidence verifies the implemented user-revocable soft intervention. It does
 claim non-bypassable Device Owner, LockTask, backend lock-command, PIN/wait, or tamper-resistant
 enforcement.
 
+## Physical Exact-Limit and Navigation Retest — July 29, 2026
+
+The navigation-fix debug APK from commit `050e42c` was built with
+`--dart-define-from-file=.env`, produced SHA-256
+`93E1A2E9BB2D4878466D3130CB65F323E421808AD22C0C73DB5B2B58DA307AE3`, and was installed in
+place on the Samsung SM-A528B with application data preserved.
+
+The user manually repeated the exact-limit intervention and reported that it activated accurately.
+After choosing “Stay in LockdIn,” the restored Rules page was tested through both exit paths:
+
+- the Rules top-left arrow returned to Dashboard;
+- Android system Back returned to Dashboard instead of exiting LockdIn;
+- Dashboard and Rules continued to load.
+
+During the verification, the read-only rule-status response for Messages reported
+`usedMilliseconds: 318793`, `usedMinutes: 5`, `limitMinutes: 5`,
+`remainingMilliseconds: 0`, `progressPercent: 106`, `status: over_limit`, and
+`isBlockedNow: true`. The exact duration was 5 minutes 18.793 seconds. The percentage is
+`round(318793 / 300000 * 100) = 106`, while the `5m` usage label correctly shows completed
+minutes. This physically confirms that the over-limit percentage and completed-minute display use
+their intended exact-time semantics.
+
 ## Edge Cases Covered in Code
 
 - duplicate source IDs and replay;

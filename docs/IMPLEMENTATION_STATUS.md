@@ -48,6 +48,11 @@ be partially implemented and its implemented subset may still be awaiting physic
   Messages, returned `usedMinutes: 0`, retained the exact value in the native cache across a second
   refresh, and rendered `<1m used` in Rules. The exact-limit intervention boundaries were not
   repeated. Accessibility finished disabled and unbound; Usage Access remained allowed.
+- Later on July 29, commit `050e42c` was installed in place after adding a Dashboard fallback for
+  the restored Rules route. The user manually repeated the exact-limit intervention and confirmed
+  that both the Rules top-left arrow and Android system Back returned to Dashboard instead of
+  exiting. A read-only status check reported 318,793 milliseconds against the five-minute limit,
+  correctly rendering `5m`, `106%`, and `over_limit`.
 
 ## High-Level Requirements
 
