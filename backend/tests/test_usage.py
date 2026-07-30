@@ -211,7 +211,7 @@ def test_usage_ingestion_rejects_overlap_with_stored_event(client, db_session) -
     assert db_session.query(UsageEvent).count() == 1
 
 
-def test_partial_events_round_once_after_exact_seconds_are_summed(client, db_session) -> None:
+def test_partial_events_keep_zero_completed_aggregate_minutes(client, db_session) -> None:
     now = _recent_midday_utc()
     response = client.post(
         "/api/v1/usage/events",
@@ -224,11 +224,11 @@ def test_partial_events_round_once_after_exact_seconds_are_summed(client, db_ses
     )
 
     assert response.status_code == 200
-    assert db_session.query(UsageDailyAppAggregate).one().total_minutes == 1
-    assert db_session.query(UsageDailyCategoryAggregate).one().total_minutes == 1
+    assert db_session.query(UsageDailyAppAggregate).one().total_minutes == 0
+    assert db_session.query(UsageDailyCategoryAggregate).one().total_minutes == 0
 
 
-def test_two_hundred_seconds_rounds_daily_aggregate_up_to_four_minutes(
+def test_two_hundred_seconds_store_three_completed_aggregate_minutes(
     client, db_session
 ) -> None:
     now = _recent_midday_utc()
@@ -247,8 +247,8 @@ def test_two_hundred_seconds_rounds_daily_aggregate_up_to_four_minutes(
 
     assert response.status_code == 200
     assert db_session.query(UsageEvent).one().duration_minutes == 4
-    assert db_session.query(UsageDailyAppAggregate).one().total_minutes == 4
-    assert db_session.query(UsageDailyCategoryAggregate).one().total_minutes == 4
+    assert db_session.query(UsageDailyAppAggregate).one().total_minutes == 3
+    assert db_session.query(UsageDailyCategoryAggregate).one().total_minutes == 3
 
 
 def test_rebuild_repairs_derived_aggregates_without_deleting_raw_events(client, db_session) -> None:

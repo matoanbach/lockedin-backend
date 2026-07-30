@@ -19,24 +19,27 @@ object LiveUsageAccounting {
         )
     }
 
-    fun liveUsedMinutes(
-        baseMinutes: Int,
+    fun liveUsedMilliseconds(
+        baseMilliseconds: Long,
         localMillis: Long,
         currentSessionMillis: Long,
-    ): Int {
-        val nonNegativeBase = baseMinutes.coerceAtLeast(0)
+    ): Long {
+        val nonNegativeBase = baseMilliseconds.coerceAtLeast(0L)
         val accumulatedMillis =
             localMillis.coerceAtLeast(0L) + currentSessionMillis.coerceAtLeast(0L)
-        return nonNegativeBase + (accumulatedMillis / MINUTE_MILLIS).toInt()
+        return nonNegativeBase + accumulatedMillis
     }
+
+    fun completedMinutes(milliseconds: Long): Int =
+        (milliseconds.coerceAtLeast(0L) / MINUTE_MILLIS).toInt()
 
     fun reconcileLocalUsageMillis(
         localUsageDate: String,
         localUsageMillis: Long,
         previousBackendUsageDate: String?,
-        previousBackendUsedMinutes: Int?,
+        previousBackendUsedMilliseconds: Long?,
         refreshedBackendUsageDate: String,
-        refreshedBackendUsedMinutes: Int,
+        refreshedBackendUsedMilliseconds: Long,
         currentUsageDate: String,
     ): Long {
         if (localUsageDate != currentUsageDate) {
@@ -48,15 +51,16 @@ object LiveUsageAccounting {
             return retainedLocalMillis
         }
 
-        val previousBaseMinutes = if (previousBackendUsageDate == currentUsageDate) {
-            previousBackendUsedMinutes?.coerceAtLeast(0) ?: 0
+        val previousBaseMilliseconds = if (previousBackendUsageDate == currentUsageDate) {
+            previousBackendUsedMilliseconds?.coerceAtLeast(0L) ?: 0L
         } else {
-            0
+            0L
         }
-        val acknowledgedMinutes =
-            (refreshedBackendUsedMinutes.coerceAtLeast(0) - previousBaseMinutes)
-                .coerceAtLeast(0)
-        val acknowledgedMillis = acknowledgedMinutes.toLong() * MINUTE_MILLIS
-        return (retainedLocalMillis - acknowledgedMillis).coerceAtLeast(0L)
+        val acknowledgedMilliseconds =
+            (
+                refreshedBackendUsedMilliseconds.coerceAtLeast(0L) -
+                    previousBaseMilliseconds
+            ).coerceAtLeast(0L)
+        return (retainedLocalMillis - acknowledgedMilliseconds).coerceAtLeast(0L)
     }
 }

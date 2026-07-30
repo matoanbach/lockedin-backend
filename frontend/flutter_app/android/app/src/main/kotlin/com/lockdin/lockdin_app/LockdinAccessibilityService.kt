@@ -146,15 +146,17 @@ class LockdinAccessibilityService : AccessibilityService() {
             return true
         }
         val elapsedMillis = (nowMillis - sessionStart).coerceAtLeast(0L)
-        val liveUsedMinutes = RuleEnforcementStore.calculateLiveUsedMinutes(this, rule, elapsedMillis)
+        val liveUsedMilliseconds =
+            RuleEnforcementStore.calculateLiveUsedMilliseconds(this, rule, elapsedMillis)
+        val liveUsedMinutes = LiveUsageAccounting.completedMinutes(liveUsedMilliseconds)
         Log.d(
             tag,
-            "Evaluated package=$packageName rule=${rule.ruleId} used=$liveUsedMinutes limit=${rule.limitMinutes}",
+            "Evaluated package=$packageName rule=${rule.ruleId} usedMillis=$liveUsedMilliseconds limitMinutes=${rule.limitMinutes}",
         )
 
-        maybeIssueNativeWarning(rule, liveUsedMinutes)
+        maybeIssueNativeWarning(rule, liveUsedMilliseconds)
 
-        if (!RuleEnforcementPolicy.shouldIntervene(rule.limitMinutes, liveUsedMinutes)) {
+        if (!RuleEnforcementPolicy.shouldIntervene(rule.limitMinutes, liveUsedMilliseconds)) {
             return true
         }
 
@@ -181,7 +183,11 @@ class LockdinAccessibilityService : AccessibilityService() {
                 usageDate = RuleEnforcementStore.currentUsageDate(),
                 usedMinutes = liveUsedMinutes,
                 limitMinutes = rule.limitMinutes,
-                status = if (liveUsedMinutes > rule.limitMinutes) "over_limit" else "at_limit",
+                status = if (liveUsedMilliseconds > rule.limitMinutes.toLong() * 60_000L) {
+                    "over_limit"
+                } else {
+                    "at_limit"
+                },
                 source = "android_accessibility",
             ),
         )
@@ -189,7 +195,10 @@ class LockdinAccessibilityService : AccessibilityService() {
         performGlobalAction(GLOBAL_ACTION_HOME)
         launchLockdinIntervention()
         stopMonitoring()
-        Log.d(tag, "Queued live intervention for package=$packageName used=$liveUsedMinutes")
+        Log.d(
+            tag,
+            "Queued live intervention for package=$packageName usedMillis=$liveUsedMilliseconds",
+        )
         return false
     }
 
@@ -305,10 +314,10 @@ class LockdinAccessibilityService : AccessibilityService() {
         monitorHandler.removeCallbacks(monitorRunnable)
     }
 
-    private fun maybeIssueNativeWarning(rule: CachedRuleStatus, liveUsedMinutes: Int) {
+    private fun maybeIssueNativeWarning(rule: CachedRuleStatus, liveUsedMilliseconds: Long) {
         val eventType = RuleEnforcementPolicy.warningEventType(
             rule.limitMinutes,
-            liveUsedMinutes,
+            liveUsedMilliseconds,
         ) ?: return
         val usageDate = RuleEnforcementStore.currentUsageDate()
         if (RuleEnforcementStore.hasIssuedWarning(this, rule.ruleId, usageDate, eventType)) {
@@ -316,7 +325,7 @@ class LockdinAccessibilityService : AccessibilityService() {
             return
         }
 
-        val warning = warningContent(rule, liveUsedMinutes, eventType) ?: return
+        val warning = warningContent(rule, liveUsedMilliseconds, eventType) ?: return
         val notificationShown = NativeWarningNotifier.showWarning(
             context = this,
             notificationId = (rule.ruleId.hashCode() * 31 + eventType.hashCode()).absoluteValue,
@@ -329,7 +338,10 @@ class LockdinAccessibilityService : AccessibilityService() {
         }
 
         RuleEnforcementStore.markWarningIssued(this, rule.ruleId, usageDate, eventType)
-        Log.d(tag, "Issued $eventType warning for rule=${rule.ruleId} used=$liveUsedMinutes")
+        Log.d(
+            tag,
+            "Issued $eventType warning for rule=${rule.ruleId} usedMillis=$liveUsedMilliseconds",
+        )
         RuleEnforcementStore.queuePendingEnforcementEvent(
             context = this,
             event = PendingEnforcementEvent(
@@ -337,7 +349,7 @@ class LockdinAccessibilityService : AccessibilityService() {
                 appId = rule.appId,
                 eventType = eventType,
                 usageDate = usageDate,
-                usedMinutes = liveUsedMinutes,
+                usedMinutes = LiveUsageAccounting.completedMinutes(liveUsedMilliseconds),
                 limitMinutes = rule.limitMinutes,
                 source = "android_accessibility",
             ),
@@ -346,13 +358,13 @@ class LockdinAccessibilityService : AccessibilityService() {
 
     private fun warningContent(
         rule: CachedRuleStatus,
-        liveUsedMinutes: Int,
+        liveUsedMilliseconds: Long,
         eventType: String,
     ): Pair<String, String>? {
         val content = RuleWarningCopy.content(
             appName = rule.appName,
             limitMinutes = rule.limitMinutes,
-            usedMinutes = liveUsedMinutes,
+            usedMilliseconds = liveUsedMilliseconds,
             eventType = eventType,
             tone = RuleEnforcementStore.notificationTone(this),
         ) ?: return null

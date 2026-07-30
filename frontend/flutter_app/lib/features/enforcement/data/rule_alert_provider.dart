@@ -125,7 +125,7 @@ class RuleAlertController extends Notifier<RuleAlert?> {
       return priorityDifference;
     }
 
-    return right.usedMinutes.compareTo(left.usedMinutes);
+    return right.usedMilliseconds.compareTo(left.usedMilliseconds);
   }
 
   int _priorityForStatus(String status) {
@@ -196,15 +196,14 @@ RuleAlert buildRuleAlert(RuleStatusData status, NotificationTone tone) {
 }
 
 String ruleAlertMessageFor(RuleStatusData status, NotificationTone tone) {
-  final remaining = formatMinuteCount(status.remainingMinutes);
-  final used = formatMinuteCount(status.usedMinutes);
+  final remaining = formatElapsedMilliseconds(status.remainingMilliseconds);
   return switch ((status.status, tone)) {
     ('approaching_limit', NotificationTone.fun) =>
       'Heads up: only $remaining left before ${status.appName} hits today\'s limit.',
     ('approaching_limit', NotificationTone.edgy) =>
       '$remaining left. ${status.appName} is almost out of runway.',
     ('approaching_limit', _) =>
-      '${formatMinutesRemaining(status.remainingMinutes)} before you hit today\'s ${status.limitMinutes}-minute limit for ${status.appName}.',
+      '${formatRemainingMilliseconds(status.remainingMilliseconds)} before you hit today\'s ${status.limitMinutes}-minute limit for ${status.appName}.',
     ('at_limit', NotificationTone.fun) =>
       'You just hit today\'s ${status.limitMinutes}-minute limit for ${status.appName}. Time to step out for a reset.',
     ('at_limit', NotificationTone.edgy) =>
@@ -212,11 +211,11 @@ String ruleAlertMessageFor(RuleStatusData status, NotificationTone tone) {
     ('at_limit', _) =>
       'You have hit today\'s ${status.limitMinutes}-minute limit for ${status.appName}.',
     ('over_limit', NotificationTone.fun) =>
-      'You\'re already at $used on ${status.appName}. Take the win by putting it down now.',
+      'You\'re over today\'s ${status.limitMinutes}-minute limit for ${status.appName}. Take the win by putting it down now.',
     ('over_limit', NotificationTone.edgy) =>
-      '${status.appName} is already over the line at $used. Stop scrolling.',
+      '${status.appName} is already over today\'s ${status.limitMinutes}-minute limit. Stop scrolling.',
     _ =>
-      'You have used $used today against a ${status.limitMinutes}-minute rule for ${status.appName}.',
+      'You are over today\'s ${status.limitMinutes}-minute rule for ${status.appName}.',
   };
 }
 

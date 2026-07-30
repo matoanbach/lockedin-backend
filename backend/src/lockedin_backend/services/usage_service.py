@@ -1,4 +1,3 @@
-import math
 from collections import defaultdict
 from datetime import timezone
 
@@ -18,9 +17,10 @@ from lockedin_backend.schemas.usage import (
 )
 from lockedin_backend.services.profile_context import profile_context_service
 from lockedin_backend.services.usage_time import (
+    completed_minutes,
     derive_duration_minutes,
     normalize_category,
-    split_seconds_by_local_date,
+    split_milliseconds_by_local_date,
 )
 
 
@@ -122,39 +122,39 @@ class UsageService:
         self.category_aggregate_repository.delete_for_profile(db, profile_id)
         db.flush()
 
-        app_seconds: dict[tuple, float] = defaultdict(float)
+        app_milliseconds: dict[tuple, int] = defaultdict(int)
         app_names: dict[tuple, str] = {}
-        category_seconds: dict[tuple, float] = defaultdict(float)
+        category_milliseconds: dict[tuple, int] = defaultdict(int)
         events = self.usage_repository.list_all_for_profile(db, profile_id)
 
         for event in events:
-            for usage_date, seconds in split_seconds_by_local_date(
+            for usage_date, milliseconds in split_milliseconds_by_local_date(
                 event.started_at,
                 event.ended_at,
                 event.timezone,
             ):
                 app_key = (usage_date, event.app_id)
-                app_seconds[app_key] += seconds
+                app_milliseconds[app_key] += milliseconds
                 app_names[app_key] = event.app_name
-                category_seconds[(usage_date, event.category)] += seconds
+                category_milliseconds[(usage_date, event.category)] += milliseconds
 
-        for (usage_date, app_id), seconds in app_seconds.items():
+        for (usage_date, app_id), milliseconds in app_milliseconds.items():
             self.app_aggregate_repository.add_minutes(
                 db,
                 profile_id=profile_id,
                 usage_date=usage_date,
                 app_id=app_id,
                 app_name=app_names[(usage_date, app_id)],
-                minutes=math.ceil(seconds / 60),
+                minutes=completed_minutes(milliseconds),
             )
 
-        for (usage_date, category), seconds in category_seconds.items():
+        for (usage_date, category), milliseconds in category_milliseconds.items():
             self.category_aggregate_repository.add_minutes(
                 db,
                 profile_id=profile_id,
                 usage_date=usage_date,
                 category=category,
-                minutes=math.ceil(seconds / 60),
+                minutes=completed_minutes(milliseconds),
             )
 
         return len(events)

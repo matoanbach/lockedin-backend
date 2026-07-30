@@ -10,6 +10,8 @@ class RuleStatusResponse(APIModel):
     limit_minutes: int
     used_minutes: int
     remaining_minutes: int
+    used_milliseconds: int
+    remaining_milliseconds: int
     progress_percent: int
     status: str
     is_blocked_now: bool

@@ -7,9 +7,9 @@ class LiveUsageAccountingTest {
     @Test
     fun interruptedSessionsAccumulateToTheLimit() {
         assertEquals(
-            5,
-            LiveUsageAccounting.liveUsedMinutes(
-                baseMinutes = 0,
+            minutes(5),
+            LiveUsageAccounting.liveUsedMilliseconds(
+                baseMilliseconds = 0L,
                 localMillis = minutes(4) + seconds(5),
                 currentSessionMillis = seconds(55),
             ),
@@ -19,9 +19,9 @@ class LiveUsageAccountingTest {
     @Test
     fun continuedAccumulatedUsageReachesTheInterventionThreshold() {
         assertEquals(
-            6,
-            LiveUsageAccounting.liveUsedMinutes(
-                baseMinutes = 0,
+            minutes(6),
+            LiveUsageAccounting.liveUsedMilliseconds(
+                baseMilliseconds = 0L,
                 localMillis = minutes(4) + seconds(5),
                 currentSessionMillis = minutes(1) + seconds(55),
             ),
@@ -50,13 +50,13 @@ class LiveUsageAccountingTest {
     }
 
     @Test
-    fun backendAdvanceRemovesOnlyAcknowledgedWholeMinutes() {
+    fun backendAdvanceRemovesOnlyAcknowledgedExactTime() {
         assertEquals(
             minutes(2) + seconds(5),
             reconcile(
                 localMillis = minutes(4) + seconds(5),
-                previousBaseMinutes = 3,
-                refreshedBaseMinutes = 5,
+                previousBaseMilliseconds = minutes(3),
+                refreshedBaseMilliseconds = minutes(5),
             ),
         )
     }
@@ -67,8 +67,8 @@ class LiveUsageAccountingTest {
             seconds(5),
             reconcile(
                 localMillis = minutes(4) + seconds(5),
-                previousBaseMinutes = 0,
-                refreshedBaseMinutes = 4,
+                previousBaseMilliseconds = 0L,
+                refreshedBaseMilliseconds = minutes(4),
             ),
         )
     }
@@ -79,8 +79,8 @@ class LiveUsageAccountingTest {
             0L,
             reconcile(
                 localMillis = seconds(30),
-                previousBaseMinutes = 1,
-                refreshedBaseMinutes = 3,
+                previousBaseMilliseconds = minutes(1),
+                refreshedBaseMilliseconds = minutes(3),
             ),
         )
     }
@@ -93,9 +93,9 @@ class LiveUsageAccountingTest {
                 localUsageDate = "2026-07-26",
                 localUsageMillis = minutes(4) + seconds(5),
                 previousBackendUsageDate = "2026-07-26",
-                previousBackendUsedMinutes = 4,
+                previousBackendUsedMilliseconds = minutes(4),
                 refreshedBackendUsageDate = TODAY,
-                refreshedBackendUsedMinutes = 0,
+                refreshedBackendUsedMilliseconds = 0L,
                 currentUsageDate = TODAY,
             ),
         )
@@ -109,9 +109,9 @@ class LiveUsageAccountingTest {
                 localUsageDate = TODAY,
                 localUsageMillis = seconds(45),
                 previousBackendUsageDate = "2026-07-26",
-                previousBackendUsedMinutes = 8,
+                previousBackendUsedMilliseconds = minutes(8),
                 refreshedBackendUsageDate = "2026-07-26",
-                refreshedBackendUsedMinutes = 8,
+                refreshedBackendUsedMilliseconds = minutes(8),
                 currentUsageDate = TODAY,
             ),
         )
@@ -119,18 +119,31 @@ class LiveUsageAccountingTest {
 
     private fun reconcile(
         localMillis: Long,
-        previousBaseMinutes: Int,
-        refreshedBaseMinutes: Int,
+        previousBaseMilliseconds: Long,
+        refreshedBaseMilliseconds: Long,
     ): Long {
         return LiveUsageAccounting.reconcileLocalUsageMillis(
             localUsageDate = TODAY,
             localUsageMillis = localMillis,
             previousBackendUsageDate = TODAY,
-            previousBackendUsedMinutes = previousBaseMinutes,
+            previousBackendUsedMilliseconds = previousBaseMilliseconds,
             refreshedBackendUsageDate = TODAY,
-            refreshedBackendUsedMinutes = refreshedBaseMinutes,
+            refreshedBackendUsedMilliseconds = refreshedBaseMilliseconds,
             currentUsageDate = TODAY,
         )
+    }
+
+    @Test
+    fun acknowledgedSubMinuteBaselineReachesLimitWithoutDelay() {
+        val backendMilliseconds = minutes(4) + 59_900L
+        val liveMilliseconds = LiveUsageAccounting.liveUsedMilliseconds(
+            baseMilliseconds = backendMilliseconds,
+            localMillis = 0L,
+            currentSessionMillis = 100L,
+        )
+
+        assertEquals(minutes(5), liveMilliseconds)
+        assertEquals(5, LiveUsageAccounting.completedMinutes(liveMilliseconds))
     }
 
     private fun minutes(value: Long): Long = value * 60_000L

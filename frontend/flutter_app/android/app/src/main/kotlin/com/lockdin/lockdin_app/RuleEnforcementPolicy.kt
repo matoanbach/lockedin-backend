@@ -1,18 +1,22 @@
 package com.lockdin.lockdin_app
 
 object RuleEnforcementPolicy {
-    fun shouldIntervene(limitMinutes: Int, usedMinutes: Int): Boolean {
-        return limitMinutes > 0 && usedMinutes >= limitMinutes
+    private const val MINUTE_MILLIS = 60_000L
+
+    fun shouldIntervene(limitMinutes: Int, usedMilliseconds: Long): Boolean {
+        return limitMinutes > 0 &&
+            usedMilliseconds >= limitMinutes.toLong() * MINUTE_MILLIS
     }
 
-    fun warningEventType(limitMinutes: Int, usedMinutes: Int): String? {
-        if (limitMinutes <= 0 || usedMinutes < 0) {
+    fun warningEventType(limitMinutes: Int, usedMilliseconds: Long): String? {
+        if (limitMinutes <= 0 || usedMilliseconds < 0L) {
             return null
         }
-        if (shouldIntervene(limitMinutes, usedMinutes)) {
+        if (shouldIntervene(limitMinutes, usedMilliseconds)) {
             return "warning_limit_reached"
         }
-        if (usedMinutes.toLong() * 5L >= limitMinutes.toLong() * 4L) {
+        val limitMilliseconds = limitMinutes.toLong() * MINUTE_MILLIS
+        if (usedMilliseconds * 5L >= limitMilliseconds * 4L) {
             return "warning_approaching_limit"
         }
         return null

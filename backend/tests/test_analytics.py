@@ -168,3 +168,56 @@ def test_dashboard_trends_and_weekly_summary_are_db_backed(client, monkeypatch) 
         "goalsMetDays": 7,
         "longestStreakDays": 11,
     }
+
+
+def test_analytics_uses_exact_time_and_floors_only_display_minutes(
+    client, monkeypatch
+) -> None:
+    monkeypatch.setattr(
+        analytics_service_module,
+        "current_utc_now",
+        lambda: analytics_service_module.datetime(
+            2026, 6, 8, 12, 10, tzinfo=analytics_service_module.timezone.utc
+        ),
+    )
+    ingestion_response = client.post(
+        "/api/v1/usage/events",
+        json={
+            "events": [
+                {
+                    "sourceEventId": "messages-yesterday-299900",
+                    "appId": "com.google.android.apps.messaging",
+                    "appName": "Messages",
+                    "category": "Social",
+                    "startedAt": "2026-06-07T12:00:00.000Z",
+                    "endedAt": "2026-06-07T12:04:59.900Z",
+                    "timezone": "UTC",
+                },
+                {
+                    "sourceEventId": "messages-today-315400",
+                    "appId": "com.google.android.apps.messaging",
+                    "appName": "Messages",
+                    "category": "Social",
+                    "startedAt": "2026-06-08T12:00:00.000Z",
+                    "endedAt": "2026-06-08T12:05:15.400Z",
+                    "timezone": "UTC",
+                },
+            ]
+        },
+    )
+
+    assert ingestion_response.status_code == 200
+    dashboard = client.get("/api/v1/analytics/dashboard").json()
+    trends = client.get("/api/v1/analytics/trends").json()
+
+    assert dashboard["todayTotalMinutes"] == 5
+    assert dashboard["categoryBreakdown"] == [{"name": "Social", "minutes": 5}]
+    assert dashboard["deltaFromYesterdayPercent"] == 5
+    assert trends["topApps"] == [
+        {
+            "appId": "com.google.android.apps.messaging",
+            "appName": "Messages",
+            "minutes": 10,
+        }
+    ]
+    assert trends["hourlyUsage"][12] == {"hour": "12pm", "minutes": 10}

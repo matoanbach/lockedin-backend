@@ -32,14 +32,15 @@ class AppLimitUsageCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasStatus = status != null;
-    final usedMinutes = status?.usedMinutes ?? 0;
-    final remainingMinutes = status?.remainingMinutes ?? limitMinutes;
+    final usedMilliseconds = status?.usedMilliseconds ?? 0;
+    final remainingMilliseconds =
+        status?.remainingMilliseconds ?? limitMinutes * 60000;
     final showReminderWarning =
         enabled &&
         hasStatus &&
         status!.status == 'approaching_limit' &&
-        remainingMinutes > 0 &&
-        remainingMinutes <= reminderThresholdMinutes;
+        remainingMilliseconds > 0 &&
+        remainingMilliseconds <= reminderThresholdMinutes * 60000;
     final effectiveStatus = status?.status;
     final statusColor = statusColorFor(effectiveStatus, color);
     final statusLabel = statusLabelFor(effectiveStatus, enabled);
@@ -60,7 +61,7 @@ class AppLimitUsageCard extends StatelessWidget {
                     Spacing.verticalXs,
                     Text(
                       hasStatus
-                          ? '${formatLimitMinutes(usedMinutes)} used'
+                          ? '${formatLimitMilliseconds(usedMilliseconds)} used'
                           : 'Waiting for current usage',
                       style: AppTextStyles.bodySmall.copyWith(
                         color: AppColors.textTertiary,
@@ -78,14 +79,14 @@ class AppLimitUsageCard extends StatelessWidget {
           ),
           Spacing.verticalMd,
           _LimitSummary(
-            usedMinutes: usedMinutes,
             limitMinutes: limitMinutes,
-            remainingMinutes: remainingMinutes,
+            usedMilliseconds: usedMilliseconds,
+            remainingMilliseconds: remainingMilliseconds,
             hasStatus: hasStatus,
           ),
           if (showReminderWarning) ...[
             Spacing.verticalMd,
-            _ReminderWarningLabel(minutes: remainingMinutes),
+            _ReminderWarningLabel(milliseconds: remainingMilliseconds),
           ],
           if (hasStatus) ...[
             Spacing.verticalMd,
@@ -268,15 +269,15 @@ class ReminderBanner extends StatelessWidget {
 
 class _LimitSummary extends StatelessWidget {
   const _LimitSummary({
-    required this.usedMinutes,
     required this.limitMinutes,
-    required this.remainingMinutes,
+    required this.usedMilliseconds,
+    required this.remainingMilliseconds,
     required this.hasStatus,
   });
 
-  final int usedMinutes;
   final int limitMinutes;
-  final int remainingMinutes;
+  final int usedMilliseconds;
+  final int remainingMilliseconds;
   final bool hasStatus;
 
   @override
@@ -285,11 +286,16 @@ class _LimitSummary extends StatelessWidget {
       spacing: 10,
       runSpacing: 8,
       children: [
-        _MetricPill(label: 'Used', value: formatLimitMinutes(usedMinutes)),
+        _MetricPill(
+          label: 'Used',
+          value: formatLimitMilliseconds(usedMilliseconds),
+        ),
         _MetricPill(label: 'Limit', value: formatLimitMinutes(limitMinutes)),
         _MetricPill(
           label: 'Left',
-          value: hasStatus ? formatLimitMinutes(remainingMinutes) : 'Pending',
+          value: hasStatus
+              ? formatLimitMilliseconds(remainingMilliseconds)
+              : 'Pending',
         ),
       ],
     );
@@ -322,9 +328,9 @@ class _MetricPill extends StatelessWidget {
 }
 
 class _ReminderWarningLabel extends StatelessWidget {
-  const _ReminderWarningLabel({required this.minutes});
+  const _ReminderWarningLabel({required this.milliseconds});
 
-  final int minutes;
+  final int milliseconds;
 
   @override
   Widget build(BuildContext context) {
@@ -345,7 +351,7 @@ class _ReminderWarningLabel extends StatelessWidget {
           ),
           Spacing.horizontalXs,
           Text(
-            '${formatMinuteCount(minutes)} left',
+            '${formatElapsedMilliseconds(milliseconds)} left',
             style: AppTextStyles.labelSmall.copyWith(color: AppColors.warning),
           ),
         ],
@@ -390,8 +396,15 @@ String formatLimitMinutes(int minutes) {
   return '${hours}h ${remainder}m';
 }
 
+String formatLimitMilliseconds(int milliseconds) {
+  if (milliseconds > 0 && milliseconds < 60000) {
+    return '<1m';
+  }
+  return formatLimitMinutes(milliseconds ~/ 60000);
+}
+
 String reminderPopupText(RuleStatusData status) {
-  return 'Reminder: You have ${formatMinuteCount(status.remainingMinutes)} left on ${status.appName}.';
+  return 'Reminder: You have ${formatElapsedMilliseconds(status.remainingMilliseconds)} left on ${status.appName}.';
 }
 
 RuleStatusData? firstReminderStatusFor(
@@ -401,10 +414,10 @@ RuleStatusData? firstReminderStatusFor(
   for (final status in statuses) {
     if (!status.enabled ||
         status.status != 'approaching_limit' ||
-        status.remainingMinutes <= 0) {
+        status.remainingMilliseconds <= 0) {
       continue;
     }
-    if (status.remainingMinutes <= reminderThresholdMinutes) {
+    if (status.remainingMilliseconds <= reminderThresholdMinutes * 60000) {
       return status;
     }
   }
@@ -439,11 +452,12 @@ String statusLabelFor(String? status, bool enabled) {
 
 String statusDetailText(RuleStatusData status) {
   return switch (status.status) {
-    'over_limit' =>
-      '${status.usedMinutes - status.limitMinutes} min over today',
+    'over_limit' => 'Over today\'s ${status.limitMinutes}-minute limit',
     'at_limit' => 'Daily limit reached',
-    'approaching_limit' => '${status.remainingMinutes} min remaining today',
-    'under_limit' => '${status.remainingMinutes} min remaining today',
+    'approaching_limit' =>
+      '${formatElapsedMilliseconds(status.remainingMilliseconds)} remaining today',
+    'under_limit' =>
+      '${formatElapsedMilliseconds(status.remainingMilliseconds)} remaining today',
     'disabled' => 'Rule disabled. Usage is still tracked.',
     _ => 'Waiting for current usage status.',
   };

@@ -10,7 +10,7 @@ claim unmeasured coverage or tests that have not been run.
 | Backend route/service tests | pytest, FastAPI TestClient, SQLAlchemy, SQLite fixtures | validation, status codes, services, repositories, serialization |
 | PostgreSQL smoke test | pytest, psycopg, Docker PostgreSQL | initialized schema and runtime connectivity |
 | Flutter unit/widget tests | `flutter_test` | app rendering, usage-sync controller behavior, rule warning widgets |
-| Android native unit tests | JUnit 4, Gradle | UsageStats reconstruction and interval subtraction |
+| Android native unit tests | JUnit 4, Gradle | UsageStats reconstruction, interval subtraction, exact-time enforcement, and warning copy |
 | Static analysis | Flutter analyzer, Dart formatter | frontend correctness and style |
 | CI build checks | GitHub Actions | Android debug APK and Windows debug build |
 | Physical system tests | Samsung SM-A528B, Android 14 | usage lifecycle, permissions, PiP, lock, offline recovery, rapid switching |
@@ -153,14 +153,94 @@ simulates a native marker arriving after Dart cached the store. The final APK re
 created no additional notification or enforcement event.
 
 The `6/5` value did not show another minute of Messages usage after intervention. The preserved
-July 28 raw events total 315.400 seconds for Messages, and the current daily aggregate policy uses
-`ceil(total_seconds / 60)`, producing six displayed minutes. The stale-cache fix prevents the
-duplicate post-disable notification, but the product's whole-minute display and rounding policy
-still requires reconciliation across rule status, dashboard, and analytics views.
+July 28 raw events total 315.400 seconds for Messages. The code at the time used
+`ceil(total_seconds / 60)`, producing six displayed minutes. That event remains preserved as
+historical diagnostic evidence.
+
+## Automated Exact-Time Policy Evidence — July 28, 2026
+
+The approved replacement policy uses raw elapsed milliseconds for rule status, warnings,
+intervention, analytics comparisons, and Android backend-plus-live accounting. Whole-minute
+fields and UI totals represent only completed minutes. A positive remainder below one minute is
+rendered as “less than 1 minute” where the distinction matters.
+
+| Exact usage | Completed minutes | Rule status | Blocked |
+| ---: | ---: | --- | --- |
+| 299.9 seconds | 4 | `approaching_limit` | No |
+| 300.0 seconds | 5 | `at_limit` | Yes |
+| 300.1 seconds | 5 | `over_limit` | Yes |
+| 315.4 seconds | 5 | `over_limit` | Yes |
+| 359.9 seconds | 5 | `over_limit` | Yes |
+
+Backend tests confirm the status contract, exact analytics percentages, completed-minute
+dashboard values, and aggregate flooring. Android JVM tests confirm that exact backend
+milliseconds and the live local remainder reach the limit without delay. Flutter tests confirm
+sub-minute remaining copy and completed-minute rendering. No aggregate rebuild, raw-event edit,
+or diagnostic-event edit was performed.
+
+## Physical Exact-Time Synchronization Smoke Check — July 29, 2026
+
+The exact-time implementation at commit `60042dc` was installed in place on the Samsung SM-A528B
+with preserved app data. The backend image was rebuilt and only the backend container was
+recreated; the existing PostgreSQL container and volume remained running and healthy. No SQL,
+aggregate rebuild, historical event edit, or diagnostic-event edit was performed.
+
+The debug APK was built with `--dart-define-from-file=.env` for
+`http://192.168.2.44:8000`. Its SHA-256 was
+`2558A0C43545B3685E97225C9E8C46CFD7ACE7792CC670479641EA5DF07276D3`, and `adb install -r`
+completed successfully without changing the original first-install timestamp.
+
+A controlled Messages foreground session synchronized through the normal UsageStats path. The
+phone became non-interactive during the intended 35-second interval, so the authoritative observed
+duration was 8,946 milliseconds rather than 35 seconds. The rebuilt backend returned:
+
+- `usedMilliseconds: 8946`;
+- `usedMinutes: 0`;
+- `remainingMilliseconds: 291054`;
+- `remainingMinutes: 4`;
+- `progressPercent: 3`;
+- `status: under_limit`;
+- `isBlockedNow: false`.
+
+The native `lockdin_enforcement` cache stored the same 8,946-millisecond backend value. The Rules
+screen rendered `Messages`, `<1m used`, `Used: <1m`, `Left: 4m`, and `3%`. After a home/resume
+cycle and another rule-status refresh, the backend, native cache, and Rules UI retained the same
+exact sub-minute value. This physically verifies in-place installation, exact sub-minute backend
+status, Android cache retention across refresh, and completed-minute/sub-minute UI copy.
+
+This was intentionally a narrow smoke check. It did not repeat the physical 299.9/300.0/300.1,
+315.4, or 359.9-second boundaries, Accessibility intervention, warning deduplication, or full
+dashboard/analytics reconciliation. Those boundaries retain automated evidence, while the earlier
+July 28 exact five-minute intervention remains the physical enforcement evidence.
+
+Final device state: Accessibility flag `0`, no enabled/bound/binding/crashed Accessibility
+services, Usage Access allowed, and LockdIn in the foreground.
 
 This evidence verifies the implemented user-revocable soft intervention. It does not verify or
 claim non-bypassable Device Owner, LockTask, backend lock-command, PIN/wait, or tamper-resistant
 enforcement.
+
+## Physical Exact-Limit and Navigation Retest — July 29, 2026
+
+The navigation-fix debug APK from commit `050e42c` was built with
+`--dart-define-from-file=.env`, produced SHA-256
+`93E1A2E9BB2D4878466D3130CB65F323E421808AD22C0C73DB5B2B58DA307AE3`, and was installed in
+place on the Samsung SM-A528B with application data preserved.
+
+The user manually repeated the exact-limit intervention and reported that it activated accurately.
+After choosing “Stay in LockdIn,” the restored Rules page was tested through both exit paths:
+
+- the Rules top-left arrow returned to Dashboard;
+- Android system Back returned to Dashboard instead of exiting LockdIn;
+- Dashboard and Rules continued to load.
+
+During the verification, the read-only rule-status response for Messages reported
+`usedMilliseconds: 318793`, `usedMinutes: 5`, `limitMinutes: 5`,
+`remainingMilliseconds: 0`, `progressPercent: 106`, `status: over_limit`, and
+`isBlockedNow: true`. The exact duration was 5 minutes 18.793 seconds. The percentage is
+`round(318793 / 300000 * 100) = 106`, while the `5m` usage label correctly shows completed
+minutes. This physically confirms that the over-limit percentage and completed-minute display use
+their intended exact-time semantics.
 
 ## Edge Cases Covered in Code
 
