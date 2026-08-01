@@ -242,6 +242,42 @@ During the verification, the read-only rule-status response for Messages reporte
 minutes. This physically confirms that the over-limit percentage and completed-minute display use
 their intended exact-time semantics.
 
+## Physical Disabled-Rule CRUD Regression — July 31, 2026
+
+An earlier exploratory TikTok CRUD run exposed a confirmed UI defect: the edit control was inside
+an `if (enabled)` footer, so a disabled rule had to be enabled before it could be edited or
+deleted. That forced-enable workflow created an unnecessary opportunity to touch another card's
+switch. Messages received a separate disable update during that earlier test window, but the
+relevant pre-restart request log was unavailable. An accidental Messages interaction remains the
+leading explanation, not a proven root cause; TikTok deletion, database cascades, and automated
+rule-disabling paths were ruled out.
+
+The regression APK made the rule-card footer unconditional, retained the existing enabled/blocked
+copy, added neutral `Rule disabled` copy, and exposed an `Edit rule` control in both states. It was
+built with `--dart-define-from-file=.env`, produced SHA-256
+`7CA3F1C1849933300E4E44927E53B059F57BA43C83389487C21A01972878D14B`, and was installed in
+place on the Samsung SM-A528B with application data preserved.
+
+The user performed every phone interaction manually. Read-only API checks were captured after
+each mutation:
+
+| Step | Physical and API result |
+| --- | --- |
+| Baseline | Instagram, Messages, and Spotify disabled; YouTube enabled |
+| Create | TikTok created disabled at 180 minutes with canonical package `com.zhiliaoapp.musically`; the edit control was immediately visible |
+| Edit | The same rule ID `c8aceaa0-bada-4962-9072-dd5d0049e07c` became `TikTok Test` with a 1,440-minute limit while remaining disabled; the card showed `Used: 0m`, `Limit: 24h`, and `Left: 24h` |
+| Delete | The disabled rule was deleted through its existing confirmation dialog; both TikTok rule and status counts returned to zero |
+| History | Trends retained TikTok's historical 176-minute usage entry after rule deletion |
+| Isolation | Every unrelated rule retained its baseline enabled state after create, edit, and delete |
+
+Focused widget coverage verifies that a disabled card exposes and invokes `Edit rule`, enabled
+cards retain editing, disabled usage-tracking copy remains accurate, and tapping one card's switch
+invokes only that card's callback. The focused file passed 14 tests; the complete Flutter suite
+passed 29 tests. `flutter analyze --fatal-infos`, the repository-wide Dart formatting check, and
+`git diff --check` also passed. This evidence verifies the current per-app daily create, edit,
+enable/disable, and delete workflow. It does not broaden the supported rule model to weekly,
+category, schedule, recurrence, exception, or version-history behavior.
+
 ## Edge Cases Covered in Code
 
 - duplicate source IDs and replay;

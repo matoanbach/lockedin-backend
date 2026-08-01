@@ -116,50 +116,53 @@ class AppLimitUsageCard extends StatelessWidget {
               ],
             ),
           ],
-          if (enabled) ...[
-            Spacing.verticalMd,
-            Container(
-              padding: const EdgeInsets.only(top: 12),
-              decoration: BoxDecoration(
-                border: Border(top: BorderSide(color: AppColors.border)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.lock_outline,
-                        color: AppColors.purple400,
-                        size: 16,
-                      ),
-                      Spacing.horizontalSm,
-                      Text(
-                        hasStatus && status!.isBlockedNow
-                            ? 'Over limit now'
-                            : 'Lockdown enabled',
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: hasStatus && status!.isBlockedNow
-                              ? AppColors.error
-                              : AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  IconButton(
-                    onPressed: onEdit,
-                    icon: const Icon(
-                      Icons.edit_outlined,
-                      size: 16,
-                      color: AppColors.textTertiary,
-                    ),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
-              ),
+          Spacing.verticalMd,
+          Container(
+            padding: const EdgeInsets.only(top: 12),
+            decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: AppColors.border)),
             ),
-          ],
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      enabled ? Icons.lock_outline : Icons.lock_open_outlined,
+                      color: enabled
+                          ? AppColors.purple400
+                          : AppColors.textMuted,
+                      size: 16,
+                    ),
+                    Spacing.horizontalSm,
+                    Text(
+                      enabled
+                          ? hasStatus && status!.isBlockedNow
+                                ? 'Over limit now'
+                                : 'Lockdown enabled'
+                          : 'Rule disabled',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: enabled && hasStatus && status!.isBlockedNow
+                            ? AppColors.error
+                            : AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+                IconButton(
+                  tooltip: 'Edit rule',
+                  onPressed: onEdit,
+                  icon: const Icon(
+                    Icons.edit_outlined,
+                    size: 16,
+                    color: AppColors.textTertiary,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
