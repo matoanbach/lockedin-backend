@@ -115,6 +115,128 @@ void main() {
     },
   );
 
+  testWidgets('disabled rule exposes edit without requiring enable', (
+    tester,
+  ) async {
+    var editCount = 0;
+    final status = _status(
+      appName: 'TikTok',
+      appId: 'com.zhiliaoapp.musically',
+      usedMinutes: 8,
+      limitMinutes: 180,
+      remainingMinutes: 172,
+      enabled: false,
+      status: 'disabled',
+    );
+
+    await tester.pumpWidget(
+      _TestHost(
+        child: AppLimitUsageCard(
+          appName: status.appName,
+          icon: Icons.music_note,
+          color: AppColors.instagram,
+          enabled: false,
+          limitMinutes: status.limitMinutes,
+          status: status,
+          reminderThresholdMinutes: 30,
+          onToggle: () {},
+          onEdit: () => editCount++,
+        ),
+      ),
+    );
+
+    expect(find.text('Disabled'), findsOneWidget);
+    expect(find.text('Rule disabled. Usage is still tracked.'), findsOneWidget);
+    expect(find.text('Rule disabled'), findsOneWidget);
+    expect(find.text('Lockdown enabled'), findsNothing);
+    expect(find.byTooltip('Edit rule'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Edit rule'));
+
+    expect(editCount, 1);
+  });
+
+  testWidgets('enabled rule retains edit behavior', (tester) async {
+    var editCount = 0;
+    final status = _status(
+      usedMinutes: 60,
+      limitMinutes: 90,
+      remainingMinutes: 30,
+    );
+
+    await tester.pumpWidget(
+      _TestHost(
+        child: AppLimitUsageCard(
+          appName: status.appName,
+          icon: Icons.camera_alt,
+          color: AppColors.instagram,
+          enabled: true,
+          limitMinutes: status.limitMinutes,
+          status: status,
+          reminderThresholdMinutes: 30,
+          onToggle: () {},
+          onEdit: () => editCount++,
+        ),
+      ),
+    );
+
+    expect(find.text('Lockdown enabled'), findsOneWidget);
+    expect(find.byTooltip('Edit rule'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Edit rule'));
+
+    expect(editCount, 1);
+  });
+
+  testWidgets('toggle invokes only the selected rule callback', (tester) async {
+    final toggledRules = <String>[];
+    final statuses = [
+      _status(
+        appName: 'Messages',
+        appId: 'com.google.android.apps.messaging',
+        usedMinutes: 1,
+        limitMinutes: 5,
+        remainingMinutes: 4,
+      ),
+      _status(
+        appName: 'TikTok',
+        appId: 'com.zhiliaoapp.musically',
+        usedMinutes: 8,
+        limitMinutes: 180,
+        remainingMinutes: 172,
+        enabled: false,
+        status: 'disabled',
+      ),
+    ];
+
+    await tester.pumpWidget(
+      _TestHost(
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              for (final status in statuses)
+                AppLimitUsageCard(
+                  appName: status.appName,
+                  icon: Icons.apps,
+                  color: AppColors.instagram,
+                  enabled: status.enabled,
+                  limitMinutes: status.limitMinutes,
+                  status: status,
+                  reminderThresholdMinutes: 30,
+                  onToggle: () => toggledRules.add(status.appName),
+                  onEdit: () {},
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(Switch).at(1));
+
+    expect(toggledRules, ['TikTok']);
+  });
+
   testWidgets(
     'lockdown rules cards use daily limits separate from weekly totals',
     (tester) async {
@@ -407,22 +529,26 @@ RuleStatusData _status({
   required int remainingMinutes,
   int? usedMilliseconds,
   int? remainingMilliseconds,
+  bool enabled = true,
+  String? status,
 }) {
   return RuleStatusData(
     ruleId: 'rule-$appId',
     appId: appId,
     appName: appName,
     usageDate: '2026-06-12',
-    enabled: true,
+    enabled: enabled,
     limitMinutes: limitMinutes,
     usedMinutes: usedMinutes,
     remainingMinutes: remainingMinutes,
     usedMilliseconds: usedMilliseconds ?? usedMinutes * 60000,
     remainingMilliseconds: remainingMilliseconds ?? remainingMinutes * 60000,
     progressPercent: ((usedMinutes / limitMinutes) * 100).round(),
-    status: usedMinutes * 5 >= limitMinutes * 4
-        ? 'approaching_limit'
-        : 'under_limit',
+    status:
+        status ??
+        (usedMinutes * 5 >= limitMinutes * 4
+            ? 'approaching_limit'
+            : 'under_limit'),
     isBlockedNow: false,
   );
 }
