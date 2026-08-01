@@ -17,6 +17,7 @@ from lockedin_backend.schemas.analytics import (
     WeeklySummaryResponse,
     WeeklyUsagePoint,
 )
+from lockedin_backend.services.app_classification import classify_app
 from lockedin_backend.services.profile_context import profile_context_service
 from lockedin_backend.services.usage_time import (
     MILLISECONDS_PER_MINUTE,
@@ -54,6 +55,7 @@ class AnalyticsService:
         )
         today_total = daily_totals.get(today, 0)
         yesterday_total = daily_totals.get(today - timedelta(days=1), 0)
+        weekly_total = sum(daily_totals.get(day, 0) for day in week_dates)
 
         return DashboardAnalyticsResponse(
             today_total_minutes=completed_minutes(today_total),
@@ -61,6 +63,7 @@ class AnalyticsService:
                 CategoryBreakdownItem(
                     name=category,
                     minutes=completed_minutes(milliseconds),
+                    duration_milliseconds=milliseconds,
                 )
                 for category, milliseconds in today_categories
             ],
@@ -68,6 +71,7 @@ class AnalyticsService:
                 self._milliseconds_to_hours(daily_totals.get(day, 0))
                 for day in week_dates
             ],
+            weekly_total_minutes=completed_minutes(weekly_total),
             delta_from_yesterday_percent=self._calculate_delta_percent(
                 current_total=today_total,
                 previous_total=yesterday_total,
@@ -120,6 +124,7 @@ class AnalyticsService:
         hourly_minutes = [
             completed_minutes(milliseconds) for milliseconds in hourly_totals
         ]
+        weekly_total = sum(daily_totals.get(day, 0) for day in week_dates)
 
         return TrendsAnalyticsResponse(
             hourly_usage=[
@@ -133,6 +138,7 @@ class AnalyticsService:
                 )
                 for day in week_dates
             ],
+            weekly_total_minutes=completed_minutes(weekly_total),
             top_apps=[
                 TopAppUsagePoint(
                     app_id=app_id,
@@ -213,14 +219,21 @@ class AnalyticsService:
         app_names: dict[str, str] = {}
 
         for event in self.usage_repository.list_all_for_profile(db, profile_id):
-            app_names[event.app_id] = event.app_name
+            classification = classify_app(
+                event.app_id,
+                event.app_name,
+                event.category,
+            )
+            app_names[event.app_id] = classification.display_name
             for usage_date, milliseconds in split_milliseconds_by_local_date(
                 event.started_at,
                 event.ended_at,
                 event.timezone,
             ):
                 daily_totals[usage_date] += milliseconds
-                category_totals[(usage_date, event.category)] += milliseconds
+                category_totals[
+                    (usage_date, classification.category)
+                ] += milliseconds
                 app_totals[(usage_date, event.app_id)] += milliseconds
 
         return daily_totals, category_totals, app_totals, app_names

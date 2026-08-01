@@ -8,35 +8,12 @@ import '../../../../shared/models/models.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../../data/analytics_provider.dart';
 
-/// Provider for star rating.
-final ratingProvider = NotifierProvider<RatingNotifier, int>(
-  RatingNotifier.new,
-);
-final feedbackProvider = NotifierProvider<FeedbackNotifier, String>(
-  FeedbackNotifier.new,
-);
-
-class RatingNotifier extends Notifier<int> {
-  @override
-  int build() => 0;
-
-  void set(int value) => state = value;
-}
-
-class FeedbackNotifier extends Notifier<String> {
-  @override
-  String build() => '';
-
-  void set(String value) => state = value;
-}
-
 /// Analytics summary / weekly review screen.
 class AnalyticsSummaryScreen extends ConsumerWidget {
   const AnalyticsSummaryScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final rating = ref.watch(ratingProvider);
     final summaryAsync = ref.watch(weeklySummaryProvider);
 
     return Scaffold(
@@ -51,7 +28,6 @@ class AnalyticsSummaryScreen extends ConsumerWidget {
                 title: 'Weekly Summary',
                 subtitle: 'Your progress this week',
                 onBack: () => context.pop(),
-                label: 'HLR-8-12',
               ),
               Spacing.verticalXxl,
               summaryAsync.when(
@@ -63,32 +39,6 @@ class AnalyticsSummaryScreen extends ConsumerWidget {
                     _StatsGrid(summary: summary),
                     Spacing.verticalXxl,
                     _AchievementsSection(summary: summary),
-                    Spacing.verticalXxl,
-                    _RatingSection(
-                      rating: rating,
-                      onRatingChanged: (value) {
-                        ref.read(ratingProvider.notifier).set(value);
-                      },
-                      onSubmit: () {
-                        if (rating == 0) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Please select a rating'),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                          return;
-                        }
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Thank you for your feedback!'),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                        ref.read(ratingProvider.notifier).set(0);
-                        ref.read(feedbackProvider.notifier).set('');
-                      },
-                    ),
                     Spacing.verticalLg,
                   ],
                 ),
@@ -186,9 +136,12 @@ class _MainAchievementCard extends StatelessWidget {
             children: [
               Icon(trendIcon, color: metricColor, size: 20),
               Spacing.horizontalSm,
-              Text(
-                caption,
-                style: AppTextStyles.titleMedium.copyWith(color: metricColor),
+              Flexible(
+                child: Text(
+                  caption,
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.titleMedium.copyWith(color: metricColor),
+                ),
               ),
             ],
           ),
@@ -211,42 +164,48 @@ class _StatsGrid extends StatelessWidget {
         ? '${summary.screenTimeReductionPercent}% less than last week'
         : '${summary.screenTimeReductionPercent.abs()}% more than last week';
 
-    return GridView.count(
-      crossAxisCount: 2,
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      children: [
-        _StatCard(
-          value: '${_formatHours(summary.totalWeekHours)}h',
-          label: 'Total this week',
-          change: totalWeekChange,
-          isPositive: summary.hasImproved
-              ? true
-              : summary.hasRegression
-              ? false
-              : null,
-        ),
-        _StatCard(
-          value: '${_formatHours(summary.dailyAverageHours)}h',
-          label: 'Daily average',
-          change: '${_formatHours(summary.dailyAverageHours)}h per day',
-          isPositive: null,
-        ),
-        _StatCard(
-          value: '${summary.goalsMetDays}/7',
-          label: 'Goals met',
-          change: '${summary.goalSuccessPercent}% success rate',
-          isPositive: null,
-        ),
-        _StatCard(
-          value: '${summary.longestStreakDays}',
-          label: 'Longest streak',
-          change: 'days',
-          isPositive: null,
-        ),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 360;
+        return GridView.count(
+          crossAxisCount: isNarrow ? 1 : 2,
+          childAspectRatio: isNarrow ? 2.2 : 1,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          children: [
+            _StatCard(
+              value: '${_formatHours(summary.totalWeekHours)}h',
+              label: 'Total this week',
+              change: totalWeekChange,
+              isPositive: summary.hasImproved
+                  ? true
+                  : summary.hasRegression
+                  ? false
+                  : null,
+            ),
+            _StatCard(
+              value: '${_formatHours(summary.dailyAverageHours)}h',
+              label: 'Daily average',
+              change: '${_formatHours(summary.dailyAverageHours)}h per day',
+              isPositive: null,
+            ),
+            _StatCard(
+              value: '${summary.goalsMetDays}/7',
+              label: 'Goals met',
+              change: '${summary.goalSuccessPercent}% success rate',
+              isPositive: null,
+            ),
+            _StatCard(
+              value: '${summary.longestStreakDays}',
+              label: 'Longest streak',
+              change: 'days',
+              isPositive: null,
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -307,15 +266,22 @@ class _AchievementsSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Achievements Unlocked',
+          'Weekly Highlights',
           style: AppTextStyles.titleMedium.copyWith(
             color: AppColors.textSecondary,
+          ),
+        ),
+        Spacing.verticalXs,
+        Text(
+          'Your goal progress and best streak, updated weekly.',
+          style: AppTextStyles.bodySmall.copyWith(
+            color: AppColors.textTertiary,
           ),
         ),
         Spacing.verticalMd,
         _AchievementCard(
           icon: Icons.star,
-          title: 'Week Warrior',
+          title: 'Goal Progress',
           description: 'Met goals ${summary.goalsMetDays} days this week',
           gradientColors: [
             AppColors.warning.withValues(alpha: 0.1),
@@ -327,7 +293,7 @@ class _AchievementsSection extends StatelessWidget {
         Spacing.verticalMd,
         _AchievementCard(
           icon: Icons.track_changes,
-          title: 'Momentum Builder',
+          title: 'Best Streak',
           description: summary.longestStreakDays == 0
               ? 'Your streak will appear once usage syncs in.'
               : 'Best streak so far: ${summary.longestStreakDays} days under goal',
@@ -386,76 +352,6 @@ class _AchievementCard extends StatelessWidget {
                   ),
                 ),
               ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RatingSection extends StatelessWidget {
-  const _RatingSection({
-    required this.rating,
-    required this.onRatingChanged,
-    required this.onSubmit,
-  });
-
-  final int rating;
-  final ValueChanged<int> onRatingChanged;
-  final VoidCallback onSubmit;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Rate Your Experience', style: AppTextStyles.titleMedium),
-          Spacing.verticalSm,
-          Text(
-            'How would you rate LockdIn this week?',
-            style: AppTextStyles.bodySmall.copyWith(
-              color: AppColors.textTertiary,
-            ),
-          ),
-          Spacing.verticalLg,
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(5, (index) {
-              final starIndex = index + 1;
-              return GestureDetector(
-                onTap: () => onRatingChanged(starIndex),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Icon(
-                    starIndex <= rating ? Icons.star : Icons.star_border,
-                    size: 32,
-                    color: starIndex <= rating
-                        ? AppColors.warning
-                        : AppColors.textMuted,
-                  ),
-                ),
-              );
-            }),
-          ),
-          Spacing.verticalLg,
-          TextField(
-            maxLines: 3,
-            style: AppTextStyles.bodyMedium,
-            decoration: InputDecoration(
-              hintText: 'Share your thoughts (optional)',
-              hintStyle: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textMuted,
-              ),
-            ),
-          ),
-          Spacing.verticalLg,
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: onSubmit,
-              child: const Text('Submit Feedback'),
             ),
           ),
         ],

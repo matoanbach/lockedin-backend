@@ -23,7 +23,6 @@ class PrivacyPolicyScreen extends StatelessWidget {
                 title: 'Privacy & Legal',
                 subtitle: 'How we protect your data',
                 onBack: () => context.pop(),
-                label: 'HLR-16-18',
               ),
               Spacing.verticalXxl,
 

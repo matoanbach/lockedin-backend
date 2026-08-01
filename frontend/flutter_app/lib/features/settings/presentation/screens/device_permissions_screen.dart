@@ -56,7 +56,6 @@ class _DevicePermissionsScreenState
                 subtitle:
                     'Manage the Android access LockdIn needs for tracking, alerts, and live interventions.',
                 onBack: () => context.pop(),
-                label: 'HLR-4 • HLR-13-15',
               ),
               Spacing.verticalXxl,
               permissionsAsync.when(

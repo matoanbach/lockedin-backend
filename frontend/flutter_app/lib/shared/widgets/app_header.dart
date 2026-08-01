@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/theme.dart';
 
-/// App bar with back button and optional label.
+/// App bar with an optional back button.
 class AppHeader extends StatelessWidget implements PreferredSizeWidget {
   const AppHeader({
     super.key,
@@ -9,14 +9,12 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
     this.subtitle,
     this.onBack,
     this.actions,
-    this.label,
   });
 
   final String title;
   final String? subtitle;
   final VoidCallback? onBack;
   final List<Widget>? actions;
-  final String? label;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight + 60);
@@ -44,8 +42,6 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
                   )
                 else
                   const SizedBox(width: 40),
-                if (label != null)
-                  Text(label!, style: AppTextStyles.labelSmall),
               ],
             ),
             Spacing.verticalLg,
@@ -105,14 +101,12 @@ class ScreenHeader extends StatelessWidget {
     this.subtitle,
     this.onBack,
     this.actions,
-    this.label,
   });
 
   final String title;
   final String? subtitle;
   final VoidCallback? onBack;
   final List<Widget>? actions;
-  final String? label;
 
   @override
   Widget build(BuildContext context) {
@@ -135,7 +129,6 @@ class ScreenHeader extends StatelessWidget {
               )
             else
               const SizedBox.shrink(),
-            if (label != null) Text(label!, style: AppTextStyles.labelSmall),
           ],
         ),
         Spacing.verticalLg,

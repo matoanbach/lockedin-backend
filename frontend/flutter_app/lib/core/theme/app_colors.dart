@@ -68,6 +68,12 @@ class AppColors {
   static const Color chart3 = Color(0xFFC4B5FD); // Lighter purple
   static const Color chart4 = Color(0xFFDDD6FE); // Lightest purple
 
+  // === Analytics Category Colors ===
+  static const Color socialMessaging = Color(0xFF2DD4BF); // Teal
+  static const Color videoEntertainment = Color(0xFFF97316); // Orange
+  static const Color systemUtilities = Color(0xFF64748B); // Slate
+  static const Color otherCategory = Color(0xFFA78BFA); // Purple
+
   // === App-specific Colors ===
   static const Color instagram = Color(0xFFE4405F);
   static const Color youtube = Color(0xFFFF0000);

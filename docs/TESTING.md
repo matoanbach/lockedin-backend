@@ -278,6 +278,58 @@ passed 29 tests. `flutter analyze --fatal-infos`, the repository-wide Dart forma
 enable/disable, and delete workflow. It does not broaden the supported rule model to weekly,
 category, schedule, recurrence, exception, or version-history behavior.
 
+## Physical Analytics and Weekly UX Verification — August 1, 2026
+
+The Samsung SM-A528B remained on Android 14 / API 34 with application data and the PostgreSQL
+volume preserved. The user performed every phone interaction and permission action manually.
+Codex used ADB only to replace the debug APK in place.
+
+The user physically verified the following behavior against read-only API responses captured at
+the same point in time:
+
+- known packages were shown with friendly labels, including WhatsApp, One UI Home, TikTok,
+  Chrome, and Clock;
+- analytics categories used a curated, package-based descriptive taxonomy and did not claim that
+  an app or behavior was productive, good, or bad;
+- exact category duration was preserved, and positive usage below one completed minute rendered
+  as `<1m` rather than `0m`;
+- Dashboard showed `17h 53m` and Trends showed `17.9h`, both representing the authoritative
+  1,073-minute weekly total rather than a sum of independently rounded daily chart values;
+- **View Weekly Summary** was visible and opened Weekly Summary; the non-persistent rating and
+  feedback controls were absent;
+- **Weekly Highlights** contained exactly **Goal Progress** and **Best Streak**, with explanatory
+  copy that describes those two summaries factually;
+- developer-oriented `HLR-*` badges were absent from the user interface;
+- category colors were distinguishable, and the first two Top Apps rank colors for WhatsApp and
+  One UI Home were also distinguishable;
+- **Add Rule** opened the creation form directly, while **Rules** opened only the overview; and
+- the checked narrow and physical layouts had no clipping or overflow.
+
+The read-only API snapshot used for reconciliation was:
+
+| View | Recorded values |
+| --- | --- |
+| Dashboard | `todayTotalMinutes: 54`; `weeklyTotalMinutes: 1073`; Social & Messaging `1,673,860 ms` / `27m`; System & Utilities `917,835 ms` / `15m`; Video & Entertainment `565,060 ms` / `9m`; Other `104,859 ms` / `1m` |
+| Trends | `weeklyTotalMinutes: 1073`; WhatsApp `369m`; One UI Home `280m`; TikTok `125m`; Chrome `84m`; Clock `48m`; peak window `11 PM - 1 AM` |
+| Weekly Summary | screen-time reduction `-68%`; total `17.9h`; daily average `2.6h`; goals met `4`; longest streak `7` |
+
+These values are a moment-in-time observation, not fixtures. They can legitimately advance as new
+usage arrives and can change at midnight rollover. Classification is applied when analytics are
+read; no historical usage rows were renamed or reclassified.
+
+The final debug APK was built with `--dart-define-from-file=.env`, installed in place, and retained
+application data. It is 173,928,253 bytes with SHA-256
+`3872BCE8F87388F8DC083E00DF6F681F9D7644E11E0A4D64CA0A9931666067E0`. Automated regression
+coverage also verifies distinct Top Apps colors, unique whole-hour labels on the weekly chart, and
+one Peak Usage Window insight instead of two repeated callouts. On the installed final build, the
+user confirmed that the weekly Y-axis had no duplicate hour labels and that only the contextual
+Peak Usage Window card beneath Usage by Time of Day remained.
+
+Current semantic limitation: once any usage history exists, Weekly Summary currently treats
+missing dates as zero-usage successful days when calculating goals met and longest streak. A
+synchronization or data-gap day can therefore be counted as successful. This behavior was not
+changed during analytics clarification.
+
 ## Edge Cases Covered in Code
 
 - duplicate source IDs and replay;

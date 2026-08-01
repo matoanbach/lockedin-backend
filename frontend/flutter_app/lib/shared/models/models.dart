@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 class UsageData {
   final String name;
   final int minutes;
+  final int durationMilliseconds;
   final Color color;
 
   const UsageData({
     required this.name,
     required this.minutes,
+    this.durationMilliseconds = 0,
     required this.color,
   });
 
@@ -17,6 +19,9 @@ class UsageData {
     final mins = minutes % 60;
     if (hours > 0) {
       return '${hours}h ${mins > 0 ? '${mins}m' : ''}';
+    }
+    if (minutes == 0 && durationMilliseconds > 0) {
+      return '<1m';
     }
     return '${mins}m';
   }
@@ -103,12 +108,14 @@ class DashboardAnalyticsData {
   final int todayTotalMinutes;
   final List<UsageData> categoryBreakdown;
   final List<double> weeklyUsageHours;
+  final int weeklyTotalMinutes;
   final int deltaFromYesterdayPercent;
 
   const DashboardAnalyticsData({
     required this.todayTotalMinutes,
     required this.categoryBreakdown,
     required this.weeklyUsageHours,
+    required this.weeklyTotalMinutes,
     required this.deltaFromYesterdayPercent,
   });
 }
@@ -139,12 +146,14 @@ class TopAppUsage {
 class TrendsAnalyticsData {
   final List<HourlyUsage> hourlyUsage;
   final List<DailyUsage> weeklyUsage;
+  final int weeklyTotalMinutes;
   final List<TopAppUsage> topApps;
   final String peakUsageWindow;
 
   const TrendsAnalyticsData({
     required this.hourlyUsage,
     required this.weeklyUsage,
+    required this.weeklyTotalMinutes,
     required this.topApps,
     required this.peakUsageWindow,
   });

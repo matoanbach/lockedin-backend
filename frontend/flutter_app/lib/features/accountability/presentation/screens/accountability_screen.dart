@@ -90,7 +90,6 @@ class _AccountabilityScreenState extends ConsumerState<AccountabilityScreen> {
                   title: 'Accountability',
                   subtitle: 'Share your progress with others',
                   onBack: () => context.pop(),
-                  label: 'HLR-5',
                 ),
                 Spacing.verticalXxl,
                 GradientCard(
