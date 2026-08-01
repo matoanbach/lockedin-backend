@@ -58,7 +58,6 @@ class _OnboardingPermissionsScreenState
                 subtitle:
                     'Grant Usage Access so LockdIn can sync Android app sessions and power your dashboard.',
                 onBack: () => context.pop(),
-                label: 'HLR-6 • HLR-13-15',
               ),
 
               Spacing.verticalXxl,

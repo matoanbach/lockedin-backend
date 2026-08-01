@@ -18,12 +18,6 @@ class OnboardingWelcomeScreen extends StatelessWidget {
           padding: Spacing.page,
           child: Column(
             children: [
-              // HLR Label
-              Align(
-                alignment: Alignment.centerRight,
-                child: Text('HLR-6', style: AppTextStyles.labelSmall),
-              ),
-
               // Main Content
               Expanded(
                 child: Column(

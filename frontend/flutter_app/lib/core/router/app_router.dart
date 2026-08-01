@@ -107,9 +107,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'lockdown-rules',
         pageBuilder: (context, state) => CustomTransitionPage(
           key: state.pageKey,
-          child: const RouteBackFallback(
+          child: RouteBackFallback(
             fallbackLocation: AppRoutes.dashboard,
-            child: LockdownRulesScreen(),
+            child: LockdownRulesScreen(
+              openCreateForm: state.uri.queryParameters['create'] == 'true',
+            ),
           ),
           transitionsBuilder: _slideTransition,
         ),

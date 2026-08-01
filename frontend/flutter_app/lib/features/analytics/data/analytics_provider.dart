@@ -42,6 +42,10 @@ class AnalyticsRepository {
             name: categoryBreakdown[index]['name'] as String? ?? 'Other',
             minutes:
                 (categoryBreakdown[index]['minutes'] as num?)?.toInt() ?? 0,
+            durationMilliseconds:
+                (categoryBreakdown[index]['durationMilliseconds'] as num?)
+                    ?.toInt() ??
+                0,
             color: _colorForCategory(
               categoryBreakdown[index]['name'] as String? ?? 'Other',
               index,
@@ -51,6 +55,7 @@ class AnalyticsRepository {
       weeklyUsageHours: _listFromJson(
         json['weeklyUsageHours'],
       ).map((item) => (item['value'] as num).toDouble()).toList(),
+      weeklyTotalMinutes: (json['weeklyTotalMinutes'] as num?)?.toInt() ?? 0,
       deltaFromYesterdayPercent:
           (json['deltaFromYesterdayPercent'] as num?)?.toInt() ?? 0,
     );
@@ -77,6 +82,7 @@ class AnalyticsRepository {
             ),
           )
           .toList(),
+      weeklyTotalMinutes: (json['weeklyTotalMinutes'] as num?)?.toInt() ?? 0,
       topApps: _listFromJson(json['topApps'])
           .map(
             (item) => TopAppUsage(
@@ -127,14 +133,24 @@ const _categoryPalette = <Color>[
 
 Color _colorForCategory(String category, int index) {
   switch (category.toLowerCase()) {
-    case 'social':
-      return AppColors.instagram;
-    case 'entertainment':
-      return AppColors.youtube;
-    case 'productivity':
+    case 'social & messaging':
+      return AppColors.socialMessaging;
+    case 'video & entertainment':
+      return AppColors.videoEntertainment;
+    case 'music & audio':
+      return AppColors.purple300;
+    case 'web & search':
       return AppColors.info;
+    case 'learning':
+      return AppColors.success;
+    case 'navigation':
+      return AppColors.warning;
+    case 'email & communication':
+      return AppColors.messages;
+    case 'system & utilities':
+      return AppColors.systemUtilities;
     case 'other':
-      return AppColors.chart4;
+      return AppColors.otherCategory;
     default:
       return _categoryPalette[index % _categoryPalette.length];
   }

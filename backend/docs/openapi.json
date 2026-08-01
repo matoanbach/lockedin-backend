@@ -86,6 +86,10 @@
       },
       "CategoryBreakdownItem": {
         "properties": {
+          "durationMilliseconds": {
+            "title": "Durationmilliseconds",
+            "type": "integer"
+          },
           "minutes": {
             "title": "Minutes",
             "type": "integer"
@@ -97,7 +101,8 @@
         },
         "required": [
           "name",
-          "minutes"
+          "minutes",
+          "durationMilliseconds"
         ],
         "title": "CategoryBreakdownItem",
         "type": "object"
@@ -119,6 +124,10 @@
             "title": "Todaytotalminutes",
             "type": "integer"
           },
+          "weeklyTotalMinutes": {
+            "title": "Weeklytotalminutes",
+            "type": "integer"
+          },
           "weeklyUsageHours": {
             "items": {
               "type": "number"
@@ -129,6 +138,7 @@
         },
         "required": [
           "todayTotalMinutes",
+          "weeklyTotalMinutes",
           "deltaFromYesterdayPercent"
         ],
         "title": "DashboardAnalyticsResponse",
@@ -620,6 +630,10 @@
             "title": "Topapps",
             "type": "array"
           },
+          "weeklyTotalMinutes": {
+            "title": "Weeklytotalminutes",
+            "type": "integer"
+          },
           "weeklyUsage": {
             "items": {
               "$ref": "#/components/schemas/WeeklyUsagePoint"
@@ -629,6 +643,7 @@
           }
         },
         "required": [
+          "weeklyTotalMinutes",
           "peakUsageWindow"
         ],
         "title": "TrendsAnalyticsResponse",

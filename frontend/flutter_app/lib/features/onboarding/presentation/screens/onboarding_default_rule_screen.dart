@@ -44,7 +44,6 @@ class _OnboardingDefaultRuleScreenState
                     subtitle:
                         'Choose a daily screen time goal. You can customize this for individual apps later.',
                     onBack: () => context.pop(),
-                    label: 'HLR-6',
                   ),
                   Spacing.verticalXxl,
                   Expanded(

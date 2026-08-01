@@ -104,6 +104,7 @@ class SecondaryButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
+      width: double.infinity,
       height: height,
       child: OutlinedButton(
         onPressed: onPressed,
@@ -118,7 +119,14 @@ class SecondaryButton extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (icon != null) ...[Icon(icon, size: 20), Spacing.horizontalSm],
-            Text(label, style: AppTextStyles.button),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.button,
+              ),
+            ),
           ],
         ),
       ),

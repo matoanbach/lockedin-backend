@@ -48,6 +48,7 @@ void main() {
                 data: {
                   'hourlyUsage': <Map<String, Object?>>[],
                   'weeklyUsage': <Map<String, Object?>>[],
+                  'weeklyTotalMinutes': 400,
                   'topApps': [
                     {
                       'appId': 'com.instagram.android',

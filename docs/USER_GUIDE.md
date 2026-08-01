@@ -49,7 +49,14 @@ The dashboard shows:
 - weekly usage;
 - Android usage-sync status;
 - shortcuts to Trends, Rules, and Accountability;
-- settings and weekly-summary actions in the header.
+- settings in the header; and
+- a visible **View Weekly Summary** action.
+
+Category names are assigned from a curated, package-based descriptive taxonomy such as **Social &
+Messaging**, **Video & Entertainment**, and **System & Utilities**. They organize comparable
+analytics; they do not judge whether an app or behavior is productive, good, or bad. Unknown
+packages retain useful supplied names and categories when available. Arbitrary category creation
+and per-app category reassignment are not available in the current build.
 
 To synchronize manually:
 
@@ -66,11 +73,13 @@ show zero new events if the automatic sync already imported them.
 
 Use **Rules** to create, edit, enable, disable, or remove a per-app daily limit.
 
-1. From the dashboard, tap **Rules** or **Add Rule**.
-2. Select a known application.
-3. Set a positive time limit.
-4. Save the rule.
-5. Use the switch to enable or disable it.
+1. From the dashboard, tap **Add Rule** to open the creation form directly. Tap **Rules** instead
+   when you want to open the rules overview without immediately opening the form.
+2. From the overview, use **Add Rule** when you are ready to create another rule.
+3. Select a known application.
+4. Set a positive time limit.
+5. Save the rule.
+6. Use the switch to enable or disable it.
 
 Current known app choices include Instagram, YouTube, Messages, Spotify, and TikTok. The backend
 rejects a second rule for the same application.
@@ -80,12 +89,18 @@ device policy, and OEM behavior can prevent absolute blocking.
 
 ## Trends and Weekly Summary
 
-- Tap **Trends** to view hourly usage, seven-day activity, top apps, and the peak usage window.
-- Tap the analytics icon in the dashboard header to open **Weekly Summary**.
-- Weekly Summary shows total time, daily average, goals met, streaks, and a local feedback form.
+- Tap **Trends** to view hourly usage, seven-day activity, top apps, and one contextual **Peak Usage
+  Window** insight. Weekly-chart labels use a consistent whole-hour scale.
+- Tap **View Weekly Summary** on the dashboard to open **Weekly Summary**.
+- Weekly Summary shows total time and daily average. **Weekly Highlights** contains exactly two
+  summaries: **Goal Progress** and **Best Streak**.
 
-The feedback form currently acknowledges a rating in the interface but does not persist a formal
-research response to the backend. Do not present it as a completed user-study system.
+The previous non-persistent rating and feedback controls were removed. The current build does not
+collect or measure user satisfaction.
+
+Current limitation: once any usage history exists, missing dates are treated as zero-usage
+successful days by the goal/streak calculation. Synchronization or data-gap days can therefore be
+counted as successful.
 
 ## Accountability
 

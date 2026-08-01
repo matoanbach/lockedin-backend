@@ -6,6 +6,7 @@ from lockedin_backend.core.serialization import APIModel
 class CategoryBreakdownItem(APIModel):
     name: str
     minutes: int
+    duration_milliseconds: int
 
 
 class HourlyUsagePoint(APIModel):
@@ -28,12 +29,14 @@ class DashboardAnalyticsResponse(APIModel):
     today_total_minutes: int
     category_breakdown: list[CategoryBreakdownItem] = Field(default_factory=list)
     weekly_usage_hours: list[float] = Field(default_factory=list)
+    weekly_total_minutes: int
     delta_from_yesterday_percent: int
 
 
 class TrendsAnalyticsResponse(APIModel):
     hourly_usage: list[HourlyUsagePoint] = Field(default_factory=list)
     weekly_usage: list[WeeklyUsagePoint] = Field(default_factory=list)
+    weekly_total_minutes: int
     top_apps: list[TopAppUsagePoint] = Field(default_factory=list)
     peak_usage_window: str
 

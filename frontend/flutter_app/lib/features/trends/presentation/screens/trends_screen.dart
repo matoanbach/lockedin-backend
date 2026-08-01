@@ -29,7 +29,6 @@ class TrendsScreen extends ConsumerWidget {
                 title: 'Trends & Insights',
                 subtitle: 'Understand your usage patterns',
                 onBack: () => context.pop(),
-                label: 'HLR-3',
               ),
               Spacing.verticalXxl,
               trendsAsync.when(
@@ -66,19 +65,12 @@ class _TrendsContent extends StatelessWidget {
         Spacing.verticalXxl,
         _PeakUsageCard(peakUsageWindow: analytics.peakUsageWindow),
         Spacing.verticalXxl,
-        _WeeklyComparisonChart(data: analytics.weeklyUsage),
+        _WeeklyComparisonChart(
+          data: analytics.weeklyUsage,
+          weeklyTotalMinutes: analytics.weeklyTotalMinutes,
+        ),
         Spacing.verticalXxl,
         _TopAppsSection(apps: analytics.topApps),
-        Spacing.verticalXxl,
-        InfoCard(
-          message: analytics.peakUsageWindow.isEmpty
-              ? 'Sync Android usage sessions to unlock trend insights here.'
-              : 'Your busiest window is ${analytics.peakUsageWindow}. Consider nudging your evening routine around it.',
-          icon: '📈',
-          type: analytics.peakUsageWindow.isEmpty
-              ? InfoCardType.info
-              : InfoCardType.success,
-        ),
         Spacing.verticalLg,
       ],
     );
@@ -242,17 +234,22 @@ class _PeakUsageCard extends StatelessWidget {
 }
 
 class _WeeklyComparisonChart extends StatelessWidget {
-  const _WeeklyComparisonChart({required this.data});
+  const _WeeklyComparisonChart({
+    required this.data,
+    required this.weeklyTotalMinutes,
+  });
 
   final List<DailyUsage> data;
+  final int weeklyTotalMinutes;
 
   @override
   Widget build(BuildContext context) {
-    final totalHours = data.fold<double>(0, (sum, item) => sum + item.hours);
     final maxY = data.fold<double>(
       0,
       (max, item) => item.hours > max ? item.hours : max,
     );
+    final yInterval = _weeklyChartInterval(maxY);
+    final chartMaxY = _weeklyChartMaxY(maxY, yInterval);
 
     return AppCard(
       child: Column(
@@ -262,7 +259,7 @@ class _WeeklyComparisonChart extends StatelessWidget {
             children: [
               Text('This Week', style: AppTextStyles.titleMedium),
               Text(
-                '${totalHours.toStringAsFixed(1)}h total',
+                '${(weeklyTotalMinutes / 60).toStringAsFixed(1)}h total',
                 style: AppTextStyles.bodySmall.copyWith(
                   color: AppColors.textTertiary,
                 ),
@@ -277,7 +274,7 @@ class _WeeklyComparisonChart extends StatelessWidget {
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
-                  horizontalInterval: (maxY <= 2 ? 1 : maxY / 4),
+                  horizontalInterval: yInterval,
                   getDrawingHorizontalLine: (value) =>
                       FlLine(color: AppColors.border, strokeWidth: 1),
                 ),
@@ -286,6 +283,7 @@ class _WeeklyComparisonChart extends StatelessWidget {
                     sideTitles: SideTitles(
                       showTitles: true,
                       reservedSize: 30,
+                      interval: yInterval,
                       getTitlesWidget: (value, meta) => Text(
                         '${value.toInt()}h',
                         style: AppTextStyles.labelSmall,
@@ -334,7 +332,7 @@ class _WeeklyComparisonChart extends StatelessWidget {
                     ],
                   );
                 }).toList(),
-                maxY: maxY == 0 ? 1 : maxY + 1,
+                maxY: chartMaxY,
               ),
             ),
           ),
@@ -342,6 +340,26 @@ class _WeeklyComparisonChart extends StatelessWidget {
       ),
     );
   }
+}
+
+double _weeklyChartInterval(double dataMaxY) {
+  if (dataMaxY <= 4) {
+    return 1;
+  }
+
+  return (dataMaxY / 4).ceilToDouble();
+}
+
+double _weeklyChartMaxY(double dataMaxY, double interval) {
+  if (dataMaxY <= 0) {
+    return interval;
+  }
+
+  var chartMaxY = (dataMaxY / interval).ceilToDouble() * interval;
+  if (chartMaxY == dataMaxY) {
+    chartMaxY += interval;
+  }
+  return chartMaxY;
 }
 
 class _TopAppsSection extends StatelessWidget {
@@ -467,8 +485,8 @@ class _TrendsStateCard extends StatelessWidget {
 
 Color _topAppColor(int index) {
   const palette = [
-    AppColors.chart1,
-    AppColors.chart2,
+    AppColors.socialMessaging,
+    AppColors.videoEntertainment,
     AppColors.info,
     AppColors.warning,
     AppColors.success,

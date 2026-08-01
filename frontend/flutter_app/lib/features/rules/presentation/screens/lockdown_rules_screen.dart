@@ -14,7 +14,9 @@ import '../widgets/app_limit_warning.dart';
 
 /// Screen for managing lockdown rules.
 class LockdownRulesScreen extends ConsumerStatefulWidget {
-  const LockdownRulesScreen({super.key});
+  const LockdownRulesScreen({super.key, this.openCreateForm = false});
+
+  final bool openCreateForm;
 
   @override
   ConsumerState<LockdownRulesScreen> createState() =>
@@ -23,6 +25,7 @@ class LockdownRulesScreen extends ConsumerStatefulWidget {
 
 class _LockdownRulesScreenState extends ConsumerState<LockdownRulesScreen> {
   bool _showLockedState = false;
+  bool _didAutoOpenCreateForm = false;
   int _reminderThresholdMinutes = 30;
   late final TextEditingController _reminderThresholdController;
 
@@ -102,6 +105,14 @@ class _LockdownRulesScreenState extends ConsumerState<LockdownRulesScreen> {
 
     return rulesAsync.when(
       data: (rules) {
+        if (widget.openCreateForm && !_didAutoOpenCreateForm) {
+          _didAutoOpenCreateForm = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _openRuleSheet();
+            }
+          });
+        }
         final activeCount = rules.where((rule) => rule.enabled).length;
         final statusMap = {
           for (final status
@@ -128,7 +139,6 @@ class _LockdownRulesScreenState extends ConsumerState<LockdownRulesScreen> {
                       context,
                       AppRoutes.dashboard,
                     ),
-                    label: 'HLR-2',
                   ),
                   Spacing.verticalXxl,
                   if (reminderStatus != null) ...[

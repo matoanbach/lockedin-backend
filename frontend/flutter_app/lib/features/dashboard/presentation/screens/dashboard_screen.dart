@@ -54,12 +54,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('HLR-1', style: AppTextStyles.labelSmall),
-              Spacing.verticalLg,
               _DashboardHeader(
                 dateLabel: _formatDateLabel(DateTime.now()),
                 onSettingsTap: () => context.push(AppRoutes.devicePermissions),
-                onAnalyticsTap: () => context.push(AppRoutes.analytics),
               ),
               Spacing.verticalLg,
               _UsageSyncPanel(
@@ -257,13 +254,11 @@ class _DashboardContent extends StatelessWidget {
           deltaFromYesterdayPercent: analytics.deltaFromYesterdayPercent,
         ),
         Spacing.verticalXxl,
-        _CategoryBreakdown(
-          usageData: analytics.categoryBreakdown,
-          totalMinutes: analytics.todayTotalMinutes,
-        ),
+        _CategoryBreakdown(usageData: analytics.categoryBreakdown),
         Spacing.verticalXxl,
         PrimaryButton(
-          onPressed: () => context.push(AppRoutes.lockdownRules),
+          onPressed: () =>
+              context.push('${AppRoutes.lockdownRules}?create=true'),
           label: 'Add Rule',
           icon: Icons.add,
         ),
@@ -274,7 +269,11 @@ class _DashboardContent extends StatelessWidget {
           onAccountabilityTap: () => context.push(AppRoutes.accountability),
         ),
         Spacing.verticalXxl,
-        _WeeklyOverview(weeklyData: analytics.weeklyUsageHours),
+        _WeeklyOverview(
+          weeklyData: analytics.weeklyUsageHours,
+          weeklyTotalMinutes: analytics.weeklyTotalMinutes,
+          onSummaryTap: () => context.push(AppRoutes.analytics),
+        ),
         Spacing.verticalLg,
       ],
     );
@@ -285,45 +284,33 @@ class _DashboardHeader extends StatelessWidget {
   const _DashboardHeader({
     required this.dateLabel,
     required this.onSettingsTap,
-    required this.onAnalyticsTap,
   });
 
   final String dateLabel;
   final VoidCallback onSettingsTap;
-  final VoidCallback onAnalyticsTap;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Dashboard', style: AppTextStyles.headlineLarge),
-            Spacing.verticalXs,
-            Text(
-              dateLabel,
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textTertiary,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Dashboard', style: AppTextStyles.headlineLarge),
+              Spacing.verticalXs,
+              Text(
+                dateLabel,
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: AppColors.textTertiary,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-        Row(
-          children: [
-            AppIconButton(
-              onPressed: onAnalyticsTap,
-              icon: Icons.star_outline,
-              iconColor: AppColors.purple400,
-            ),
-            Spacing.horizontalSm,
-            AppIconButton(
-              onPressed: onSettingsTap,
-              icon: Icons.settings_outlined,
-            ),
-          ],
-        ),
+        Spacing.horizontalSm,
+        AppIconButton(onPressed: onSettingsTap, icon: Icons.settings_outlined),
       ],
     );
   }
@@ -357,7 +344,9 @@ class _UsageCard extends StatelessWidget {
               .map(
                 (data) => PieChartSectionData(
                   color: data.color,
-                  value: data.minutes.toDouble(),
+                  value: data.durationMilliseconds > 0
+                      ? data.durationMilliseconds.toDouble()
+                      : data.minutes * 60000.0,
                   radius: 15,
                   showTitle: false,
                 ),
@@ -387,34 +376,37 @@ class _UsageCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Today\'s Screen Time',
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.textTertiary,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Today\'s Screen Time',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textTertiary,
+                      ),
                     ),
-                  ),
-                  Spacing.verticalSm,
-                  RichText(
-                    text: TextSpan(
-                      children: [
-                        TextSpan(
-                          text: '$hours',
-                          style: AppTextStyles.statLarge,
-                        ),
-                        TextSpan(text: 'h ', style: AppTextStyles.statUnit),
-                        TextSpan(
-                          text: '$minutes',
-                          style: AppTextStyles.statLarge,
-                        ),
-                        TextSpan(text: 'm', style: AppTextStyles.statUnit),
-                      ],
+                    Spacing.verticalSm,
+                    RichText(
+                      text: TextSpan(
+                        children: [
+                          TextSpan(
+                            text: '$hours',
+                            style: AppTextStyles.statLarge,
+                          ),
+                          TextSpan(text: 'h ', style: AppTextStyles.statUnit),
+                          TextSpan(
+                            text: '$minutes',
+                            style: AppTextStyles.statLarge,
+                          ),
+                          TextSpan(text: 'm', style: AppTextStyles.statUnit),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              Spacing.horizontalMd,
               SizedBox(
                 width: 96,
                 height: 96,
@@ -432,25 +424,30 @@ class _UsageCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: trendColor,
-                      shape: BoxShape.circle,
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: trendColor,
+                        shape: BoxShape.circle,
+                      ),
                     ),
-                  ),
-                  Spacing.horizontalSm,
-                  Text(
-                    trendText,
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.textSecondary,
+                    Spacing.horizontalSm,
+                    Expanded(
+                      child: Text(
+                        trendText,
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              Spacing.horizontalSm,
               Icon(trendIcon, color: trendColor, size: 16),
             ],
           ),
@@ -461,16 +458,21 @@ class _UsageCard extends StatelessWidget {
 }
 
 class _CategoryBreakdown extends StatelessWidget {
-  const _CategoryBreakdown({
-    required this.usageData,
-    required this.totalMinutes,
-  });
+  const _CategoryBreakdown({required this.usageData});
 
   final List<UsageData> usageData;
-  final int totalMinutes;
 
   @override
   Widget build(BuildContext context) {
+    final totalDurationMilliseconds = usageData.fold<int>(
+      0,
+      (total, data) =>
+          total +
+          (data.durationMilliseconds > 0
+              ? data.durationMilliseconds
+              : data.minutes * 60000),
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -493,7 +495,12 @@ class _CategoryBreakdown extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 8),
               child: _CategoryItem(
                 data: data,
-                percentage: totalMinutes == 0 ? 0 : data.minutes / totalMinutes,
+                percentage: totalDurationMilliseconds == 0
+                    ? 0
+                    : (data.durationMilliseconds > 0
+                              ? data.durationMilliseconds
+                              : data.minutes * 60000) /
+                          totalDurationMilliseconds,
               ),
             ),
           ),
@@ -515,22 +522,20 @@ class _CategoryItem extends StatelessWidget {
       child: Column(
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: data.color,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  Spacing.horizontalMd,
-                  Text(data.name, style: AppTextStyles.titleMedium),
-                ],
+              Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: data.color,
+                  shape: BoxShape.circle,
+                ),
               ),
+              Spacing.horizontalMd,
+              Expanded(
+                child: Text(data.name, style: AppTextStyles.titleMedium),
+              ),
+              Spacing.horizontalMd,
               Text(
                 data.formattedTime,
                 style: AppTextStyles.bodyMedium.copyWith(
@@ -623,9 +628,15 @@ class _QuickActionButton extends StatelessWidget {
 }
 
 class _WeeklyOverview extends StatelessWidget {
-  const _WeeklyOverview({required this.weeklyData});
+  const _WeeklyOverview({
+    required this.weeklyData,
+    required this.weeklyTotalMinutes,
+    required this.onSummaryTap,
+  });
 
   final List<double> weeklyData;
+  final int weeklyTotalMinutes;
+  final VoidCallback onSummaryTap;
 
   @override
   Widget build(BuildContext context) {
@@ -637,10 +648,6 @@ class _WeeklyOverview extends StatelessWidget {
       0,
       (max, value) => value > max ? value : max,
     );
-    final totalHours = normalizedData.fold<double>(
-      0,
-      (sum, value) => sum + value,
-    );
     final dayLabels = _recentDayLabels();
 
     return AppCard(
@@ -651,7 +658,7 @@ class _WeeklyOverview extends StatelessWidget {
             children: [
               Text('This Week', style: AppTextStyles.titleMedium),
               Text(
-                _formatHoursAndMinutes(totalHours),
+                _formatMinutes(weeklyTotalMinutes),
                 style: AppTextStyles.bodySmall.copyWith(
                   color: AppColors.textTertiary,
                 ),
@@ -680,6 +687,22 @@ class _WeeklyOverview extends StatelessWidget {
                   ),
                 );
               }),
+            ),
+          ),
+          Spacing.verticalLg,
+          Tooltip(
+            message: 'Open your Weekly Summary',
+            child: Semantics(
+              button: true,
+              label: 'View Weekly Summary',
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: onSummaryTap,
+                  icon: const Icon(Icons.calendar_view_week_outlined),
+                  label: const Text('View Weekly Summary'),
+                ),
+              ),
             ),
           ),
         ],
@@ -776,8 +799,7 @@ List<String> _recentDayLabels() {
   });
 }
 
-String _formatHoursAndMinutes(double totalHours) {
-  final totalMinutes = (totalHours * 60).round();
+String _formatMinutes(int totalMinutes) {
   final hours = totalMinutes ~/ 60;
   final minutes = totalMinutes % 60;
   if (hours == 0) {

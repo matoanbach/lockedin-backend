@@ -45,7 +45,6 @@ class _AccessibilitySettingsScreenState
                     title: 'Display & Accessibility',
                     subtitle: 'Customize text size, contrast, and tap targets',
                     onBack: () => context.pop(),
-                    label: 'HLR-7',
                   ),
                   Spacing.verticalXxl,
                   Row(

@@ -44,7 +44,6 @@ class _NotificationSettingsScreenState
                     title: 'Notification Tone',
                     subtitle: 'Customize how LockdIn talks to you',
                     onBack: () => context.pop(),
-                    label: 'HLR-4',
                   ),
                   Spacing.verticalXxl,
                   Row(
