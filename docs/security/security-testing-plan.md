@@ -2,10 +2,10 @@
 
 | Field | Value |
 |---|---|
-| Version | 0.3 (Review Candidate) |
-| Date | 2026-07-17 |
+| Version | 0.4 (Review Candidate) |
+| Date | 2026-08-03 |
 | Status | Draft for team review |
-| System baseline | Git commit `cc9720b` |
+| System baseline | Git commit `88ec6954ef2f781a0038509e2a6ae4cdc5549ee0` |
 
 ## 1. Purpose
 
@@ -63,7 +63,7 @@ Security decisions in this plan use stable identifiers. Each decision records it
 | Decision | Decision and rationale | Alternatives/trade-offs | Verification or review trigger |
 |---|---|---|---|
 | SEC-DEC-001 | Use ASVS/WSTG for the API and MASVS/MASTG for Android. The system has both API and mobile attack surfaces, so one checklist would leave material gaps. | A custom-only checklist is shorter but harder to defend, repeat, and maintain. | Review when adopting a new major standard version or changing a platform. |
-| SEC-DEC-002 | Do not prescribe a JWT library or custom login yet. Identity provider, first-party accounts, tenant boundaries, token lifecycle, recovery, and revocation must be designed first. | A quick custom JWT implementation is faster initially but risks embedding the wrong identity and tenancy model. | Create an ADR before authentication implementation. |
+| SEC-DEC-002 | Do not prescribe a JWT library or custom login before identity, account, tenant, session, recovery, and revocation are approved. [ADR-001](../../backend/docs/decisions/authentication-session-tenant-isolation.md) accepts D1–D6 for local implementation: self-hosted Keycloak OIDC, verified synthetic email/recovery, direct Keycloak-token introspection with minimal local revocation state, physical-phone local TLS, explicit queue/default-profile handling, and role-based operational ownership. | A quick custom JWT implementation is faster initially but risks embedding the wrong identity and tenancy model. A commercial free tier cannot guarantee the project's no-charge requirement. | Review when identity provider, exposure, session, recovery, ownership, or mobile lifecycle changes; verify actual role holders and runbooks before Phase E completion or shared/external exposure. |
 | SEC-DEC-003 | Treat the current authorization issue as unauthenticated shared-profile access, not IDOR. Call it IDOR only after user-controllable object references and ownership boundaries exist. | Keeping the IDOR label is familiar but technically inaccurate and leads to invalid tests. | Review after multi-user/profile isolation is implemented. |
 | SEC-DEC-004 | Use the 5x5 matrix for project risk prioritization and CVSS only for confirmed technical vulnerabilities when useful. | Mapping the matrix directly to CVSS appears precise but combines two different models. | Re-score when exposure, controls, or impact changes. |
 | SEC-DEC-005 | Enforce request limits in layers: ingress/reverse proxy for raw body size and rate controls, ASGI/application controls for API behavior, and schema controls for fields and collections. | Schema-only validation happens after request parsing; proxy-only controls lack business context. Gunicorn has no `limit_request_body` setting. | Verify each layer in staging after deployment configuration exists. |
@@ -189,7 +189,7 @@ Scores are provisional until the deployment facts in Section 4.3 are resolved.
 | H3 | A person is added or impersonated as an accountability contact without meaningful verification or consent. | 3 | 4 | 12 | Current contact model requires design review; PRIV-02 through PRIV-04. |
 | H4 | A user bypasses enforcement through reinstall, multiple profiles, clock changes, permission revocation, or force-stop. | 4 | 2 | 8 | Expected client-side adversarial behavior; MOB-PLAT-02 through MOB-PLAT-05. |
 | H5 | Contact emails are harvested or reused for phishing. | 2 | 3 | 6 | Depends on API exposure and notification design; DATA-02, PRIV-04. |
-| H6 | A security event is not detected, contained, or communicated because response ownership and monitoring are undefined. | 4 | 4 | 16 | Verified documentation gap; OPS-01 through OPS-04. |
+| H6 | A security event is not detected, contained, or communicated because acting ownership, monitoring, and response procedures are not operationally verified. | 4 | 4 | 16 | Role-based ownership is assigned, but acting people and operational evidence remain unverified; OPS-01 through OPS-04. |
 
 ### 6.3 Risk-to-Testing-Focus Mapping
 
@@ -259,7 +259,10 @@ Do not install unpinned `latest` scanner versions inside each pipeline run. Pin 
 
 #### Weak or Missing Authentication Mechanisms
 
-Authentication tests marked **design-gated** become runnable only after SEC-DEC-002 has an approved identity/tenancy ADR.
+Authentication tests marked **design-gated** become runnable as their Phase B–D controls are
+implemented under accepted
+[ADR-001](../../backend/docs/decisions/authentication-session-tenant-isolation.md). Their presence
+in this plan is not evidence that those controls exist.
 
 | ID | Test | Expected result | Current state |
 |---|---|---|---|
@@ -504,9 +507,13 @@ This is a decision backlog, not authorization to implement a particular package 
 ### Phase 0: Confirm architecture and exposure
 
 - [ ] Record whether the API/ingress is public and where TLS terminates.
-- [ ] Approve identity, account recovery, device/client, session, and tenant-isolation architecture (SEC-DEC-002).
+- [x] Approve identity, account recovery, device/client, session, and tenant-isolation architecture
+  for local implementation in
+  [ADR-001](../../backend/docs/decisions/authentication-session-tenant-isolation.md)
+  (SEC-DEC-002; D1–D6 approved on 2026-08-03).
 - [ ] Complete the usage/contact data inventory and privacy requirements (SEC-DEC-010).
-- [ ] Assign security finding, incident response, deployment, and risk-acceptance owners.
+- [x] Assign role-based security finding, incident response, deployment, identity, database, and
+  risk-acceptance owners in ADR-001; verify the acting people and private runbook before release.
 
 ### Phase 1: Production blockers
 
