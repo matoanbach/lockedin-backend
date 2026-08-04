@@ -16,6 +16,7 @@ report disagrees with the current implementation.
 | Requirements reviewer | [Requirements Implementation Status](IMPLEMENTATION_STATUS.md) |
 | API consumer | [API Reference](../backend/docs/api.md) |
 | Security reviewer | [Security Testing Plan](security/security-testing-plan.md) |
+| Authentication architecture reviewer | [Authentication, Session, and Tenant-Isolation ADR](../backend/docs/decisions/authentication-session-tenant-isolation.md) |
 
 The backend also has a focused onboarding set under [`backend/docs`](../backend/docs/index.md).
 
@@ -29,6 +30,12 @@ admin/user roles. It uses one default development profile created by the backend
 - seeded rules, usage, preferences, and contacts belong to the same profile;
 - the system must remain on a trusted local/demo network;
 - authentication and role-based authorization are documented limitations, not hidden features.
+
+The approved local next-state design is recorded in the
+[Authentication, Session, and Tenant-Isolation ADR](../backend/docs/decisions/authentication-session-tenant-isolation.md).
+It is accepted for local implementation but does not change the current runtime status. Role-based
+operational ownership is approved; acting people and runbooks still require verification before
+release completion or external exposure.
 
 ## Historical Documents
 

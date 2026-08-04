@@ -39,6 +39,12 @@ There are no admin, user, or guest credentials in the current build. Do not expo
 untrusted network until authentication, authorization, production secrets, and transport security
 are implemented.
 
+The evidence-backed current exposure inventory and proposed public/protected/internal
+classification are in the
+[Authentication, Session, and Tenant-Isolation ADR](decisions/authentication-session-tenant-isolation.md).
+That ADR is accepted for local implementation; it does not add endpoints or change this current
+API contract.
+
 ## Endpoint Summary
 
 | Method | Path | Request | Success | Other documented responses |

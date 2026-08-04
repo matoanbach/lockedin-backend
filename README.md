@@ -53,6 +53,7 @@ profile. Keep the application on a trusted local/demo network.
 | [API Reference](backend/docs/api.md) | Endpoints, parameters, requests, responses, validation, and errors |
 | [Media Capture Checklist](docs/MEDIA_CAPTURE_CHECKLIST.md) | Real screenshot/video requirements and privacy checks |
 | [Security Testing Plan](docs/security/security-testing-plan.md) | Security scope, cases, tools, and readiness work |
+| [Authentication Architecture ADR](backend/docs/decisions/authentication-session-tenant-isolation.md) | Local-demo identity, session, tenant, mobile-data, and migration decisions; implementation is pending |
 | [Backend Onboarding](backend/docs/index.md) | Backend architecture and maintenance guide |
 
 When an older academic report differs from the current code, use the current source, generated

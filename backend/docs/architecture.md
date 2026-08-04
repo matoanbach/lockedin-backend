@@ -113,6 +113,21 @@ Instead, the backend currently works through a default profile model:
 
 This is a major onboarding detail. New teammates should not assume the API is multi-user yet.
 
+## Authentication Architecture Gate
+
+Authentication is now the next planned architecture initiative, but it is not implemented. The
+[Authentication, Session, and Tenant-Isolation ADR](decisions/authentication-session-tenant-isolation.md)
+contains the evidence baseline, endpoint/data inventory, threat model, account/profile alternatives,
+mobile queue lifecycle, tenant-enforcement design, acceptance matrix, and migration/rollback plan.
+
+The ADR is **accepted for local implementation**. D1–D6 approve local/demo-only exposure,
+self-hosted Keycloak OIDC with no external identity-service charge, verification/recovery, direct
+Keycloak-token sessions with server-side revocation checks, physical-phone local TLS,
+existing/pre-login data handling, and role-based operational ownership. The runtime still has no
+authentication, continues to use the default profile, and remains suitable only for a trusted
+local/demo deployment until the approved controls are implemented and tested. Acting role holders,
+contacts, access, and runbooks still require verification before release or external exposure.
+
 ## Serialization Model
 
 Schema models inherit from `APIModel` in `core/serialization.py`.
@@ -138,9 +153,9 @@ Routes translate those into HTTP responses.
 
 ## Current Non-Goals
 
-These are intentionally not part of the current active architecture:
+These are not implemented in the current active architecture:
 
-- auth
+- authentication and tenant isolation (local design approved in ADR-001; implementation pending)
 - Supabase integration
 - microservices
 - Alembic-driven migrations

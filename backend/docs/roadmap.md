@@ -29,6 +29,26 @@ The backend currently has working support for:
 - production hardening is still incomplete
 - schema evolution is SQL-bootstrap driven, not migration-driven
 
+## Next Major Initiative: Identity And Tenant Isolation
+
+The initiative is intentionally split into reviewable stages:
+
+1. accept the local technical and role-based ownership decisions in the
+   [Authentication, Session, and Tenant-Isolation ADR](decisions/authentication-session-tenant-isolation.md);
+2. add a safe migration mechanism, account/profile ownership, current-principal dependency, and
+   tenant-scoped services/repositories;
+3. implement the approved backend signup/OIDC, verification, login, renewal, logout/revocation,
+   recovery, throttling, and audit contract;
+4. implement Flutter auth state, platform-backed credential storage, guarded routing, and
+   account-scoped cache/queue lifecycle;
+5. complete two-account isolation, adversarial auth, mobile lifecycle, TLS/secret, deployment, and
+   rollback verification.
+
+The ADR's D1–D6 decisions are accepted for local implementation. Do not describe authentication as
+implemented until working controls and acceptance evidence exist. Do not enable shared/external
+exposure until the actual role holders, contacts, access, runbooks, and remaining production gate
+are verified.
+
 ## Planning Files
 
 Main planning/context files in this directory:

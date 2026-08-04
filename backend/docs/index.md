@@ -38,6 +38,7 @@ Recommended reading order for new contributors:
 7. [Testing](testing.md)
 8. [Deployment](deployment.md)
 9. [Roadmap](roadmap.md)
+10. [Authentication, session, and tenant-isolation ADR](decisions/authentication-session-tenant-isolation.md)
 
 If you are onboarding in one sitting, stop after [Layers](layers.md) first and then start reading code.
 
@@ -54,6 +55,7 @@ If you are onboarding in one sitting, stop after [Layers](layers.md) first and t
 - [Architecture](architecture.md)
 - [Layers](layers.md)
 - [Data model](data-model.md)
+- [Authentication, session, and tenant-isolation ADR](decisions/authentication-session-tenant-isolation.md)
 
 ### I want to change or add an endpoint
 

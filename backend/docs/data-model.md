@@ -182,6 +182,19 @@ That behavior comes from `services/profile_context.py`, which:
 
 New teammates should treat this as a deliberate temporary design, not a full auth model.
 
+## Approved Future Account/Profile Relationship
+
+[ADR-001](decisions/authentication-session-tenant-isolation.md) preserves `Profile` as
+the behavioral tenant boundary and adds a separate account/identity that initially owns exactly
+one non-demo profile. The fixed `default` profile would remain demo-only and could not be claimed
+automatically by a registrant.
+
+This is an **approved future migration design**, not a description of the current schema. There
+are still no account, identity, session, verification, recovery, audit, device-registration, or role
+tables. Exact additive DDL must implement the approved self-hosted Keycloak external-identity and
+minimal revocation model and ship through a reviewed migration mechanism; editing
+`database/initdb/10-schema.sql` alone is not safe for an existing PostgreSQL volume.
+
 ## Important Backend/Data Boundary
 
 If you change:
