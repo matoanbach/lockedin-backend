@@ -23,11 +23,12 @@ The backend currently has working support for:
 
 ## Important Current Limits
 
-- no auth yet
-- current runtime is effectively single-profile
+- no real Keycloak authentication yet; protected routes fail closed
+- tenant/account ownership exists, but account bootstrap is not exposed
 - health is liveness-oriented, not DB readiness-oriented
 - production hardening is still incomplete
-- schema evolution is SQL-bootstrap driven, not migration-driven
+- one guarded Alembic migration head exists; disposable empty/legacy upgrades, fresh bootstrap,
+  triggers, two-account isolation, and dump/restore pass, while target-deployment evidence remains
 
 ## Next Major Initiative: Identity And Tenant Isolation
 
@@ -36,7 +37,7 @@ The initiative is intentionally split into reviewable stages:
 1. accept the local technical and role-based ownership decisions in the
    [Authentication, Session, and Tenant-Isolation ADR](decisions/authentication-session-tenant-isolation.md);
 2. add a safe migration mechanism, account/profile ownership, current-principal dependency, and
-   tenant-scoped services/repositories;
+   tenant-scoped services/repositories — **implemented in Phase B**;
 3. implement the approved backend signup/OIDC, verification, login, renewal, logout/revocation,
    recovery, throttling, and audit contract;
 4. implement Flutter auth state, platform-backed credential storage, guarded routing, and

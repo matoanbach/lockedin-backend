@@ -7,7 +7,7 @@
 | Date | 2026-08-01 |
 | Last updated | 2026-08-03 |
 | Evidence baseline | Git commit `88ec6954ef2f781a0038509e2a6ae4cdc5549ee0` |
-| Scope | Phase A architecture and acceptance criteria only; no production authentication or schema change |
+| Scope | Phase A architecture plus Phase B tenant/infrastructure foundation status; no production authentication |
 | Owners | Product/account behavior and risk acceptance: Project owner; security findings and incident response: Security owner; Keycloak administration/upgrades: Identity operator; deployment/local TLS: Deployment operator; backup/restore: Database operator |
 
 ## Decision gate
@@ -35,13 +35,26 @@ acting people, contacts, access, and runbooks still require verification before 
 incident exercise, or any shared/external exposure. Authentication remains unimplemented until
 working controls and evidence exist.
 
+## Phase B implementation status
+
+Phase B implements the guarded Alembic migration head, explicit demo/active profile state,
+account/external-identity ownership, minimal account not-before and revoked provider-session
+storage, the typed `CurrentPrincipal`, protected route boundaries, operator-scoped aggregate
+rebuild, and profile-scoped services. The default principal and operator dependencies fail closed;
+tests override them only with synthetic trusted principals.
+
+The pinned local Keycloak, separate Keycloak PostgreSQL volume, Mailpit, and Caddy TLS foundation
+are configured but were not started or physically trusted as part of this change. Phase B does not
+implement Keycloak realm/client configuration, introspection, account bootstrap, token/session
+validation, or Flutter login. Those remain Phase C/D work, so “authentication implemented” and
+production-readiness claims remain prohibited.
+
 ## Context and evidence
 
-The FastAPI application is a modular monolith mounted under `/api/v1`. Route functions depend on a
-database session, call services, and then use repositories and SQLAlchemy. There is no
-authentication or authorization dependency. Application startup and every user-facing service use
-`ProfileContextService.ensure_default_profile()`, which resolves or creates the profile with slug
-`default`.
+The FastAPI application is a modular monolith mounted under `/api/v1`. Phase B route functions
+depend on a fail-closed typed principal and a database session, then call profile-scoped services
+and repositories. Real token authentication is not installed. Application startup no longer
+creates a profile, and protected services no longer call `ensure_default_profile()`.
 
 The current database is closer to tenant-ready than the request layer: every behavioral table has
 a non-null `profile_id` foreign key, and most repository reads include `profile_id`. The missing
@@ -59,8 +72,9 @@ and anonymous device-only mode. Those are requirements/design hypotheses, not cu
 
 ## Current endpoint exposure inventory
 
-All routes below are currently unauthenticated. “Target” is the required Phase B/C exposure, not a
-claim about current protection.
+The “current behavior” column below records the Phase A baseline. Phase B now applies a
+fail-closed principal boundary to every protected target and a separate operator boundary to
+aggregate rebuild; real authentication remains Phase C.
 
 | Method and path | Current behavior / data | Current profile resolution | Target exposure |
 | --- | --- | --- | --- |
@@ -430,12 +444,13 @@ credentials fail as specified.
 No database changes occur in this ADR phase. Editing `database/initdb/10-schema.sql` alone is not a
 migration for an existing volume.
 
-### Required mechanism before schema changes
+### Versioned mechanism
 
-Adopt an explicit, versioned migration runner (Alembic is the natural SQLAlchemy candidate, but
-selection and operating procedure require review). It must record applied revisions, run once per
-deployment, fail closed on partial execution, and have PostgreSQL integration tests starting from
-both a fresh bootstrap and the current schema.
+Phase B adopts pinned Alembic 1.18.5. Revision `20260803_01` records applied state, runs through a
+one-shot Compose migration service, creates an empty schema, and accepts an unversioned database
+only after verifying its exact legacy shape. The isolated PostgreSQL harness now passes empty and
+legacy upgrades, ownership triggers, and two-account request isolation. The actual bootstrap SQL
+and an isolated custom-format dump/restore round trip also pass on PostgreSQL 16.13.
 
 ### Additive sequence
 
@@ -481,9 +496,11 @@ account/revocation schema details. It must be reviewed before execution. The req
 - Destructive down-migrations are not the primary rollback plan. A later reviewed cleanup migration
   may remove unused structures only after the compatibility window and backup retention period.
 
-Before Phase B begins, attach the exact schema diff, locks/transaction behavior, backfill queries,
-row-count assertions, backup command/runbook, restore evidence, forward/backward compatibility
-matrix, and rollback decision point to the migration change.
+The Phase B change includes the exact additive schema diff and fail-closed legacy-shape checks.
+The trigger paths serialize ownership checks on the profile row, and disposable migration,
+bootstrap, row-preservation, and dump/restore evidence now exists. Target-deployment inventory,
+lock observation under representative load, the full forward/backward compatibility matrix, and
+the operational rollback decision point remain release evidence requirements.
 
 ## Flutter credential, cache, and queue lifecycle
 

@@ -104,7 +104,9 @@ counted as successful.
 
 ## Accountability
 
-The Accountability screen stores a contact email associated with the default profile.
+The Accountability screen stores a contact email inside the current principal's profile. On the
+Phase B branch, the Flutter client has no login flow yet, so protected product screens receive
+`401` until Phases C and D supply backend authentication and mobile credentials.
 
 1. Open **Accountability**.
 2. Enter a valid email address.
@@ -131,7 +133,7 @@ not silently grant the permission.
 
 | Message or state | Meaning | What to do |
 | --- | --- | --- |
-| `Backend unavailable` | The app cannot load the default profile | Start the backend, verify the configured URL, then tap **Retry** |
+| `Backend unavailable` | The app cannot load protected data; this also covers the expected Phase B `401` before mobile login exists | Verify the configured URL and backend; use a Phase A demo build for the behavioral walkthrough, or wait for Phases C/D rather than bypassing authentication |
 | `Could not connect to the backend at ...` | Network or backend connection failed | Check Wi-Fi, host IP, firewall, container health, and frontend `.env` |
 | `Grant Usage Access before syncing...` | Android usage permission is missing | Open Device Permissions and grant Usage Access |
 | `Live usage uploads are still pending...` | Accessibility events remain queued | Keep the backend reachable and retry |
@@ -155,7 +157,8 @@ watermarks, and pending state.
 
 - Usage history and accountability contacts are personal information.
 - Use demo addresses and test accounts during presentations.
-- Do not expose the current unauthenticated backend to the public internet.
+- Do not expose the local stack to the public internet. Protected routes fail closed in Phase B,
+  but real token validation, edge hardening, and production TLS trust are not implemented evidence.
 - Do not display notifications containing private information during screen sharing.
 - Do not reset the Docker volume unless all stored data may be deleted.
 - Do not enable Accessibility solely for a presentation unless the feature is part of the planned
@@ -165,8 +168,10 @@ watermarks, and pending state.
 
 ### Why is there no login?
 
-Authentication and multi-user roles are outside the implemented prototype scope. The backend uses
-one default profile. This is a known limitation and must be addressed before public deployment.
+The Phase B backend has account/profile ownership and tenant-scoped protected routes, but it does
+not yet authenticate tokens. Its default principal dependency rejects protected requests, and the
+seeded default profile is demo-only and unowned. Phase C adds Keycloak authentication/session
+behavior; Phase D adds Flutter login, credential storage, and account-owned queues.
 
 ### Why does a short session sometimes appear as one minute?
 

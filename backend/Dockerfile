@@ -6,6 +6,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 COPY pyproject.toml PLAN.md README.md ./
+COPY alembic.ini ./
+COPY migrations ./migrations
 COPY conf ./conf
 COPY docs ./docs
 COPY src ./src
@@ -24,6 +26,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 COPY pyproject.toml PLAN.md README.md ./
+COPY alembic.ini ./
+COPY migrations ./migrations
 COPY conf ./conf
 COPY src ./src
 COPY --from=docs-builder /app/.artifacts ./.artifacts

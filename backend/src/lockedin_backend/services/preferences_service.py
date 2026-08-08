@@ -7,19 +7,20 @@ from lockedin_backend.schemas.preferences import (
     PreferencesResponse,
     PreferencesUpdate,
 )
-from lockedin_backend.services.profile_context import profile_context_service
 
 
 class PreferencesService:
     def __init__(self) -> None:
         self.repository = PreferencesRepository()
 
-    def get_preferences(self, db: Session) -> PreferencesResponse:
-        preferences = self._get_preferences_model(db)
+    def get_preferences(self, db: Session, profile_id: str) -> PreferencesResponse:
+        preferences = self._get_preferences_model(db, profile_id)
         return self._to_response(preferences)
 
-    def update_preferences(self, db: Session, payload: PreferencesUpdate) -> PreferencesResponse:
-        preferences = self._get_preferences_model(db)
+    def update_preferences(
+        self, db: Session, profile_id: str, payload: PreferencesUpdate
+    ) -> PreferencesResponse:
+        preferences = self._get_preferences_model(db, profile_id)
         updates = payload.model_dump(exclude_none=True)
 
         for field, value in updates.items():
@@ -29,11 +30,10 @@ class PreferencesService:
         db.refresh(preferences)
         return self._to_response(preferences)
 
-    def _get_preferences_model(self, db: Session) -> Preferences:
-        profile = profile_context_service.ensure_default_profile(db)
-        preferences = self.repository.get_by_profile_id(db, profile.id)
+    def _get_preferences_model(self, db: Session, profile_id: str) -> Preferences:
+        preferences = self.repository.get_by_profile_id(db, profile_id)
         if preferences is None:
-            preferences = self.repository.create(db, profile.id)
+            preferences = self.repository.create(db, profile_id)
             db.commit()
             db.refresh(preferences)
         return preferences

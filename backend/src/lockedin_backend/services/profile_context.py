@@ -20,7 +20,12 @@ class ProfileContextService:
                 db,
                 slug=DEFAULT_PROFILE_SLUG,
                 name=DEFAULT_PROFILE_NAME,
+                is_demo=True,
             )
+            created = True
+
+        if not profile.is_demo:
+            profile.is_demo = True
             created = True
 
         preferences = self.preferences_repository.get_by_profile_id(db, profile.id)

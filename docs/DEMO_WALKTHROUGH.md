@@ -3,17 +3,23 @@
 This runbook is designed for a 7–10 minute live demonstration. Rehearse it using the same device,
 network, database, and build planned for the evaluation.
 
+The current Phase B branch is intentionally not an end-to-end mobile demo build: protected API
+routes fail closed, while Flutter login and real Keycloak authentication belong to Phases C and D.
+Do not bypass that boundary. Use a previously approved Phase A build for this walkthrough, or
+present Phase B through its automated route/tenant tests and static infrastructure configuration.
+
 ## Demo Identity and Roles
 
-The current build has no login, password, authentication, or role-based access control.
+The Phase A demo build has no login or account roles. The Phase B backend adds a typed tenant
+principal and account/profile schema, but no runtime authenticator.
 
 | Demo identity | Credentials | Effective access |
 | --- | --- | --- |
-| Default development profile | None | All current frontend and API functions |
+| Phase A default development profile | None | Behavioral demo functions in the approved Phase A build only |
 
-Do not advertise admin/user role differences. Explain that a single-profile identity model kept
-the prototype focused on usage reconstruction, rules, analytics, and Android enforcement. State
-that authentication and authorization are required before multi-user or public deployment.
+Do not advertise admin/user role differences. Explain that the demonstrated Phase A build focused
+on usage reconstruction, rules, analytics, and Android enforcement. Phase B establishes tenant
+boundaries; Phases C/D are still required for working login and multi-account use.
 
 ## Preparation Checklist
 
@@ -27,7 +33,7 @@ Complete this before the audience arrives:
 - [ ] Confirm Swagger UI opens at `/api/docs`.
 - [ ] Confirm the phone and host are on the same trusted Wi-Fi.
 - [ ] Confirm the compiled `LOCKDIN_API_BASE_URL` uses the host's current IPv4 address.
-- [ ] Open LockdIn and confirm the dashboard loads.
+- [ ] If using the approved Phase A demo build, open LockdIn and confirm the dashboard loads.
 - [ ] Confirm Usage Access is in the planned state.
 - [ ] Confirm notification and Accessibility states match the planned script.
 - [ ] Load only seeded or synthetic data.
@@ -77,7 +83,8 @@ Show the dashboard and briefly identify the client/backend interaction.
 2. Explain that seeded data makes the evaluation repeatable.
 3. Point out that dashboard totals come from backend aggregates, not hard-coded UI values.
 
-Expected result: dashboard loads without a spinner or error.
+Expected result on the approved Phase A demo build: dashboard loads without a spinner or error.
+On the Phase B branch, a `401` is expected until Phases C/D are implemented.
 
 ### 3. Usage synchronization — 90 seconds
 
@@ -186,6 +193,7 @@ Expected result: `422`, no database write.
 End with:
 
 > The prototype demonstrates reliable usage ingestion, idempotent synchronization, rules,
-> analytics, accessible display options, and Android soft enforcement. It is local/demo ready, not
-> public-production ready. Authentication, authorization, HTTPS deployment, formal usability
-> research, release signing, and stronger operations are explicit next steps.
+> analytics, accessible display options, and Android soft enforcement. Phase B adds fail-closed
+> tenant and infrastructure foundations, but working Keycloak authentication, mobile login,
+> physically verified TLS trust, formal usability research, release signing, and stronger
+> operations remain explicit next steps.

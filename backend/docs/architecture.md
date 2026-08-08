@@ -40,17 +40,18 @@ The backend owns:
 - DB session usage
 - API validation and response serialization
 
-The backend does not own local schema bootstrap.
+The backend owns versioned schema transitions through Alembic.
 
-The top-level `database/` folder owns:
+The top-level `database/` folder owns the matching fresh-database snapshot:
 
 - Docker Postgres startup for local development
 - SQL schema bootstrap
 - seed data
 
-That means schema changes must stay aligned between:
+Schema changes must stay aligned between:
 
 - `backend/src/lockedin_backend/models/`
+- `backend/migrations/`
 - `database/initdb/10-schema.sql`
 
 ## Application Startup
@@ -64,7 +65,8 @@ Key behaviors:
 - `create_app()` builds the FastAPI application
 - the API router is mounted under `/api/v1`
 - a root `/` endpoint returns a simple service message
-- a lifespan hook ensures the default profile exists before serving requests
+- startup does not create or select a profile
+- protected route groups require a `CurrentPrincipal` before service execution
 
 ## Request Lifecycle
 
@@ -72,8 +74,8 @@ Typical request flow:
 
 1. FastAPI receives an HTTP request.
 2. A route function in `api/routes/*.py` validates the request payload using a schema.
-3. The route gets a DB session via `Depends(get_db)`.
-4. The route calls a service in `services/`.
+3. A protected route resolves a trusted `CurrentPrincipal`; the default dependency returns `401`.
+4. The route gets a DB session via `Depends(get_db)` and passes `principal.profile_id` to a service.
 5. The service coordinates repository access and business rules.
 6. Repositories query or write SQLAlchemy models.
 7. The service commits or refreshes entities if needed.
@@ -95,7 +97,7 @@ Flow:
 
 1. `POST /api/v1/rules` receives a `RuleCreate` payload.
 2. `create_rule()` in `api/routes/rules.py` calls `rules_service.create_rule()`.
-3. `RulesService` ensures the default profile exists.
+3. The protected router resolves the trusted principal before the service runs.
 4. `RulesService` canonicalizes the app ID and checks for duplicate rules.
 5. `RuleRepository.create()` inserts a `Rule` ORM object.
 6. The service commits and refreshes it.
@@ -103,15 +105,15 @@ Flow:
 
 ## Current Identity Model
 
-There is no auth yet.
+Phase B supplies the tenant foundation, not a working login system:
 
-Instead, the backend currently works through a default profile model:
-
-- `ProfileContextService` ensures a default profile exists
-- the default profile slug is `default`
-- many services operate against that profile automatically
-
-This is a major onboarding detail. New teammates should not assume the API is multi-user yet.
+- `Account` owns exactly one non-demo `Profile` initially;
+- `ExternalIdentity` links by exact immutable `(issuer, subject)`;
+- `CurrentPrincipal` carries trusted account/profile/provider identifiers;
+- the default principal dependency fails closed until Phase C installs Keycloak introspection;
+- protected services accept an explicit trusted profile ID and never call
+  `ensure_default_profile()`;
+- the fixed `default` profile is demo-only and cannot be owned.
 
 ## Authentication Architecture Gate
 
@@ -120,12 +122,12 @@ Authentication is now the next planned architecture initiative, but it is not im
 contains the evidence baseline, endpoint/data inventory, threat model, account/profile alternatives,
 mobile queue lifecycle, tenant-enforcement design, acceptance matrix, and migration/rollback plan.
 
-The ADR is **accepted for local implementation**. D1–D6 approve local/demo-only exposure,
+The ADR is **accepted for local implementation**, and its Phase B foundation is implemented. D1–D6 approve local/demo-only exposure,
 self-hosted Keycloak OIDC with no external identity-service charge, verification/recovery, direct
 Keycloak-token sessions with server-side revocation checks, physical-phone local TLS,
 existing/pre-login data handling, and role-based operational ownership. The runtime still has no
-authentication, continues to use the default profile, and remains suitable only for a trusted
-local/demo deployment until the approved controls are implemented and tested. Acting role holders,
+real token authentication and remains suitable only for a trusted local/demo deployment until the
+remaining controls are implemented and tested. Acting role holders,
 contacts, access, and runbooks still require verification before release or external exposure.
 
 ## Serialization Model
@@ -155,10 +157,10 @@ Routes translate those into HTTP responses.
 
 These are not implemented in the current active architecture:
 
-- authentication and tenant isolation (local design approved in ADR-001; implementation pending)
+- Keycloak introspection/session authentication (Phase B tenant isolation foundation exists)
 - Supabase integration
 - microservices
-- Alembic-driven migrations
+- a complete identity/security audit workflow beyond the Phase B migration head
 
 ## Related Pages
 

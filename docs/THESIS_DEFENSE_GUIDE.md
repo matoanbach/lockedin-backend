@@ -204,15 +204,16 @@ Remove personal data from research artifacts.
 
 Current limitations:
 
-- one default profile;
-- no authentication, authorization, or admin/user roles;
+- account/profile tenant foundation with an unowned default demo profile;
+- no working Keycloak authentication, mobile login, or admin/user roles;
 - no outbound accountability email;
 - no public-production security posture;
 - no production HTTPS/reverse-proxy runbook;
 - checked-in Kubernetes secret manifests are templates and the ingress has no TLS host;
 - the Argo CD application syncs only the backend manifest path and assumes database prerequisites;
 - debug API documentation remains exposed;
-- no Alembic migration workflow;
+- one guarded Alembic migration head with passing disposable empty/legacy upgrades, fresh
+  bootstrap, and dump/restore verification; target-deployment backup/restore evidence remains;
 - release Android build still uses debug signing;
 - Android-focused collection; no equivalent iOS implementation;
 - soft rather than tamper-resistant enforcement;
@@ -227,7 +228,7 @@ Future priorities:
 
 1. authentication and per-user authorization;
 2. production secrets, HTTPS, restricted docs, and release signing;
-3. migration tooling, backups, readiness checks, metrics, and structured logs;
+3. restore evidence, readiness checks, metrics, and structured logs beyond the Phase B migration tooling;
 4. formal usability/accessibility study;
 5. broader Android compatibility and end-to-end automation;
 6. notification/accountability delivery with consent and abuse controls;

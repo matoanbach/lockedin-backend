@@ -18,7 +18,6 @@ from lockedin_backend.schemas.analytics import (
     WeeklyUsagePoint,
 )
 from lockedin_backend.services.app_classification import classify_app
-from lockedin_backend.services.profile_context import profile_context_service
 from lockedin_backend.services.usage_time import (
     MILLISECONDS_PER_MINUTE,
     completed_minutes,
@@ -37,13 +36,12 @@ class AnalyticsService:
         self.preferences_repository = PreferencesRepository()
         self.usage_repository = UsageRepository()
 
-    def get_dashboard(self, db: Session) -> DashboardAnalyticsResponse:
-        profile = profile_context_service.ensure_default_profile(db)
-        effective_timezone = self._get_effective_timezone(db, profile.id)
+    def get_dashboard(self, db: Session, profile_id: str) -> DashboardAnalyticsResponse:
+        effective_timezone = self._get_effective_timezone(db, profile_id)
         today = self._today_in_timezone(effective_timezone)
         week_dates = self._build_day_range(today, 7)
         daily_totals, category_totals, _, _ = self._collect_daily_usage(
-            db, profile.id
+            db, profile_id
         )
         today_categories = sorted(
             (
@@ -78,14 +76,13 @@ class AnalyticsService:
             ),
         )
 
-    def get_trends(self, db: Session) -> TrendsAnalyticsResponse:
-        profile = profile_context_service.ensure_default_profile(db)
-        effective_timezone = self._get_effective_timezone(db, profile.id)
+    def get_trends(self, db: Session, profile_id: str) -> TrendsAnalyticsResponse:
+        effective_timezone = self._get_effective_timezone(db, profile_id)
         timezone_value = ZoneInfo(effective_timezone)
         today = self._today_in_timezone(effective_timezone)
         week_dates = self._build_day_range(today, 7)
         daily_totals, _, app_totals, app_names = self._collect_daily_usage(
-            db, profile.id
+            db, profile_id
         )
         range_start = datetime.combine(week_dates[0], time.min, tzinfo=timezone_value).astimezone(
             timezone.utc
@@ -99,7 +96,7 @@ class AnalyticsService:
 
         for event in self.usage_repository.list_overlapping_range(
             db,
-            profile.id,
+            profile_id,
             range_start,
             range_end,
         ):
@@ -150,21 +147,22 @@ class AnalyticsService:
             peak_usage_window=self._build_peak_usage_window(hourly_totals),
         )
 
-    def get_weekly_summary(self, db: Session) -> WeeklySummaryResponse:
-        profile = profile_context_service.ensure_default_profile(db)
-        effective_timezone = self._get_effective_timezone(db, profile.id)
+    def get_weekly_summary(
+        self, db: Session, profile_id: str
+    ) -> WeeklySummaryResponse:
+        effective_timezone = self._get_effective_timezone(db, profile_id)
         today = self._today_in_timezone(effective_timezone)
         current_week_dates = self._build_day_range(today, 7)
         previous_week_end = current_week_dates[0] - timedelta(days=1)
         previous_week_dates = self._build_day_range(previous_week_end, 7)
-        daily_totals, _, _, _ = self._collect_daily_usage(db, profile.id)
+        daily_totals, _, _, _ = self._collect_daily_usage(db, profile_id)
         current_totals = {
             day: daily_totals.get(day, 0) for day in current_week_dates
         }
         previous_totals = {
             day: daily_totals.get(day, 0) for day in previous_week_dates
         }
-        preferences = self.preferences_repository.get_by_profile_id(db, profile.id)
+        preferences = self.preferences_repository.get_by_profile_id(db, profile_id)
         daily_limit = preferences.default_daily_limit_minutes if preferences is not None else 0
         daily_limit_milliseconds = daily_limit * MILLISECONDS_PER_MINUTE
         current_total_milliseconds = sum(

@@ -1,4 +1,4 @@
-.PHONY: install-venv init-env run build-docs docs-build docs-serve export-openapi test test-postgres clean
+.PHONY: install-venv init-env run build-docs docs-build docs-serve export-openapi migrate migration-current migration-heads test test-postgres clean
 
 PROJECT_DIR := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 PY ?= python
@@ -41,11 +41,20 @@ docs-serve: ensure-venv
 export-openapi: ensure-venv
 	cd "$(PROJECT_DIR)" && "$(VENV_PY)" scripts/export_openapi.py
 
+migrate: ensure-venv
+	cd "$(PROJECT_DIR)" && "$(VENV_PY)" -m alembic upgrade head
+
+migration-current: ensure-venv
+	cd "$(PROJECT_DIR)" && "$(VENV_PY)" -m alembic current
+
+migration-heads: ensure-venv
+	cd "$(PROJECT_DIR)" && "$(VENV_PY)" -m alembic heads
+
 test: ensure-venv
 	cd "$(PROJECT_DIR)" && "$(VENV_PY)" -m pytest
 
 test-postgres: ensure-venv
-	cd "$(PROJECT_DIR)" && TEST_DATABASE_URL="$(or $(TEST_DATABASE_URL),postgresql+psycopg://postgres:postgres@localhost:5433/lockedin)" "$(VENV_PY)" -m pytest tests/test_postgres_integration.py
+	cd "$(PROJECT_DIR)" && "$(VENV_PY)" -m pytest tests/test_postgres_integration.py
 
 clean:
 	"$(PY)" -c "import pathlib, shutil; p=pathlib.Path(r'$(PROJECT_DIR)'); [(shutil.rmtree(p/d, ignore_errors=True)) for d in ['.pytest_cache','.mypy_cache','.ruff_cache','build','dist','$(PYVENV)']]; [(shutil.rmtree(x, ignore_errors=True)) for x in p.glob('*.egg-info')]; (p/'lockdin.db').unlink(missing_ok=True)"

@@ -29,29 +29,38 @@ def test_ensure_default_profile_is_idempotent_and_seeds_preferences(db_session) 
     assert stored_preferences is not None
 
 
-def test_preferences_service_recreates_missing_preferences_row(db_session) -> None:
-    profile = profile_context_service.ensure_default_profile(db_session)
-    preferences = PreferencesRepository().get_by_profile_id(db_session, profile.id)
+def test_preferences_service_recreates_missing_preferences_row(
+    db_session, test_profile_id
+) -> None:
+    preferences = PreferencesRepository().get_by_profile_id(db_session, test_profile_id)
 
     db_session.delete(preferences)
     db_session.commit()
 
-    response = preferences_service.get_preferences(db_session)
-    recreated_preferences = PreferencesRepository().get_by_profile_id(db_session, profile.id)
+    response = preferences_service.get_preferences(db_session, test_profile_id)
+    recreated_preferences = PreferencesRepository().get_by_profile_id(
+        db_session, test_profile_id
+    )
 
     assert response.default_daily_limit_minutes == 180
     assert recreated_preferences is not None
 
 
-def test_rules_service_raises_not_found_for_missing_rule(db_session) -> None:
+def test_rules_service_raises_not_found_for_missing_rule(
+    db_session, test_profile_id
+) -> None:
     with pytest.raises(NotFoundError):
-        rules_service.update_rule(db_session, "missing-rule", RuleUpdate(limit_minutes=30))
+        rules_service.update_rule(
+            db_session, test_profile_id, "missing-rule", RuleUpdate(limit_minutes=30)
+        )
 
     with pytest.raises(NotFoundError):
-        rules_service.delete_rule(db_session, "missing-rule")
+        rules_service.delete_rule(db_session, test_profile_id, "missing-rule")
 
 
-def test_rules_service_duplicate_app_id_raises_conflict(db_session) -> None:
+def test_rules_service_duplicate_app_id_raises_conflict(
+    db_session, test_profile_id
+) -> None:
     payload = RuleCreate(
         app_id="com.youtube.android",
         app_name="YouTube",
@@ -59,21 +68,24 @@ def test_rules_service_duplicate_app_id_raises_conflict(db_session) -> None:
         enabled=True,
     )
 
-    rules_service.create_rule(db_session, payload)
+    rules_service.create_rule(db_session, test_profile_id, payload)
 
     with pytest.raises(ConflictError):
-        rules_service.create_rule(db_session, payload)
+        rules_service.create_rule(db_session, test_profile_id, payload)
 
 
-def test_accountability_service_normalizes_email_and_derives_name(db_session) -> None:
+def test_accountability_service_normalizes_email_and_derives_name(
+    db_session, test_profile_id
+) -> None:
     response = accountability_service.create_contact(
         db_session,
+        test_profile_id,
         AccountabilityContactCreate(email="Buddy@Example.com", consent_confirmed=True),
     )
 
     stored_contact = AccountabilityRepository().get_by_email(
         db_session,
-        profile_context_service.ensure_default_profile(db_session).id,
+        test_profile_id,
         "buddy@example.com",
     )
 
@@ -82,14 +94,18 @@ def test_accountability_service_normalizes_email_and_derives_name(db_session) ->
     assert stored_contact is not None
 
 
-def test_accountability_service_duplicate_normalized_email_raises_conflict(db_session) -> None:
+def test_accountability_service_duplicate_normalized_email_raises_conflict(
+    db_session, test_profile_id
+) -> None:
     accountability_service.create_contact(
         db_session,
+        test_profile_id,
         AccountabilityContactCreate(email="Friend@Example.com", consent_confirmed=False),
     )
 
     with pytest.raises(ConflictError):
         accountability_service.create_contact(
             db_session,
+            test_profile_id,
             AccountabilityContactCreate(email="friend@example.com", consent_confirmed=True),
         )

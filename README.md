@@ -25,21 +25,27 @@ yet hardened for public production use.
 - warning notifications and soft Accessibility-based interventions
 - dashboard, trends, top-app, peak-window, and weekly-summary analytics
 - accountability contact storage
+- account/profile ownership and fail-closed tenant routing foundation
+- guarded Alembic migrations for fresh and exact legacy PostgreSQL schemas
 - text-size, high-contrast, and large-tap-target preferences
 - offline error messages, queued retry behavior, and aggregate rebuild support
 - interactive Swagger/ReDoc API documentation and exportable OpenAPI JSON
 
 ## Current Scope
 
-The backend uses one default development profile. There is currently:
+Phase B adds account/external-identity ownership, an explicit non-claimable demo profile, typed
+current-principal routing, tenant-scoped services, versioned migrations, and pinned local
+Keycloak/Mailpit/TLS infrastructure. It deliberately does not implement token validation or the
+mobile login flow. Therefore:
 
-- no login or password;
-- no admin, user, or guest role separation;
-- no outbound accountability email;
-- no public-production security guarantee.
+- health and root liveness remain public;
+- user-facing API routes return `401` until Phase C installs the Keycloak authenticator;
+- aggregate rebuild returns `403` unless an internal operator dependency is installed;
+- there is still no usable login, admin/user role system, or outbound accountability email;
+- the stack has no public-production security guarantee.
 
-Evaluators do not need credentials. All current requests operate on the same seeded/default
-profile. Keep the application on a trusted local/demo network.
+The seeded `default` profile is synthetic demo data and is never an account owner. Keep the
+application on a trusted local/demo network.
 
 ## Documentation
 
@@ -53,7 +59,8 @@ profile. Keep the application on a trusted local/demo network.
 | [API Reference](backend/docs/api.md) | Endpoints, parameters, requests, responses, validation, and errors |
 | [Media Capture Checklist](docs/MEDIA_CAPTURE_CHECKLIST.md) | Real screenshot/video requirements and privacy checks |
 | [Security Testing Plan](docs/security/security-testing-plan.md) | Security scope, cases, tools, and readiness work |
-| [Authentication Architecture ADR](backend/docs/decisions/authentication-session-tenant-isolation.md) | Local-demo identity, session, tenant, mobile-data, and migration decisions; implementation is pending |
+| [Authentication Architecture ADR](backend/docs/decisions/authentication-session-tenant-isolation.md) | Local-demo identity, session, tenant, mobile-data, and migration decisions; Phase B foundation is implemented |
+| [Infrastructure Foundation](infrastructure/README.md) | Pinned images, digests, local TLS boundary, volumes, and update procedure |
 | [Backend Onboarding](backend/docs/index.md) | Backend architecture and maintenance guide |
 
 When an older academic report differs from the current code, use the current source, generated
@@ -294,7 +301,7 @@ Before public deployment:
 3. use HTTPS through a trusted ingress or reverse proxy;
 4. disable debug behavior and make API-doc exposure an explicit decision;
 5. use proper Android release signing;
-6. add migrations, backup/restore procedures, readiness checks, monitoring, and alerting;
+6. verify the migration/backup foundation and add readiness checks, monitoring, and alerting;
 7. review CORS, rate limits, abuse controls, privacy retention, and dependency licenses;
 8. run load, security, accessibility, and disaster-recovery tests.
 
@@ -330,14 +337,18 @@ Prepare a separate demo environment instead of deleting a developer's active dat
 
 ## Data Safety
 
-Rebuild derived aggregates without deleting accepted raw events:
+Aggregate rebuild is an internal/operator operation. The default Phase B runtime intentionally has
+no operator authenticator, so direct requests return `403`. Tests install a synthetic operator
+dependency and verify rebuild remains profile-scoped. Do not expose this route at the public edge.
+
+When an approved operator mechanism is installed, the operation rebuilds derived aggregates
+without deleting accepted raw events:
 
 ```powershell
 Invoke-RestMethod -Method Post http://127.0.0.1:8000/api/v1/usage/aggregates/rebuild
 ```
 
-This endpoint rewrites derived aggregate rows and is currently unauthenticated. Use it only in a
-controlled environment.
+Use it only in a controlled environment after confirming the server-derived target profile.
 
 The following command is destructive because `-v` deletes the PostgreSQL volume and all LockdIn
 data:
@@ -365,7 +376,7 @@ Treat this as explicit test debt, not evidence that the older SRS target was ach
 
 ## Known Limitations
 
-- single default profile and no authentication/roles;
+- no Phase C Keycloak introspection/authentication or Phase D mobile login UI;
 - local/demo deployment posture;
 - no accountability email delivery;
 - soft enforcement can be bypassed through Android controls;
@@ -374,7 +385,8 @@ Treat this as explicit test debt, not evidence that the older SRS target was ach
 - no full automated cross-stack UI test suite;
 - no verified performance/load target;
 - release build uses debug signing;
-- schema changes require coordinated SQL and ORM updates; no migration framework yet;
+- isolated empty/legacy migrations, fresh bootstrap, and a dump/restore round trip pass against
+  disposable PostgreSQL; target-deployment backup/restore evidence remains required;
 - unknown apps may remain in the `Other` analytics category;
 - no top-level project license has been selected.
 

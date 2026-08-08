@@ -2,11 +2,16 @@ CREATE TABLE IF NOT EXISTS profiles (
     id VARCHAR(36) NOT NULL,
     slug VARCHAR(50) NOT NULL,
     name VARCHAR(100) NOT NULL,
+    is_demo BOOLEAN NOT NULL DEFAULT FALSE,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL,
     CONSTRAINT pk_profiles PRIMARY KEY (id),
     CONSTRAINT uq_profiles_slug UNIQUE (slug)
 );
+
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_demo BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
 
 CREATE TABLE IF NOT EXISTS preferences (
     id VARCHAR(36) NOT NULL,
@@ -143,3 +148,89 @@ CREATE INDEX IF NOT EXISTS ix_enforcement_events_profile_usage_date
 
 CREATE INDEX IF NOT EXISTS ix_enforcement_events_profile_rule_created_at
     ON enforcement_events (profile_id, rule_id, created_at);
+
+CREATE TABLE IF NOT EXISTS accounts (
+    id VARCHAR(36) NOT NULL,
+    profile_id VARCHAR(36) NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    tokens_valid_after TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL,
+    CONSTRAINT pk_accounts PRIMARY KEY (id),
+    CONSTRAINT fk_accounts_profile_id_profiles FOREIGN KEY (profile_id)
+        REFERENCES profiles (id)
+        ON DELETE RESTRICT,
+    CONSTRAINT uq_accounts_profile_id UNIQUE (profile_id)
+);
+
+CREATE TABLE IF NOT EXISTS external_identities (
+    id VARCHAR(36) NOT NULL,
+    account_id VARCHAR(36) NOT NULL,
+    issuer VARCHAR(255) NOT NULL,
+    subject VARCHAR(255) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL,
+    CONSTRAINT pk_external_identities PRIMARY KEY (id),
+    CONSTRAINT fk_external_identities_account_id_accounts FOREIGN KEY (account_id)
+        REFERENCES accounts (id)
+        ON DELETE CASCADE,
+    CONSTRAINT uq_external_identities_issuer_subject UNIQUE (issuer, subject)
+);
+
+CREATE TABLE IF NOT EXISTS revoked_provider_sessions (
+    id VARCHAR(36) NOT NULL,
+    account_id VARCHAR(36) NOT NULL,
+    issuer VARCHAR(255) NOT NULL,
+    sid VARCHAR(255) NOT NULL,
+    revoked_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL,
+    CONSTRAINT pk_revoked_provider_sessions PRIMARY KEY (id),
+    CONSTRAINT fk_revoked_provider_sessions_account_id_accounts FOREIGN KEY (account_id)
+        REFERENCES accounts (id)
+        ON DELETE CASCADE,
+    CONSTRAINT uq_revoked_provider_sessions_issuer_sid UNIQUE (issuer, sid),
+    CONSTRAINT ck_revoked_provider_sessions_expires_not_before_revocation
+        CHECK (expires_at >= revoked_at)
+);
+
+CREATE OR REPLACE FUNCTION lockdin_assert_account_profile_ownable()
+RETURNS trigger AS $$
+DECLARE
+    profile_is_demo BOOLEAN;
+BEGIN
+    SELECT is_demo INTO profile_is_demo
+    FROM profiles
+    WHERE id = NEW.profile_id
+    FOR UPDATE;
+    IF profile_is_demo THEN
+        RAISE EXCEPTION 'demo profiles cannot be owned by accounts'
+            USING ERRCODE = '23514';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_accounts_profile_ownable ON accounts;
+CREATE TRIGGER trg_accounts_profile_ownable
+BEFORE INSERT OR UPDATE OF profile_id ON accounts
+FOR EACH ROW EXECUTE FUNCTION lockdin_assert_account_profile_ownable();
+
+CREATE OR REPLACE FUNCTION lockdin_prevent_owned_demo_profile()
+RETURNS trigger AS $$
+BEGIN
+    IF NEW.is_demo AND EXISTS (
+        SELECT 1 FROM accounts WHERE profile_id = NEW.id
+    ) THEN
+        RAISE EXCEPTION 'owned profiles cannot become demo profiles'
+            USING ERRCODE = '23514';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_profiles_prevent_owned_demo ON profiles;
+CREATE TRIGGER trg_profiles_prevent_owned_demo
+BEFORE UPDATE OF is_demo ON profiles
+FOR EACH ROW EXECUTE FUNCTION lockdin_prevent_owned_demo_profile();
