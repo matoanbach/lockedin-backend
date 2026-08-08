@@ -15,7 +15,6 @@ from lockedin_backend.schemas.usage import (
     UsageIngestionRequest,
     UsageIngestionResponse,
 )
-from lockedin_backend.services.profile_context import profile_context_service
 from lockedin_backend.services.usage_time import (
     completed_minutes,
     derive_duration_minutes,
@@ -35,9 +34,8 @@ class UsageService:
         self.category_aggregate_repository = UsageDailyCategoryAggregateRepository()
 
     def ingest_events(
-        self, db: Session, payload: UsageIngestionRequest
+        self, db: Session, profile_id: str, payload: UsageIngestionRequest
     ) -> UsageIngestionResponse:
-        profile = profile_context_service.ensure_default_profile(db)
         duplicate_count = 0
         candidates = []
         seen_source_ids: set[str] = set()
@@ -49,7 +47,7 @@ class UsageService:
             seen_source_ids.add(event.source_event_id)
             if (
                 self.usage_repository.get_by_source_event_id(
-                    db, profile.id, event.source_event_id
+                    db, profile_id, event.source_event_id
                 )
                 is not None
             ):
@@ -64,7 +62,7 @@ class UsageService:
             ended_at = event.ended_at.astimezone(timezone.utc)
             overlaps = self.usage_repository.list_overlapping_for_app(
                 db,
-                profile.id,
+                profile_id,
                 event.app_id,
                 started_at,
                 ended_at,
@@ -80,7 +78,7 @@ class UsageService:
             ended_at = event.ended_at.astimezone(timezone.utc)
             self.usage_repository.create(
                 db,
-                profile_id=profile.id,
+                profile_id=profile_id,
                 app_id=event.app_id,
                 app_name=event.app_name,
                 category=normalize_category(event.category),
@@ -92,7 +90,7 @@ class UsageService:
             )
 
         if candidates:
-            self._rebuild_aggregates_for_profile(db, profile.id)
+            self._rebuild_aggregates_for_profile(db, profile_id)
 
         db.commit()
         return UsageIngestionResponse(
@@ -102,18 +100,17 @@ class UsageService:
         )
 
     def rebuild_aggregates(
-        self, db: Session
+        self, db: Session, profile_id: str
     ) -> UsageAggregateRebuildResponse:
-        profile = profile_context_service.ensure_default_profile(db)
-        event_count = self._rebuild_aggregates_for_profile(db, profile.id)
+        event_count = self._rebuild_aggregates_for_profile(db, profile_id)
         db.commit()
         return UsageAggregateRebuildResponse(
             event_count=event_count,
             app_aggregate_count=self.app_aggregate_repository.count_for_profile(
-                db, profile.id
+                db, profile_id
             ),
             category_aggregate_count=(
-                self.category_aggregate_repository.count_for_profile(db, profile.id)
+                self.category_aggregate_repository.count_for_profile(db, profile_id)
             ),
         )
 

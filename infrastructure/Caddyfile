@@ -1,0 +1,16 @@
+{
+    admin off
+}
+
+https://192.168.2.44 {
+    tls internal
+
+    @keycloak path /realms/* /resources/* /admin/* /.well-known/*
+    handle @keycloak {
+        reverse_proxy keycloak:8080
+    }
+
+    handle {
+        reverse_proxy backend:8000
+    }
+}

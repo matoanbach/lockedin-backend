@@ -22,20 +22,23 @@ The backend also has a focused onboarding set under [`backend/docs`](../backend/
 
 ## Current Identity and Access Status
 
-The current application does not implement login, authentication, authorization, or separate
-admin/user roles. It uses one default development profile created by the backend. Therefore:
+The Phase B tenant foundation is implemented: accounts link immutable provider identities to one
+non-demo profile, services require a server-derived tenant, and user-facing routes fail closed.
+Real Keycloak token introspection and the mobile login flow are not implemented. Therefore:
 
 - there are no evaluator credentials to distribute;
-- all API callers have the same effective access;
-- seeded rules, usage, preferences, and contacts belong to the same profile;
-- the system must remain on a trusted local/demo network;
-- authentication and role-based authorization are documented limitations, not hidden features.
+- protected API requests return `401` unless tests or a later authenticator supply a trusted
+  `CurrentPrincipal`;
+- the seeded default profile remains demo-only, unowned, and unavailable through protected routes;
+- aggregate rebuild requires a separate operator dependency;
+- the system must remain on a trusted local/demo network.
 
 The approved local next-state design is recorded in the
 [Authentication, Session, and Tenant-Isolation ADR](../backend/docs/decisions/authentication-session-tenant-isolation.md).
-It is accepted for local implementation but does not change the current runtime status. Role-based
-operational ownership is approved; acting people and runbooks still require verification before
-release completion or external exposure.
+Its Phase B foundation is now reflected in runtime and schema code. Phase C identity/session
+controls and Phase D mobile lifecycle work remain pending. Role-based operational ownership is
+approved; acting people and runbooks still require verification before release completion or
+external exposure.
 
 ## Historical Documents
 

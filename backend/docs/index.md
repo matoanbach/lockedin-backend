@@ -101,9 +101,10 @@ Project-wide user, evaluator, testing, and thesis-defense guides are indexed in 
 ## Important Current Assumptions
 
 - the backend is a modular monolith, not a microservice system
-- the app auto-creates a default profile on startup
-- there is no auth yet
-- the database schema is owned by SQL files under the top-level `database/initdb/`
+- startup does not create or select a default profile; protected tenant scope comes from a trusted
+  `CurrentPrincipal`
+- protected routes fail closed because real Keycloak authentication is deferred to Phase C
+- Alembic owns upgrades, while top-level `database/initdb/` is the aligned fresh-bootstrap snapshot
 - local Postgres uses host port `5433`
 
 ## Source Of Truth Notes

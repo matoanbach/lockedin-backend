@@ -13,7 +13,8 @@ Important files:
 
 The backend ORM models under `backend/src/lockedin_backend/models/` must stay aligned with that schema.
 
-Alembic is not part of the active workflow.
+Alembic 1.18.5 is the active upgrade workflow. The SQL files remain the fresh-bootstrap snapshot
+at migration head `20260803_01`.
 
 ## Current Entity Set
 
@@ -31,6 +32,9 @@ Main entities:
 - `UsageDailyCategoryAggregate`
 - `AccountabilityContact`
 - `EnforcementEvent`
+- `Account`
+- `ExternalIdentity`
+- `RevokedProviderSession`
 
 ## Profile
 
@@ -46,6 +50,8 @@ Important details:
 
 - unique `slug`
 - current default profile slug is `default`
+- `is_demo` prevents the seed profile from being claimed
+- `is_active` is the profile status seam for Phase C
 - related to preferences, rules, contacts, usage events, aggregates, and enforcement events
 
 ## Preferences
@@ -170,17 +176,15 @@ Important details:
 
 Examples of event types appear in `schemas/enforcement.py`.
 
-## Current Single-Profile Assumption
+## Account, Identity, and Revocation Foundation
 
-The app currently behaves as a single-profile system for real usage.
-
-That behavior comes from `services/profile_context.py`, which:
-
-- ensures a default profile exists
-- ensures matching preferences exist
-- commits them during startup or first use when necessary
-
-New teammates should treat this as a deliberate temporary design, not a full auth model.
+- `accounts.profile_id` is non-null and unique, preserving one profile per account initially.
+- PostgreSQL triggers reject account ownership of a demo profile and reject changing an owned
+  profile into a demo profile.
+- `external_identities` is unique on exact `(issuer, subject)` and stores no provider credential.
+- `accounts.tokens_valid_after` is the account-level not-before boundary.
+- `revoked_provider_sessions` stores exact provider `(issuer, sid)` revocations with bounded expiry.
+- Security audit events are deferred to Phase C, when the emitted event contract is implemented.
 
 ## Approved Future Account/Profile Relationship
 
@@ -189,11 +193,9 @@ the behavioral tenant boundary and adds a separate account/identity that initial
 one non-demo profile. The fixed `default` profile would remain demo-only and could not be claimed
 automatically by a registrant.
 
-This is an **approved future migration design**, not a description of the current schema. There
-are still no account, identity, session, verification, recovery, audit, device-registration, or role
-tables. Exact additive DDL must implement the approved self-hosted Keycloak external-identity and
-minimal revocation model and ship through a reviewed migration mechanism; editing
-`database/initdb/10-schema.sql` alone is not safe for an existing PostgreSQL volume.
+This relationship is implemented as the Phase B foundation. There are still no LockdIn password,
+raw token, verification/recovery action, security-audit, device-registration, or end-user role
+tables. Real provider validation and account bootstrap belong to Phase C.
 
 ## Important Backend/Data Boundary
 

@@ -9,7 +9,6 @@ from lockedin_backend.schemas.enforcement import (
     EnforcementEventCreate,
     EnforcementEventResponse,
 )
-from lockedin_backend.services.profile_context import profile_context_service
 
 
 class EnforcementService:
@@ -18,18 +17,16 @@ class EnforcementService:
         self.rule_repository = RuleRepository()
 
     def create_event(
-        self, db: Session, payload: EnforcementEventCreate
+        self, db: Session, profile_id: str, payload: EnforcementEventCreate
     ) -> EnforcementEventResponse:
-        profile = profile_context_service.ensure_default_profile(db)
-
         if payload.rule_id is not None:
-            rule = self.rule_repository.get_by_id(db, profile.id, payload.rule_id)
+            rule = self.rule_repository.get_by_id(db, profile_id, payload.rule_id)
             if rule is None:
                 raise NotFoundError(f"Rule '{payload.rule_id}' was not found")
 
         enforcement_event = self.repository.create(
             db,
-            profile_id=profile.id,
+            profile_id=profile_id,
             rule_id=payload.rule_id,
             app_id=payload.app_id,
             event_type=payload.event_type,

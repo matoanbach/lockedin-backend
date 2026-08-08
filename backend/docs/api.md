@@ -29,15 +29,15 @@ The output is `backend/docs/openapi.json`. Postman can import either that file o
 | API base path | `/api/v1` |
 | Content type | `application/json` |
 | Field naming | camelCase over HTTP; snake_case internally |
-| Authentication | None |
-| Identity | Every request operates on the seeded/default profile |
+| Authentication | Phase B fail-closed dependency; real Keycloak validation is not implemented |
+| Identity | Protected routes require a server-derived `CurrentPrincipal` |
 | Query parameters | None in the current API |
 | Validation errors | HTTP `422` with FastAPI/Pydantic error details |
 | Application errors | JSON shaped as `{"detail": "message"}` |
 
-There are no admin, user, or guest credentials in the current build. Do not expose this API to an
-untrusted network until authentication, authorization, production secrets, and transport security
-are implemented.
+There are no usable admin, user, or guest credentials in the current build. Without a Phase C
+authenticator, protected routes return `401` and aggregate rebuild returns `403`. Do not expose
+this API to an untrusted network.
 
 The evidence-backed current exposure inventory and proposed public/protected/internal
 classification are in the
@@ -57,7 +57,7 @@ API contract.
 | `PATCH` | `/api/v1/rules/{rule_id}` | `RuleUpdate` | `200` rule | `404`, `422` |
 | `DELETE` | `/api/v1/rules/{rule_id}` | None | `204` | `404`, `422` |
 | `POST` | `/api/v1/usage/events` | `UsageIngestionRequest` | `200` counts | `409`, `422` |
-| `POST` | `/api/v1/usage/aggregates/rebuild` | None | `200` counts | — |
+| `POST` | `/api/v1/usage/aggregates/rebuild` | None | `200` counts | `403` without internal operator scope |
 | `GET` | `/api/v1/analytics/dashboard` | None | `200` dashboard metrics | — |
 | `GET` | `/api/v1/analytics/trends` | None | `200` trend metrics | — |
 | `GET` | `/api/v1/analytics/weekly-summary` | None | `200` weekly summary | — |
@@ -153,7 +153,7 @@ curl -X POST http://127.0.0.1:8000/api/v1/rules \
   }'
 ```
 
-Returns `409` if the default profile already has a rule for the canonicalized app ID.
+Returns `409` if the principal's profile already has a rule for the canonicalized app ID.
 
 ### `PATCH /api/v1/rules/{rule_id}`
 
@@ -241,9 +241,10 @@ Recalculates daily app and category aggregates from accepted raw usage events.
 }
 ```
 
-This endpoint does not delete raw usage events, but it rewrites derived aggregate rows. Treat it as
-an administrative maintenance operation. It is currently unauthenticated, which is a known
-production gap.
+This endpoint does not delete raw usage events, but it rewrites derived aggregate rows. It is on a
+separate operator router. The default Phase B operator dependency returns `403`; only tests can
+override it with a trusted, profile-scoped `OperatorPrincipal`. A deployable operator mechanism is
+still pending.
 
 ## Analytics
 
@@ -362,7 +363,7 @@ be positive. A supplied but unknown rule ID returns `404`.
 
 ### `GET /api/v1/accountability/contacts`
 
-Returns the contacts associated with the default profile.
+Returns contacts associated with the principal's server-derived profile.
 
 ### `POST /api/v1/accountability/contacts`
 

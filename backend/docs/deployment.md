@@ -64,10 +64,14 @@ docker compose --env-file backend/.env up -d --build
 
 Behavior:
 
-- starts Postgres
-- waits for Postgres health
-- starts backend
-- backend container talks to Postgres on the internal compose network
+- starts the LockdIn and Keycloak PostgreSQL services on separate volumes
+- runs the LockdIn Alembic migration as a one-shot dependency
+- starts Keycloak, Mailpit, the backend, and the Caddy local-TLS edge
+- keeps Mailpit SMTP internal and binds its UI only to loopback
+- requires explicit Keycloak database/bootstrap passwords with no Compose defaults
+
+These Phase B services are statically configured and pinned by tag plus digest, but they were not
+started or physically trusted as part of the Phase B change.
 
 ## Backend-Only Compose
 
@@ -134,7 +138,11 @@ The backend is deployable locally in Docker, but not fully production-hardened y
 Current gaps include:
 
 - no DB-aware readiness endpoint yet
-- no auth or access protection yet
+- protected product routes fail closed, but real Keycloak token/session validation is not yet
+  implemented
+- the Flutter client has no login or credential flow and therefore cannot call protected routes
+- local Caddy TLS/CA trust lacks physical evidence; PostgreSQL migration/bootstrap/restore paths
+  have isolated disposable-container evidence but have not been run against a deployment volume
 - no explicit production settings split yet
 - limited deployment hardening and observability
 
@@ -152,7 +160,7 @@ Those gaps are tracked more fully in `PHASE5.md`.
 Treat the current deployment posture as:
 
 - local development ready
-- Docker-runtime ready
+- Docker configuration validated without container startup
 - early production-planning stage
 
 Do not assume the current compose files alone represent a complete production design.

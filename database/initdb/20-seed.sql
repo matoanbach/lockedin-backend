@@ -1,8 +1,10 @@
-INSERT INTO profiles (id, slug, name, created_at, updated_at)
+INSERT INTO profiles (id, slug, name, is_demo, is_active, created_at, updated_at)
 VALUES (
     '00000000-0000-0000-0000-000000000001',
     'default',
     'Development Profile',
+    TRUE,
+    TRUE,
     CURRENT_TIMESTAMP,
     CURRENT_TIMESTAMP
 )

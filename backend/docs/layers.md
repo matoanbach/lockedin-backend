@@ -246,7 +246,8 @@ Do put here:
 - domain logic
 - aggregate updates
 - dedupe rules
-- default profile orchestration
+- tenant-scoped orchestration using a trusted `profile_id`
+- explicit demo/bootstrap profile creation only in `profile_context.py`
 
 Do not put here:
 
@@ -262,7 +263,9 @@ Purpose:
 Current shape:
 
 - most tests use SQLite fixtures from `tests/conftest.py`
-- one live Postgres smoke test uses `tests/test_postgres_integration.py`
+- isolated PostgreSQL migration, trigger, and two-account request tests use
+  `tests/test_postgres_integration.py` only when `LOCKDIN_TEST_POSTGRES_ADMIN_URL` is configured;
+  each test creates and drops its own uniquely named database
 
 Use this layer to:
 

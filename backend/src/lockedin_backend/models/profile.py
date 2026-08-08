@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from sqlalchemy import String
+from sqlalchemy import Boolean, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from lockedin_backend.db.base import Base, TimestampMixin
@@ -16,6 +16,10 @@ class Profile(Base, TimestampMixin):
     )
     slug: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
+    is_demo: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    owned_account = relationship("Account", back_populates="profile", uselist=False)
 
     preferences = relationship(
         "Preferences",

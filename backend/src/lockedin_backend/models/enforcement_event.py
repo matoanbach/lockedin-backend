@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from uuid import uuid4
 
-from sqlalchemy import Date, ForeignKey, Integer, String, Text
+from sqlalchemy import Date, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from lockedin_backend.db.base import Base, TimestampMixin
@@ -11,6 +11,19 @@ from lockedin_backend.db.base import Base, TimestampMixin
 
 class EnforcementEvent(Base, TimestampMixin):
     __tablename__ = "enforcement_events"
+    __table_args__ = (
+        Index(
+            "ix_enforcement_events_profile_usage_date",
+            "profile_id",
+            "usage_date",
+        ),
+        Index(
+            "ix_enforcement_events_profile_rule_created_at",
+            "profile_id",
+            "rule_id",
+            "created_at",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(
         String(36), primary_key=True, default=lambda: str(uuid4())

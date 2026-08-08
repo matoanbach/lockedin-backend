@@ -251,7 +251,9 @@ def test_two_hundred_seconds_store_three_completed_aggregate_minutes(
     assert db_session.query(UsageDailyCategoryAggregate).one().total_minutes == 3
 
 
-def test_rebuild_repairs_derived_aggregates_without_deleting_raw_events(client, db_session) -> None:
+def test_rebuild_repairs_derived_aggregates_without_deleting_raw_events(
+    client, operator_client, db_session
+) -> None:
     now = _recent_midday_utc()
     event = _event_payload("repair-1", now - timedelta(minutes=30), now)
     assert client.post("/api/v1/usage/events", json={"events": [event]}).status_code == 200
@@ -259,7 +261,7 @@ def test_rebuild_repairs_derived_aggregates_without_deleting_raw_events(client, 
     aggregate.total_minutes = 999
     db_session.commit()
 
-    response = client.post("/api/v1/usage/aggregates/rebuild")
+    response = operator_client.post("/api/v1/usage/aggregates/rebuild")
 
     assert response.status_code == 200
     assert response.json()["eventCount"] == 1

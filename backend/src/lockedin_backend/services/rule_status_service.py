@@ -9,7 +9,6 @@ from lockedin_backend.repositories.rule_repository import RuleRepository
 from lockedin_backend.repositories.usage_repository import UsageRepository
 from lockedin_backend.schemas.rule_status import RuleStatusResponse
 from lockedin_backend.services.app_identity import app_id_variants
-from lockedin_backend.services.profile_context import profile_context_service
 from lockedin_backend.services.usage_time import (
     MILLISECONDS_PER_MINUTE,
     completed_minutes,
@@ -26,11 +25,12 @@ class RuleStatusService:
         self.rule_repository = RuleRepository()
         self.usage_repository = UsageRepository()
 
-    def list_rule_statuses(self, db: Session) -> list[RuleStatusResponse]:
-        profile = profile_context_service.ensure_default_profile(db)
-        effective_timezone = self.usage_repository.get_latest_timezone(db, profile.id) or "UTC"
+    def list_rule_statuses(
+        self, db: Session, profile_id: str
+    ) -> list[RuleStatusResponse]:
+        effective_timezone = self.usage_repository.get_latest_timezone(db, profile_id) or "UTC"
         today = current_utc_now().astimezone(ZoneInfo(effective_timezone)).date()
-        rules = self.rule_repository.list_by_profile_id(db, profile.id)
+        rules = self.rule_repository.list_by_profile_id(db, profile_id)
         requested_app_ids = sorted({
             variant
             for rule in rules
@@ -39,7 +39,7 @@ class RuleStatusService:
         used_milliseconds_by_app_id = {
             app_id: 0 for app_id in requested_app_ids
         }
-        for event in self.usage_repository.list_all_for_profile(db, profile.id):
+        for event in self.usage_repository.list_all_for_profile(db, profile_id):
             if event.app_id not in used_milliseconds_by_app_id:
                 continue
             for usage_date, milliseconds in split_milliseconds_by_local_date(
