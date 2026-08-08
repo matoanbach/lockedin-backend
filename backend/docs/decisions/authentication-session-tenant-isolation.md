@@ -44,22 +44,37 @@ rebuild, and profile-scoped services. The default principal and operator depende
 tests override them only with synthetic trusted principals.
 
 The pinned local Keycloak, separate Keycloak PostgreSQL volume, Mailpit, and Caddy TLS foundation
-are configured but were not started or physically trusted as part of this change. Phase B does not
-implement Keycloak realm/client configuration, introspection, account bootstrap, token/session
-validation, or Flutter login. Those remain Phase C/D work, so “authentication implemented” and
-production-readiness claims remain prohibited.
+were configured but not started or physically trusted as part of Phase B. Phase B did not implement
+Keycloak realm/client configuration, introspection, account bootstrap, token/session validation, or
+Flutter login. Phase C subsequently implemented the backend controls described below; Flutter login
+remains Phase D, and production-readiness claims remain prohibited.
+
+## Phase C backend implementation status
+
+Phase C implements per-request confidential-client introspection, the exact restrictive access
+token contract, immutable identity provisioning, account/profile/session state enforcement,
+current-session and logout-all invalidation, OIDC back-channel logout, HMAC provider events, and
+redacted security-audit persistence at Alembic head `20260808_02`. The provider SPI compiles inside
+a pinned Keycloak 26.7.0 image and Compose interpolation is validated.
+
+A disposable, volume-free Keycloak 26.7.0 realm import succeeded after the redirect contract was
+corrected to `com.lockdin.lockdinapp:/oauth2redirect`. Live discovery, realm security, mobile
+client/PKCE/audience, API service-account role, session-limiter/reset-flow, and event-listener
+assertions passed. This is process/container evidence only: persistent full-stack startup, Mailpit
+delivery, physical Caddy/phone CA trust, Flutter Phase D login, and production readiness remain
+unverified.
 
 ## Context and evidence
 
-The FastAPI application is a modular monolith mounted under `/api/v1`. Phase B route functions
+The FastAPI application is a modular monolith mounted under `/api/v1`. Protected route functions
 depend on a fail-closed typed principal and a database session, then call profile-scoped services
-and repositories. Real token authentication is not installed. Application startup no longer
-creates a profile, and protected services no longer call `ensure_default_profile()`.
+and repositories. Phase C resolves that principal through per-request Keycloak introspection and
+the exact token/account/session contract. Application startup no longer creates a profile, and
+protected services no longer call `ensure_default_profile()`.
 
-The current database is closer to tenant-ready than the request layer: every behavioral table has
-a non-null `profile_id` foreign key, and most repository reads include `profile_id`. The missing
-control is a trusted current principal that selects the authorized profile. Consequently, every
-caller currently reaches the same profile.
+Every behavioral table has a non-null `profile_id` foreign key, and protected repository reads
+include the server-derived profile scope. Exact `(issuer, subject)` identity links select the
+authorized account/profile; the synthetic default profile is never account-owned.
 
 The Android client has no authentication state or guarded route. Dio sends no credential. The
 native uploader posts directly to `/api/v1/usage/events` without using Dio, and its SQLite queue
@@ -72,9 +87,9 @@ and anonymous device-only mode. Those are requirements/design hypotheses, not cu
 
 ## Current endpoint exposure inventory
 
-The “current behavior” column below records the Phase A baseline. Phase B now applies a
-fail-closed principal boundary to every protected target and a separate operator boundary to
-aggregate rebuild; real authentication remains Phase C.
+The “current behavior” column below records the Phase A baseline for historical comparison. Phase C
+now applies real Keycloak authentication and a fail-closed principal boundary to every protected
+target; aggregate rebuild retains a separate operator boundary.
 
 | Method and path | Current behavior / data | Current profile resolution | Target exposure |
 | --- | --- | --- | --- |
@@ -341,7 +356,7 @@ adding a revocation database anyway.
 
 The Flutter app uses Keycloak's native Authorization Code flow through the system browser. The
 public client is `lockdin-mobile`, uses the exact private-use redirect URI
-`com.lockdin.lockdin_app:/oauth2redirect`, and requires transaction-specific PKCE with `S256`.
+`com.lockdin.lockdinapp:/oauth2redirect`, and requires transaction-specific PKCE with `S256`.
 Implicit, hybrid, direct-access/password, device-authorization, client-credentials, and offline
 access grants are disabled for this client. No client secret is present in the app or APK.
 

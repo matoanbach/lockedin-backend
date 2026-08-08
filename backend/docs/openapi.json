@@ -84,6 +84,58 @@
         "title": "AccountabilityContactResponse",
         "type": "object"
       },
+      "AuthConfigResponse": {
+        "properties": {
+          "authorizationEndpoint": {
+            "title": "Authorizationendpoint",
+            "type": "string"
+          },
+          "clientId": {
+            "title": "Clientid",
+            "type": "string"
+          },
+          "codeChallengeMethod": {
+            "const": "S256",
+            "default": "S256",
+            "title": "Codechallengemethod",
+            "type": "string"
+          },
+          "endSessionEndpoint": {
+            "title": "Endsessionendpoint",
+            "type": "string"
+          },
+          "issuer": {
+            "title": "Issuer",
+            "type": "string"
+          },
+          "redirectUri": {
+            "title": "Redirecturi",
+            "type": "string"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Scopes",
+            "type": "array"
+          },
+          "tokenEndpoint": {
+            "title": "Tokenendpoint",
+            "type": "string"
+          }
+        },
+        "required": [
+          "issuer",
+          "authorizationEndpoint",
+          "tokenEndpoint",
+          "endSessionEndpoint",
+          "clientId",
+          "redirectUri",
+          "scopes"
+        ],
+        "title": "AuthConfigResponse",
+        "type": "object"
+      },
       "CategoryBreakdownItem": {
         "properties": {
           "durationMilliseconds": {
@@ -409,6 +461,51 @@
         "title": "PreferencesUpdate",
         "type": "object"
       },
+      "ProviderSecurityEventRequest": {
+        "properties": {
+          "action": {
+            "enum": [
+              "password_changed",
+              "logout_all",
+              "account_disabled"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "eventId": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Eventid",
+            "type": "string"
+          },
+          "issuer": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Issuer",
+            "type": "string"
+          },
+          "occurredAt": {
+            "exclusiveMinimum": 0.0,
+            "title": "Occurredat",
+            "type": "integer"
+          },
+          "subject": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Subject",
+            "type": "string"
+          }
+        },
+        "required": [
+          "eventId",
+          "occurredAt",
+          "issuer",
+          "subject",
+          "action"
+        ],
+        "title": "ProviderSecurityEventRequest",
+        "type": "object"
+      },
       "RuleCreate": {
         "properties": {
           "appId": {
@@ -585,6 +682,39 @@
           }
         },
         "title": "RuleUpdate",
+        "type": "object"
+      },
+      "SessionResponse": {
+        "properties": {
+          "accountId": {
+            "title": "Accountid",
+            "type": "string"
+          },
+          "issuer": {
+            "title": "Issuer",
+            "type": "string"
+          },
+          "profileId": {
+            "title": "Profileid",
+            "type": "string"
+          },
+          "sid": {
+            "title": "Sid",
+            "type": "string"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          }
+        },
+        "required": [
+          "accountId",
+          "profileId",
+          "issuer",
+          "subject",
+          "sid"
+        ],
+        "title": "SessionResponse",
         "type": "object"
       },
       "TopAppUsagePoint": {
@@ -857,6 +987,12 @@
         "title": "WeeklyUsagePoint",
         "type": "object"
       }
+    },
+    "securitySchemes": {
+      "KeycloakAccessToken": {
+        "scheme": "bearer",
+        "type": "http"
+      }
     }
   },
   "info": {
@@ -909,6 +1045,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "KeycloakAccessToken": []
+          }
+        ],
         "summary": "List Contacts",
         "tags": [
           "accountability"
@@ -948,6 +1089,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "KeycloakAccessToken": []
+          }
+        ],
         "summary": "Create Contact",
         "tags": [
           "accountability"
@@ -983,6 +1129,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "KeycloakAccessToken": []
+          }
+        ],
         "summary": "Delete Contact",
         "tags": [
           "accountability"
@@ -1004,6 +1155,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "KeycloakAccessToken": []
+          }
+        ],
         "summary": "Get Dashboard Analytics",
         "tags": [
           "analytics"
@@ -1025,6 +1181,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "KeycloakAccessToken": []
+          }
+        ],
         "summary": "Get Trends Analytics",
         "tags": [
           "analytics"
@@ -1046,9 +1207,195 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "KeycloakAccessToken": []
+          }
+        ],
         "summary": "Get Weekly Summary Analytics",
         "tags": [
           "analytics"
+        ]
+      }
+    },
+    "/api/v1/auth/backchannel-logout": {
+      "post": {
+        "operationId": "backchannel_logout_api_v1_auth_backchannel_logout_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "description": "Invalid provider event"
+          },
+          "503": {
+            "description": "Authentication service unavailable"
+          }
+        },
+        "summary": "Backchannel Logout",
+        "tags": [
+          "authentication"
+        ]
+      }
+    },
+    "/api/v1/auth/config": {
+      "get": {
+        "operationId": "auth_config_api_v1_auth_config_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthConfigResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Auth Config",
+        "tags": [
+          "authentication"
+        ]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "logout_api_v1_auth_logout_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "503": {
+            "description": "Authentication service unavailable"
+          }
+        },
+        "security": [
+          {
+            "KeycloakAccessToken": []
+          }
+        ],
+        "summary": "Logout",
+        "tags": [
+          "authentication"
+        ]
+      }
+    },
+    "/api/v1/auth/logout-all": {
+      "post": {
+        "operationId": "logout_all_api_v1_auth_logout_all_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "503": {
+            "description": "Authentication service unavailable"
+          }
+        },
+        "security": [
+          {
+            "KeycloakAccessToken": []
+          }
+        ],
+        "summary": "Logout All",
+        "tags": [
+          "authentication"
+        ]
+      }
+    },
+    "/api/v1/auth/provider-events": {
+      "post": {
+        "operationId": "provider_event_api_v1_auth_provider_events_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-LockdIn-Event-Signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Lockdin-Event-Signature"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderSecurityEventRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "description": "Invalid provider event"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Authentication service unavailable"
+          }
+        },
+        "summary": "Provider Event",
+        "tags": [
+          "authentication"
+        ]
+      }
+    },
+    "/api/v1/auth/session": {
+      "get": {
+        "operationId": "session_api_v1_auth_session_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "503": {
+            "description": "Authentication service unavailable"
+          }
+        },
+        "security": [
+          {
+            "KeycloakAccessToken": []
+          }
+        ],
+        "summary": "Session",
+        "tags": [
+          "authentication"
         ]
       }
     },
@@ -1087,6 +1434,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "KeycloakAccessToken": []
+          }
+        ],
         "summary": "Create Enforcement Event",
         "tags": [
           "enforcement"
@@ -1133,6 +1485,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "KeycloakAccessToken": []
+          }
+        ],
         "summary": "Get Preferences",
         "tags": [
           "preferences"
@@ -1172,6 +1529,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "KeycloakAccessToken": []
+          }
+        ],
         "summary": "Update Preferences",
         "tags": [
           "preferences"
@@ -1197,6 +1559,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "KeycloakAccessToken": []
+          }
+        ],
         "summary": "List Rules",
         "tags": [
           "rules"
@@ -1236,6 +1603,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "KeycloakAccessToken": []
+          }
+        ],
         "summary": "Create Rule",
         "tags": [
           "rules"
@@ -1261,6 +1633,11 @@
             "description": "Successful Response"
           }
         },
+        "security": [
+          {
+            "KeycloakAccessToken": []
+          }
+        ],
         "summary": "List Rule Statuses",
         "tags": [
           "rules"
@@ -1296,6 +1673,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "KeycloakAccessToken": []
+          }
+        ],
         "summary": "Delete Rule",
         "tags": [
           "rules"
@@ -1346,6 +1728,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "KeycloakAccessToken": []
+          }
+        ],
         "summary": "Update Rule",
         "tags": [
           "rules"
@@ -1409,6 +1796,11 @@
             "description": "Validation Error"
           }
         },
+        "security": [
+          {
+            "KeycloakAccessToken": []
+          }
+        ],
         "summary": "Ingest Usage Events",
         "tags": [
           "usage"

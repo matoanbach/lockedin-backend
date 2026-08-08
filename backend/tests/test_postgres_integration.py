@@ -57,7 +57,7 @@ def postgres_database_url() -> str:
     """Create a disposable database without touching an existing LockdIn database."""
 
     admin_url = make_url(os.environ[ADMIN_URL_ENV])
-    database_name = f"lockdin_phase_b_{uuid4().hex}"
+    database_name = f"lockdin_phase_c_{uuid4().hex}"
     admin_engine = create_engine(admin_url, isolation_level="AUTOCOMMIT")
     with admin_engine.connect() as connection:
         connection.exec_driver_sql(f'CREATE DATABASE "{database_name}"')
@@ -114,6 +114,7 @@ def test_empty_database_migrates_to_head_and_enforces_ownership(
             "accounts",
             "external_identities",
             "revoked_provider_sessions",
+            "security_audit_events",
             "alembic_version",
         }
         assert {
@@ -124,8 +125,25 @@ def test_empty_database_migrates_to_head_and_enforces_ownership(
         } == {"ck_revoked_provider_sessions_expires_not_before_revocation"}
         with engine.connect() as connection:
             assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-                "20260803_01"
+                "20260808_02"
             )
+        assert {
+            index["name"]
+            for index in inspector.get_indexes("security_audit_events")
+        } >= {
+            "ix_security_audit_events_account_created_at",
+            "ix_security_audit_events_type_created_at",
+        }
+        assert {
+            constraint["name"]
+            for constraint in inspector.get_unique_constraints("security_audit_events")
+        } == {"uq_security_audit_events_provider_event_id"}
+        audit_foreign_keys = inspector.get_foreign_keys("security_audit_events")
+        assert len(audit_foreign_keys) == 1
+        assert audit_foreign_keys[0]["name"] == (
+            "fk_security_audit_events_account_id_accounts"
+        )
+        assert audit_foreign_keys[0]["options"]["ondelete"] == "SET NULL"
 
         with factory() as session:
             demo = Profile(slug="default", name="Demo", is_demo=True, is_active=True)
@@ -198,7 +216,7 @@ def test_exact_legacy_schema_upgrades_without_rewriting_existing_rows(
                 text("SELECT is_demo FROM profiles WHERE slug = 'default'")
             ) is True
             assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-                "20260803_01"
+                "20260808_02"
             )
     finally:
         engine.dispose()

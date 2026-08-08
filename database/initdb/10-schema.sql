@@ -179,7 +179,7 @@ CREATE TABLE IF NOT EXISTS external_identities (
 
 CREATE TABLE IF NOT EXISTS revoked_provider_sessions (
     id VARCHAR(36) NOT NULL,
-    account_id VARCHAR(36) NOT NULL,
+    account_id VARCHAR(36),
     issuer VARCHAR(255) NOT NULL,
     sid VARCHAR(255) NOT NULL,
     revoked_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -194,6 +194,30 @@ CREATE TABLE IF NOT EXISTS revoked_provider_sessions (
     CONSTRAINT ck_revoked_provider_sessions_expires_not_before_revocation
         CHECK (expires_at >= revoked_at)
 );
+
+CREATE TABLE IF NOT EXISTS security_audit_events (
+    id VARCHAR(36) NOT NULL,
+    event_type VARCHAR(64) NOT NULL,
+    outcome VARCHAR(32) NOT NULL,
+    account_id VARCHAR(36),
+    issuer VARCHAR(255),
+    provider_sid VARCHAR(255),
+    provider_event_id VARCHAR(255),
+    source_category VARCHAR(32) NOT NULL DEFAULT 'provider',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_security_audit_events PRIMARY KEY (id),
+    CONSTRAINT fk_security_audit_events_account_id_accounts FOREIGN KEY (account_id)
+        REFERENCES accounts (id)
+        ON DELETE SET NULL,
+    CONSTRAINT uq_security_audit_events_provider_event_id UNIQUE (provider_event_id)
+);
+
+CREATE INDEX IF NOT EXISTS ix_security_audit_events_account_created_at
+    ON security_audit_events (account_id, created_at);
+
+CREATE INDEX IF NOT EXISTS ix_security_audit_events_type_created_at
+    ON security_audit_events (event_type, created_at);
 
 CREATE OR REPLACE FUNCTION lockdin_assert_account_profile_ownable()
 RETURNS trigger AS $$

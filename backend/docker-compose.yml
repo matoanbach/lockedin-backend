@@ -16,5 +16,14 @@ services:
       WORKER_CLASS: ${WORKER_CLASS:-uvicorn.workers.UvicornWorker}
       LOGLEVEL: ${LOGLEVEL:-info}
       DATABASE_URL: ${DOCKER_DATABASE_URL:-postgresql+psycopg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@host.docker.internal:${POSTGRES_PORT:-5433}/${POSTGRES_DB:-lockedin}}
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-https://192.168.2.44/realms/lockdin}
+      KEYCLOAK_MOBILE_CLIENT_ID: ${KEYCLOAK_MOBILE_CLIENT_ID:-lockdin-mobile}
+      KEYCLOAK_API_CLIENT_ID: ${KEYCLOAK_API_CLIENT_ID:-lockdin-api}
+      KEYCLOAK_API_CLIENT_SECRET: ${KEYCLOAK_API_CLIENT_SECRET:?set KEYCLOAK_API_CLIENT_SECRET}
+      KEYCLOAK_REDIRECT_URI: ${KEYCLOAK_REDIRECT_URI:-com.lockdin.lockdinapp:/oauth2redirect}
+      KEYCLOAK_CA_BUNDLE: /etc/lockedin/keycloak-ca/ca.crt
+      KEYCLOAK_EVENT_WEBHOOK_SECRET: ${KEYCLOAK_EVENT_WEBHOOK_SECRET:?set KEYCLOAK_EVENT_WEBHOOK_SECRET}
+    volumes:
+      - ${KEYCLOAK_CA_BUNDLE_HOST_PATH:?set KEYCLOAK_CA_BUNDLE_HOST_PATH}:/etc/lockedin/keycloak-ca/ca.crt:ro
     ports:
       - "${BACKEND_PORT:-8000}:${BACKEND_CONTAINER_PORT:-8000}"

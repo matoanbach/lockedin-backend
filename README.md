@@ -30,21 +30,27 @@ yet hardened for public production use.
 - text-size, high-contrast, and large-tap-target preferences
 - offline error messages, queued retry behavior, and aggregate rebuild support
 - interactive Swagger/ReDoc API documentation and exportable OpenAPI JSON
+- per-request Keycloak token introspection, immutable identity provisioning, session revocation,
+  and redacted security audit
 
 ## Current Scope
 
-Phase B adds account/external-identity ownership, an explicit non-claimable demo profile, typed
-current-principal routing, tenant-scoped services, versioned migrations, and pinned local
-Keycloak/Mailpit/TLS infrastructure. It deliberately does not implement token validation or the
-mobile login flow. Therefore:
+Phase C adds per-request Keycloak introspection, restrictive token validation, exact immutable
+identity linking, first-login tenant provisioning, current/logout-all revocation, signed provider
+callbacks, and redacted audit persistence. The Flutter mobile login flow remains Phase D.
+Therefore:
 
 - health and root liveness remain public;
-- user-facing API routes return `401` until Phase C installs the Keycloak authenticator;
+- user-facing API routes require an introspected Keycloak bearer token;
 - aggregate rebuild returns `403` unless an internal operator dependency is installed;
-- there is still no usable login, admin/user role system, or outbound accountability email;
+- there is still no Flutter login, end-user role system, or outbound accountability email;
 - the stack has no public-production security guarantee.
 
-The seeded `default` profile is synthetic demo data and is never an account owner. Keep the
+The seeded `default` profile is synthetic demo data and is never an account owner. The corrected
+mobile redirect URI is `com.lockdin.lockdinapp:/oauth2redirect`. A disposable, volume-free
+Keycloak 26.7.0 realm import succeeded, and live realm/client/flow/listener assertions passed. This
+is process/container evidence only: persistent full-stack startup, Mailpit delivery, physical
+Caddy/phone CA trust, Flutter Phase D login, and production readiness remain unverified. Keep the
 application on a trusted local/demo network.
 
 ## Documentation
@@ -376,7 +382,7 @@ Treat this as explicit test debt, not evidence that the older SRS target was ach
 
 ## Known Limitations
 
-- no Phase C Keycloak introspection/authentication or Phase D mobile login UI;
+- no Phase D mobile login UI or account-scoped mobile credential/queue lifecycle;
 - local/demo deployment posture;
 - no accountability email delivery;
 - soft enforcement can be bypassed through Android controls;

@@ -64,7 +64,7 @@ Security decisions in this plan use stable identifiers. Each decision records it
 |---|---|---|---|
 | SEC-DEC-001 | Use ASVS/WSTG for the API and MASVS/MASTG for Android. The system has both API and mobile attack surfaces, so one checklist would leave material gaps. | A custom-only checklist is shorter but harder to defend, repeat, and maintain. | Review when adopting a new major standard version or changing a platform. |
 | SEC-DEC-002 | Do not prescribe a JWT library or custom login before identity, account, tenant, session, recovery, and revocation are approved. [ADR-001](../../backend/docs/decisions/authentication-session-tenant-isolation.md) accepts D1–D6 for local implementation: self-hosted Keycloak OIDC, verified synthetic email/recovery, direct Keycloak-token introspection with minimal local revocation state, physical-phone local TLS, explicit queue/default-profile handling, and role-based operational ownership. | A quick custom JWT implementation is faster initially but risks embedding the wrong identity and tenancy model. A commercial free tier cannot guarantee the project's no-charge requirement. | Review when identity provider, exposure, session, recovery, ownership, or mobile lifecycle changes; verify actual role holders and runbooks before Phase E completion or shared/external exposure. |
-| SEC-DEC-003 | Treat the Phase A issue as unauthenticated shared-profile access, not IDOR. Phase B now has trusted-principal tenant boundaries; cross-tenant object access is tested as horizontal authorization. | Keeping the IDOR label for the Phase A baseline is familiar but technically inaccurate. Calling every authorization defect IDOR also obscures missing-authentication failures. | Review again after Phase C installs real authentication and exposes authenticated object references. |
+| SEC-DEC-003 | Treat the Phase A issue as unauthenticated shared-profile access, not IDOR. Phase C now has a real authenticated principal plus tenant boundaries; cross-tenant object access is tested as horizontal authorization. | Keeping the IDOR label for the Phase A baseline is familiar but technically inaccurate. Calling every authorization defect IDOR also obscures missing-authentication failures. | Review again after Phase D exposes authenticated mobile object references. |
 | SEC-DEC-004 | Use the 5x5 matrix for project risk prioritization and CVSS only for confirmed technical vulnerabilities when useful. | Mapping the matrix directly to CVSS appears precise but combines two different models. | Re-score when exposure, controls, or impact changes. |
 | SEC-DEC-005 | Enforce request limits in layers: ingress/reverse proxy for raw body size and rate controls, ASGI/application controls for API behavior, and schema controls for fields and collections. | Schema-only validation happens after request parsing; proxy-only controls lack business context. Gunicorn has no `limit_request_body` setting. | Verify each layer in staging after deployment configuration exists. |
 | SEC-DEC-006 | Require valid HTTPS and platform certificate validation for release traffic. Certificate pinning is optional and requires a documented threat model, backup pins, and a safe rotation/recovery procedure. | Pinning can narrow CA trust but can also cause outages during certificate or key rotation. | Revisit if the app handles higher-impact secrets or the network threat model changes. |
@@ -101,8 +101,8 @@ For new decisions, add a row above with this minimum evidence:
 
 ### 4.2 Verified control gaps
 
-- Real Keycloak token validation is not implemented, so the default runtime returns `401` before
-  service execution. The Flutter client also lacks login/credential handling.
+- Real Keycloak introspection and restrictive claim validation execute before every protected
+  service. The Flutter client still lacks Phase D login/credential handling.
 - Development database credentials are present in the default database URL, and Kubernetes database credential configuration is inconsistent with that URL.
 - Debug mode defaults to enabled; OpenAPI, Swagger UI, and ReDoc are always mounted.
 - Kubernetes ingress does not configure TLS or a production host.
@@ -171,8 +171,8 @@ Scores are provisional until the deployment facts in Section 4.3 are resolved.
 
 | ID | Risk scenario | L | I | Score | Basis and mapped tests |
 |---|---|---:|---:|---:|---|
-| T1 | An unauthenticated caller reads or changes rules, preferences, contacts, usage-derived analytics, or enforcement data if the API is reachable. | 2 | 5 | 10 | Phase B default runtime and route tests fail closed; deployed-edge verification and the Phase C authenticator remain pending through AUTH-01 and AUTH-02. |
-| T2 | A principal/profile mapping or repository predicate exposes another profile's data. | 3 | 5 | 15 | Phase B application controls and the isolated two-account PostgreSQL request test pass; the real Phase C principal resolver remains unimplemented and requires AUTH-03/DATA-01 regression. |
+| T1 | An unauthenticated caller reads or changes rules, preferences, contacts, usage-derived analytics, or enforcement data if the API is reachable. | 2 | 5 | 10 | Phase C route/auth tests fail closed and OpenAPI identifies protected routes; deployed-edge verification remains pending through AUTH-01 and AUTH-02. |
+| T2 | A principal/profile mapping or repository predicate exposes another profile's data. | 3 | 5 | 15 | Phase C exact-identity/principal tests, Phase B application controls, and the isolated two-account PostgreSQL request test pass; deployed AUTH-03/DATA-01 regression remains pending. |
 | T3 | Default, committed, or inconsistently provisioned database credentials permit unauthorized database access. | 4 | 5 | 20 | Verified configuration gap; DEP-03, CICD-02. |
 | T4 | Traffic is intercepted or modified where the deployment lacks correctly configured TLS. | 4 | 5 | 20 | Ingress gap; NET-01 through NET-04, MOB-NET-01. |
 | T5 | Crafted input alters a database query or exposes error details. | 2 | 4 | 8 | ORM is a control; validate actual endpoints with INP-01 through INP-04. |
@@ -262,18 +262,18 @@ Do not install unpinned `latest` scanner versions inside each pipeline run. Pin 
 
 #### Weak or Missing Authentication Mechanisms
 
-Authentication tests marked **design-gated** become runnable as their Phase C–D controls are
-implemented under accepted
+Authentication tests marked **design-gated** become runnable as their remaining Phase D controls
+are implemented under accepted
 [ADR-001](../../backend/docs/decisions/authentication-session-tenant-isolation.md). Their presence
 in this plan is not evidence that those controls exist.
 
 | ID | Test | Expected result | Current state |
 |---|---|---|---|
-| AUTH-01 | Call every protected endpoint without credentials. | Request is rejected consistently; only explicitly public health/bootstrap endpoints remain accessible. | Phase B route suite passes with generic `401`; deployed edge/OpenAPI verification remains pending. |
-| AUTH-02 | Use missing, malformed, expired, revoked, wrong-audience, and wrong-issuer credentials. | Rejected without sensitive error detail. | Design-gated. |
-| AUTH-03 | Attempt read/update/delete using identifiers owned by a second synthetic user. | Denied at the service/repository boundary; no cross-tenant existence leak. | Phase B SQLite matrix and isolated PostgreSQL two-account request test pass; repeat through the real Phase C authenticator. |
-| AUTH-04 | Modify object/profile identifiers in paths, bodies, and query parameters. | Server derives or verifies ownership rather than trusting the client. | Phase B schemas expose no ownership-authority field and routes use the trusted principal; repeat after Phase C installs real authentication. |
-| AUTH-05 | Exercise login, recovery, refresh, logout, and credential-revocation abuse cases. | Rate controls, session invalidation, audit events, and non-enumerating responses match the approved design. | Design-gated. |
+| AUTH-01 | Call every protected endpoint without credentials. | Request is rejected consistently; only explicitly public health/bootstrap endpoints remain accessible. | Phase C route suite passes with generic `401` and real bearer OpenAPI; deployed-edge verification remains pending. |
+| AUTH-02 | Use missing, malformed, expired, revoked, wrong-audience, and wrong-issuer credentials. | Rejected without sensitive error detail. | Phase C authentication tests pass for missing/malformed credentials, restrictive claims, provider state, and local revocation; deployed-edge verification remains pending. |
+| AUTH-03 | Attempt read/update/delete using identifiers owned by a second synthetic user. | Denied at the service/repository boundary; no cross-tenant existence leak. | Exact identity resolution, the Phase B SQLite matrix, and the isolated PostgreSQL two-account request test pass; deployed authenticator regression remains pending. |
+| AUTH-04 | Modify object/profile identifiers in paths, bodies, and query parameters. | Server derives or verifies ownership rather than trusting the client. | Schemas expose no ownership-authority field and protected routes use the Phase C server-derived principal; deployed-edge verification remains pending. |
+| AUTH-05 | Exercise login, recovery, refresh, logout, and credential-revocation abuse cases. | Rate controls, session invalidation, audit events, and non-enumerating responses match the approved design. | Phase C current-session/logout-all, signed back-channel logout, provider-event, replay, and audit tests pass; Phase D login/recovery/mobile lifecycle and deployed-provider testing remain pending. |
 
 #### Password Entropy
 

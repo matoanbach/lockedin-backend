@@ -8,7 +8,7 @@ This directory owns the PostgreSQL schema snapshot and repeatable development se
 - `.env.example`: database defaults
 - `initdb/00-extensions.sql`: required extensions
 - `initdb/10-schema.sql`: tables, constraints, and indexes
-- `initdb/15-migration-head.sql`: records the fresh snapshot at Alembic head `20260803_01`
+- `initdb/15-migration-head.sql`: records the fresh snapshot at Alembic head `20260808_02`
 - `initdb/20-seed.sql`: synthetic default-profile, rule, usage, contact, and enforcement data
 
 Backend ORM models, Alembic revisions, `10-schema.sql`, and the recorded bootstrap head must stay
@@ -24,7 +24,8 @@ Run from `backend/`:
 .\.venv\Scripts\python.exe -m alembic upgrade head
 ```
 
-Revision `20260803_01` creates the complete schema on an empty database. An unversioned database
+Revision `20260803_01` creates the tenant foundation on an empty database and `20260808_02` adds
+the redacted security-audit registry and `sid`-only revocation support. An unversioned database
 must exactly match the eight-table legacy schema before the additive tenant foundation is applied.
 Partial, unexpected, or already-modified unversioned schemas fail closed. Do not use `alembic
 stamp` to bypass this verification. Fresh Docker initialization runs `10-schema.sql` and then

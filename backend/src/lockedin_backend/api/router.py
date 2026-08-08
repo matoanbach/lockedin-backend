@@ -8,6 +8,8 @@ from lockedin_backend.api.routes.accountability import router as accountability_
 from lockedin_backend.api.routes.analytics import router as analytics_router
 from lockedin_backend.api.routes.enforcement import router as enforcement_router
 from lockedin_backend.api.routes.health import router as health_router
+from lockedin_backend.api.routes.auth import public_router as auth_public_router
+from lockedin_backend.api.routes.auth import protected_router as auth_protected_router
 from lockedin_backend.api.routes.preferences import router as preferences_router
 from lockedin_backend.api.routes.rules import router as rules_router
 from lockedin_backend.api.routes.usage import operator_router as usage_operator_router
@@ -16,8 +18,10 @@ from lockedin_backend.api.routes.usage import router as usage_router
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health_router)
+api_router.include_router(auth_public_router)
 
 protected_router = APIRouter(dependencies=[Depends(get_current_principal)])
+protected_router.include_router(auth_protected_router)
 protected_router.include_router(accountability_router)
 protected_router.include_router(analytics_router)
 protected_router.include_router(enforcement_router)

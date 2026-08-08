@@ -29,23 +29,36 @@ The output is `backend/docs/openapi.json`. Postman can import either that file o
 | API base path | `/api/v1` |
 | Content type | `application/json` |
 | Field naming | camelCase over HTTP; snake_case internally |
-| Authentication | Phase B fail-closed dependency; real Keycloak validation is not implemented |
+| Authentication | HTTP bearer; every protected request is introspected by the configured Keycloak client |
 | Identity | Protected routes require a server-derived `CurrentPrincipal` |
 | Query parameters | None in the current API |
 | Validation errors | HTTP `422` with FastAPI/Pydantic error details |
 | Application errors | JSON shaped as `{"detail": "message"}` |
 
-There are no usable admin, user, or guest credentials in the current build. Without a Phase C
-authenticator, protected routes return `401` and aggregate rebuild returns `403`. Do not expose
-this API to an untrusted network.
+Phase C validates the exact issuer, restrictive `lockdin-api` audience, `lockdin-mobile` authorized
+party, RS256 header, verified email, required session claims, token times, account status, account
+not-before boundary, and local `sid` revocations. Missing or rejected credentials return a generic
+`401`; unavailable or ambiguous provider state returns a generic `503`. The separate operator
+dependency remains fail-closed with `403`.
 
 The evidence-backed current exposure inventory and proposed public/protected/internal
 classification are in the
 [Authentication, Session, and Tenant-Isolation ADR](decisions/authentication-session-tenant-isolation.md).
-That ADR is accepted for local implementation; it does not add endpoints or change this current
-API contract.
+The generated OpenAPI document contains the `KeycloakAccessToken` HTTP bearer scheme. This is not
+evidence that a physical phone trusts the local CA or that the Flutter Phase D login exists.
 
 ## Endpoint Summary
+
+Authentication endpoints:
+
+| Method | Path | Purpose | Success | Other responses |
+| --- | --- | --- | --- | --- |
+| `GET` | `/api/v1/auth/config` | Public native OIDC bootstrap, with no secret | `200` | - |
+| `GET` | `/api/v1/auth/session` | Resolve the authenticated account/session | `200` | `401`, `503` |
+| `POST` | `/api/v1/auth/logout` | Revoke the current provider/local session | `204` | `401` |
+| `POST` | `/api/v1/auth/logout-all` | Advance the account boundary and terminate provider sessions | `204` | `401`, `503` |
+| `POST` | `/api/v1/auth/backchannel-logout` | Verify an OIDC logout token and revoke it replay-safely | `204` | `400`, `503` |
+| `POST` | `/api/v1/auth/provider-events` | Verify an internal HMAC provider event | `204` | `400`, `503` |
 
 | Method | Path | Request | Success | Other documented responses |
 | --- | --- | --- | --- | --- |

@@ -105,19 +105,24 @@ Flow:
 
 ## Current Identity Model
 
-Phase B supplies the tenant foundation, not a working login system:
+Phase C supplies the backend authentication and session boundary:
 
 - `Account` owns exactly one non-demo `Profile` initially;
 - `ExternalIdentity` links by exact immutable `(issuer, subject)`;
 - `CurrentPrincipal` carries trusted account/profile/provider identifiers;
-- the default principal dependency fails closed until Phase C installs Keycloak introspection;
+- the principal dependency introspects every bearer token without positive caching and validates
+  the exact provider/token contract before resolving or provisioning an identity;
+- first verified identities provision a fresh enabled account, active non-demo profile, and
+  preferences row; identity linking uses only exact `(issuer, subject)`;
+- logout and authenticated/replay-resistant provider callbacks enforce local `sid` and account
+  not-before revocation and write redacted security-audit rows;
 - protected services accept an explicit trusted profile ID and never call
   `ensure_default_profile()`;
 - the fixed `default` profile is demo-only and cannot be owned.
 
 ## Authentication Architecture Gate
 
-Authentication is now the next planned architecture initiative, but it is not implemented. The
+The backend portion of the accepted authentication architecture is implemented and tested. The
 [Authentication, Session, and Tenant-Isolation ADR](decisions/authentication-session-tenant-isolation.md)
 contains the evidence baseline, endpoint/data inventory, threat model, account/profile alternatives,
 mobile queue lifecycle, tenant-enforcement design, acceptance matrix, and migration/rollback plan.
@@ -125,9 +130,12 @@ mobile queue lifecycle, tenant-enforcement design, acceptance matrix, and migrat
 The ADR is **accepted for local implementation**, and its Phase B foundation is implemented. D1–D6 approve local/demo-only exposure,
 self-hosted Keycloak OIDC with no external identity-service charge, verification/recovery, direct
 Keycloak-token sessions with server-side revocation checks, physical-phone local TLS,
-existing/pre-login data handling, and role-based operational ownership. The runtime still has no
-real token authentication and remains suitable only for a trusted local/demo deployment until the
-remaining controls are implemented and tested. Acting role holders,
+existing/pre-login data handling, and role-based operational ownership. Phase D Flutter login and
+account-scoped mobile storage are not implemented. The corrected redirect is
+`com.lockdin.lockdinapp:/oauth2redirect`; a disposable, volume-free Keycloak 26.7.0 realm import
+succeeded and live realm/client/flow/listener assertions passed. That is process/container evidence
+only, not persistent full-stack, Mailpit-delivery, physical Caddy/phone CA-trust, Flutter-login, or
+production-readiness evidence. Acting role holders,
 contacts, access, and runbooks still require verification before release or external exposure.
 
 ## Serialization Model
@@ -157,10 +165,10 @@ Routes translate those into HTTP responses.
 
 These are not implemented in the current active architecture:
 
-- Keycloak introspection/session authentication (Phase B tenant isolation foundation exists)
+- Flutter Authorization Code/PKCE login and account-scoped mobile queue lifecycle
 - Supabase integration
 - microservices
-- a complete identity/security audit workflow beyond the Phase B migration head
+- physical Keycloak/Mailpit/local-CA and mobile trust evidence
 
 ## Related Pages
 

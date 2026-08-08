@@ -69,9 +69,18 @@ Behavior:
 - starts Keycloak, Mailpit, the backend, and the Caddy local-TLS edge
 - keeps Mailpit SMTP internal and binds its UI only to loopback
 - requires explicit Keycloak database/bootstrap passwords with no Compose defaults
+- imports the `lockdin` realm with `start --import-realm`, builds the pinned event-listener SPI,
+  and mounts the import directory read-only
+- passes the confidential-client and webhook secrets only through required environment variables
+- requires an operator-supplied CA bundle mounted read-only into the backend
 
-These Phase B services are statically configured and pinned by tag plus digest, but they were not
-started or physically trusted as part of the Phase B change.
+Compose interpolation and the custom Keycloak/provider image build are validated. With the
+corrected redirect `com.lockdin.lockdinapp:/oauth2redirect`, a completely disposable, volume-free
+Keycloak 26.7.0 realm import succeeded and live realm/client/flow/listener assertions passed. This
+is process/container evidence only. The stack has not been started against persistent project
+volumes, Mailpit delivery has not been exercised, the local CA has not been physically trusted by
+Caddy/phone use, the Flutter Phase D login is not implemented, and production readiness is not
+established.
 
 ## Backend-Only Compose
 
@@ -138,8 +147,8 @@ The backend is deployable locally in Docker, but not fully production-hardened y
 Current gaps include:
 
 - no DB-aware readiness endpoint yet
-- protected product routes fail closed, but real Keycloak token/session validation is not yet
-  implemented
+- protected product routes use per-request introspection and local session/account revocation; the
+  corrected redirect URI is `com.lockdin.lockdinapp:/oauth2redirect`
 - the Flutter client has no login or credential flow and therefore cannot call protected routes
 - local Caddy TLS/CA trust lacks physical evidence; PostgreSQL migration/bootstrap/restore paths
   have isolated disposable-container evidence but have not been run against a deployment volume
@@ -160,7 +169,8 @@ Those gaps are tracked more fully in `PHASE5.md`.
 Treat the current deployment posture as:
 
 - local development ready
-- Docker configuration validated without container startup
+- Docker configuration and provider image build validated; disposable volume-free realm import and
+  live realm/client/flow/listener assertions passed
 - early production-planning stage
 
 Do not assume the current compose files alone represent a complete production design.

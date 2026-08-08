@@ -14,7 +14,7 @@ Important files:
 The backend ORM models under `backend/src/lockedin_backend/models/` must stay aligned with that schema.
 
 Alembic 1.18.5 is the active upgrade workflow. The SQL files remain the fresh-bootstrap snapshot
-at migration head `20260803_01`.
+at migration head `20260808_02`.
 
 ## Current Entity Set
 
@@ -35,6 +35,7 @@ Main entities:
 - `Account`
 - `ExternalIdentity`
 - `RevokedProviderSession`
+- `SecurityAuditEvent`
 
 ## Profile
 
@@ -183,8 +184,12 @@ Examples of event types appear in `schemas/enforcement.py`.
   profile into a demo profile.
 - `external_identities` is unique on exact `(issuer, subject)` and stores no provider credential.
 - `accounts.tokens_valid_after` is the account-level not-before boundary.
-- `revoked_provider_sessions` stores exact provider `(issuer, sid)` revocations with bounded expiry.
-- Security audit events are deferred to Phase C, when the emitted event contract is implemented.
+- `revoked_provider_sessions` stores exact provider `(issuer, sid)` revocations with bounded expiry;
+  `account_id` is nullable so a standards-valid `sid`-only back-channel logout can fail closed
+  globally without fabricating an identity link.
+- `security_audit_events` stores redacted event type/outcome, optional internal account/provider
+  identifiers, replay-resistant provider event IDs, and timestamps. It has no fields for email,
+  passwords, tokens, secrets, action links, authorization headers, or token hashes.
 
 ## Approved Future Account/Profile Relationship
 
@@ -193,9 +198,9 @@ the behavioral tenant boundary and adds a separate account/identity that initial
 one non-demo profile. The fixed `default` profile would remain demo-only and could not be claimed
 automatically by a registrant.
 
-This relationship is implemented as the Phase B foundation. There are still no LockdIn password,
-raw token, verification/recovery action, security-audit, device-registration, or end-user role
-tables. Real provider validation and account bootstrap belong to Phase C.
+This relationship and first-login account bootstrap are implemented. There are still no LockdIn
+password, raw token, verification/recovery action, device-registration, or end-user role tables;
+Keycloak owns credentials and recovery actions.
 
 ## Important Backend/Data Boundary
 

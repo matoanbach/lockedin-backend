@@ -3,23 +3,24 @@
 This runbook is designed for a 7–10 minute live demonstration. Rehearse it using the same device,
 network, database, and build planned for the evaluation.
 
-The current Phase B branch is intentionally not an end-to-end mobile demo build: protected API
-routes fail closed, while Flutter login and real Keycloak authentication belong to Phases C and D.
-Do not bypass that boundary. Use a previously approved Phase A build for this walkthrough, or
-present Phase B through its automated route/tenant tests and static infrastructure configuration.
+The current Phase C branch is intentionally not an end-to-end mobile demo build. Backend token,
+identity, session, callback, and audit behavior has automated evidence, but Flutter login remains
+Phase D and physical realm/TLS/Mailpit evidence is not complete. Do not bypass that boundary. Use
+a previously approved Phase A build for the behavioral walkthrough, or present Phase C through its
+automated auth/tenant tests and provider-image evidence.
 
 ## Demo Identity and Roles
 
-The Phase A demo build has no login or account roles. The Phase B backend adds a typed tenant
-principal and account/profile schema, but no runtime authenticator.
+The Phase A demo build has no login or account roles. The Phase C backend has a runtime
+authenticator and account/profile provisioning, but the Flutter client has no login integration.
 
 | Demo identity | Credentials | Effective access |
 | --- | --- | --- |
 | Phase A default development profile | None | Behavioral demo functions in the approved Phase A build only |
 
 Do not advertise admin/user role differences. Explain that the demonstrated Phase A build focused
-on usage reconstruction, rules, analytics, and Android enforcement. Phase B establishes tenant
-boundaries; Phases C/D are still required for working login and multi-account use.
+on usage reconstruction, rules, analytics, and Android enforcement. Phase C establishes backend
+authentication; Phase D is still required for working mobile login and multi-account use.
 
 ## Preparation Checklist
 
@@ -84,7 +85,8 @@ Show the dashboard and briefly identify the client/backend interaction.
 3. Point out that dashboard totals come from backend aggregates, not hard-coded UI values.
 
 Expected result on the approved Phase A demo build: dashboard loads without a spinner or error.
-On the Phase B branch, a `401` is expected until Phases C/D are implemented.
+On the Phase C branch, a `401` is expected until the client supplies a valid Keycloak bearer token;
+the current Flutter client does not yet implement that Phase D flow.
 
 ### 3. Usage synchronization — 90 seconds
 

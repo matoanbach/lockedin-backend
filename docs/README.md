@@ -22,23 +22,26 @@ The backend also has a focused onboarding set under [`backend/docs`](../backend/
 
 ## Current Identity and Access Status
 
-The Phase B tenant foundation is implemented: accounts link immutable provider identities to one
-non-demo profile, services require a server-derived tenant, and user-facing routes fail closed.
-Real Keycloak token introspection and the mobile login flow are not implemented. Therefore:
+The Phase C backend identity/session boundary is implemented: every protected request is
+introspected, restrictive provider claims are validated, exact immutable identities provision or
+resolve one non-demo tenant, and local revocation/audit controls are enforced. The Flutter mobile
+login flow is not implemented. Therefore:
 
 - there are no evaluator credentials to distribute;
-- protected API requests return `401` unless tests or a later authenticator supply a trusted
-  `CurrentPrincipal`;
+- protected API requests require a valid introspected Keycloak bearer token;
 - the seeded default profile remains demo-only, unowned, and unavailable through protected routes;
 - aggregate rebuild requires a separate operator dependency;
 - the system must remain on a trusted local/demo network.
 
 The approved local next-state design is recorded in the
 [Authentication, Session, and Tenant-Isolation ADR](../backend/docs/decisions/authentication-session-tenant-isolation.md).
-Its Phase B foundation is now reflected in runtime and schema code. Phase C identity/session
-controls and Phase D mobile lifecycle work remain pending. Role-based operational ownership is
-approved; acting people and runbooks still require verification before release completion or
-external exposure.
+Its Phase C backend controls are reflected in runtime, schema, tests, and generated OpenAPI. The
+corrected redirect URI is `com.lockdin.lockdinapp:/oauth2redirect`; a disposable, volume-free
+Keycloak 26.7.0 realm import succeeded and live realm/client/flow/listener assertions passed. This
+is process/container evidence only: persistent full-stack startup, Mailpit delivery, physical
+Caddy/phone CA trust, Flutter Phase D login, and production readiness remain unverified.
+Role-based operational ownership is approved; acting people and runbooks still require
+verification before release completion or external exposure.
 
 ## Historical Documents
 

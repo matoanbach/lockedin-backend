@@ -1,7 +1,8 @@
 # Local identity and TLS foundation
 
-This stack is for the trusted local demonstration only. It does not configure the complete realm,
-clients, token introspection, or mobile login contract; those controls belong to later phases.
+This stack is for the trusted local demonstration only. Phase C configures the backend
+introspection/session boundary, realm import, and a narrow signed security-event listener. It does
+not implement the Flutter mobile login or establish physical local-CA trust.
 
 ## Pinned selections
 
@@ -37,6 +38,17 @@ migration and tenant-isolation suites.
   no relay configuration exists. Use synthetic addresses only.
 - The Keycloak database and bootstrap-admin passwords are required environment values. Do not use
   the placeholders from `.env.example` as actual credentials.
+- The API-client secret and event-webhook secret are separate required environment values. The
+  backend CA bundle is an operator-owned read-only mount; never commit CA or private-key material.
+
+## Phase C validation status
+
+The custom event-listener provider compiles and the pinned Keycloak image build succeeds. Compose
+configuration validates with synthetic process-only values. With the corrected redirect URI
+`com.lockdin.lockdinapp:/oauth2redirect`, a completely disposable, volume-free Keycloak 26.7.0
+realm import succeeded and live realm/client/flow/listener assertions passed. This is
+process/container evidence only: persistent full-stack startup, Mailpit delivery, physical
+Caddy/phone CA trust, Flutter Phase D login, and production readiness remain unverified.
 
 Before starting the stack, make a verified backup of any existing LockdIn database and read the
 migration runbook in `database/README.md`. Starting containers and installing the local CA on a
