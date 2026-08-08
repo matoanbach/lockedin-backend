@@ -133,7 +133,7 @@ not silently grant the permission.
 
 | Message or state | Meaning | What to do |
 | --- | --- | --- |
-| `Backend unavailable` | The app cannot load protected data; this also covers the expected Phase B `401` before mobile login exists | Verify the configured URL and backend; use a Phase A demo build for the behavioral walkthrough, or wait for Phases C/D rather than bypassing authentication |
+| `Backend unavailable` | The app cannot load protected data; this also covers the expected `401` while the Flutter client has no Phase D login token | Verify the configured URL and backend; use a Phase A demo build for the behavioral walkthrough, or wait for Phase D rather than bypassing authentication |
 | `Could not connect to the backend at ...` | Network or backend connection failed | Check Wi-Fi, host IP, firewall, container health, and frontend `.env` |
 | `Grant Usage Access before syncing...` | Android usage permission is missing | Open Device Permissions and grant Usage Access |
 | `Live usage uploads are still pending...` | Accessibility events remain queued | Keep the backend reachable and retry |
@@ -157,8 +157,8 @@ watermarks, and pending state.
 
 - Usage history and accountability contacts are personal information.
 - Use demo addresses and test accounts during presentations.
-- Do not expose the local stack to the public internet. Protected routes fail closed in Phase B,
-  but real token validation, edge hardening, and production TLS trust are not implemented evidence.
+- Do not expose the local stack to the public internet. Protected routes authenticate in Phase C,
+  but deployed-edge hardening and production TLS trust do not have implementation evidence.
 - Do not display notifications containing private information during screen sharing.
 - Do not reset the Docker volume unless all stored data may be deleted.
 - Do not enable Accessibility solely for a presentation unless the feature is part of the planned
@@ -168,10 +168,9 @@ watermarks, and pending state.
 
 ### Why is there no login?
 
-The Phase B backend has account/profile ownership and tenant-scoped protected routes, but it does
-not yet authenticate tokens. Its default principal dependency rejects protected requests, and the
-seeded default profile is demo-only and unowned. Phase C adds Keycloak authentication/session
-behavior; Phase D adds Flutter login, credential storage, and account-owned queues.
+The Phase C backend has account/profile ownership, Keycloak token/session authentication, and
+tenant-scoped protected routes. The seeded default profile remains demo-only and unowned. Phase D
+adds Flutter login, credential storage, and account-owned queues.
 
 ### Why does a short session sometimes appear as one minute?
 

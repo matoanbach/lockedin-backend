@@ -5,4 +5,4 @@ CREATE TABLE alembic_version (
     CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num)
 );
 
-INSERT INTO alembic_version (version_num) VALUES ('20260803_01');
+INSERT INTO alembic_version (version_num) VALUES ('20260808_02');

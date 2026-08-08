@@ -5,13 +5,18 @@ from sqlalchemy.orm import sessionmaker
 from lockedin_backend.api.router import api_router
 from lockedin_backend.app.docs_site import mount_docs_site
 from lockedin_backend.core.settings import get_settings
+from lockedin_backend.core.settings import Settings
 from lockedin_backend.db.session import get_session_factory
+from lockedin_backend.services.keycloak_client import KeycloakClient
 
 
-settings = get_settings()
-
-
-def create_app(session_factory: sessionmaker | None = None) -> FastAPI:
+def create_app(
+    session_factory: sessionmaker | None = None,
+    *,
+    app_settings: Settings | None = None,
+    keycloak_client: KeycloakClient | None = None,
+) -> FastAPI:
+    settings = app_settings or get_settings()
     resolved_session_factory = session_factory or get_session_factory()
 
     app = FastAPI(
@@ -32,6 +37,8 @@ def create_app(session_factory: sessionmaker | None = None) -> FastAPI:
     )
     mount_docs_site(app)
     app.state.session_factory = resolved_session_factory
+    app.state.settings = settings
+    app.state.keycloak_client = keycloak_client or KeycloakClient(settings)
     app.include_router(api_router)
 
     @app.get("/", tags=["root"])

@@ -20,11 +20,16 @@ The backend currently has working support for:
 - enforcement event logging
 - local Docker runtime
 - local Postgres bootstrap through the top-level `database/` folder
+- per-request Keycloak introspection and restrictive access-token validation
+- immutable identity provisioning, local session/account revocation, and redacted security audit
+- signed OIDC back-channel logout and HMAC provider security events
 
 ## Important Current Limits
 
-- no real Keycloak authentication yet; protected routes fail closed
-- tenant/account ownership exists, but account bootstrap is not exposed
+- Flutter login and platform credential storage are not implemented
+- the corrected mobile redirect URI is `com.lockdin.lockdinapp:/oauth2redirect`; disposable
+  volume-free realm import and live realm/client/flow/listener assertions pass, but persistent-stack,
+  Mailpit, physical Caddy/phone CA-trust, Flutter Phase D, and production evidence remain pending
 - health is liveness-oriented, not DB readiness-oriented
 - production hardening is still incomplete
 - one guarded Alembic migration head exists; disposable empty/legacy upgrades, fresh bootstrap,
@@ -38,8 +43,8 @@ The initiative is intentionally split into reviewable stages:
    [Authentication, Session, and Tenant-Isolation ADR](decisions/authentication-session-tenant-isolation.md);
 2. add a safe migration mechanism, account/profile ownership, current-principal dependency, and
    tenant-scoped services/repositories — **implemented in Phase B**;
-3. implement the approved backend signup/OIDC, verification, login, renewal, logout/revocation,
-   recovery, throttling, and audit contract;
+3. implement the approved backend OIDC introspection, identity bootstrap, logout/revocation,
+   provider-event, and audit contract - **implemented in Phase C with automated evidence**;
 4. implement Flutter auth state, platform-backed credential storage, guarded routing, and
    account-scoped cache/queue lifecycle;
 5. complete two-account isolation, adversarial auth, mobile lifecycle, TLS/secret, deployment, and

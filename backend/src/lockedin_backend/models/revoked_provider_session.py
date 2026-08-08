@@ -24,8 +24,8 @@ class RevokedProviderSession(Base, TimestampMixin):
     id: Mapped[str] = mapped_column(
         String(36), primary_key=True, default=lambda: str(uuid4())
     )
-    account_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False
+    account_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("accounts.id", ondelete="CASCADE"), nullable=True
     )
     issuer: Mapped[str] = mapped_column(String(255), nullable=False)
     sid: Mapped[str] = mapped_column(String(255), nullable=False)

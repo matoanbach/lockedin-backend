@@ -84,7 +84,7 @@ coverage target has been met until a measured report confirms it.
 | Flutter line coverage | 603/3,609 lines, 16.71% |
 | Android/Gradle unit tests | `BUILD SUCCESSFUL`; 82 actionable tasks |
 | Strict MkDocs build | Passed |
-| Generated OpenAPI validation | OpenAPI 3.1.0; 14 paths; 18 operations |
+| Generated OpenAPI validation | OpenAPI 3.1.0; 20 paths; 24 operations |
 | Documentation local-link check | 17 key Markdown files passed |
 
 Flutter coverage was measured from `coverage/lcov.info` produced by `flutter test --coverage`.

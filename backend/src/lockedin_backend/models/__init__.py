@@ -9,6 +9,7 @@ from lockedin_backend.models.preferences import Preferences
 from lockedin_backend.models.profile import Profile
 from lockedin_backend.models.rule import Rule
 from lockedin_backend.models.revoked_provider_session import RevokedProviderSession
+from lockedin_backend.models.security_audit_event import SecurityAuditEvent
 from lockedin_backend.models.usage_daily_app_aggregate import UsageDailyAppAggregate
 from lockedin_backend.models.usage_daily_category_aggregate import (
     UsageDailyCategoryAggregate,
@@ -25,6 +26,7 @@ __all__ = [
     "Profile",
     "Rule",
     "RevokedProviderSession",
+    "SecurityAuditEvent",
     "TimestampMixin",
     "UsageDailyAppAggregate",
     "UsageDailyCategoryAggregate",

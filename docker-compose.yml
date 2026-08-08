@@ -18,7 +18,7 @@ services:
       retries: 10
 
   backend:
-    image: lockedin-backend-local:phase-b
+    image: lockedin-backend-local:phase-c
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -33,6 +33,15 @@ services:
       WORKER_CLASS: ${WORKER_CLASS:-uvicorn.workers.UvicornWorker}
       LOGLEVEL: ${LOGLEVEL:-info}
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-lockedin}
+      KEYCLOAK_ISSUER: https://192.168.2.44/realms/lockdin
+      KEYCLOAK_MOBILE_CLIENT_ID: lockdin-mobile
+      KEYCLOAK_API_CLIENT_ID: lockdin-api
+      KEYCLOAK_API_CLIENT_SECRET: ${KEYCLOAK_API_CLIENT_SECRET:?set KEYCLOAK_API_CLIENT_SECRET}
+      KEYCLOAK_REDIRECT_URI: com.lockdin.lockdinapp:/oauth2redirect
+      KEYCLOAK_CA_BUNDLE: /etc/lockedin/keycloak-ca/ca.crt
+      KEYCLOAK_EVENT_WEBHOOK_SECRET: ${KEYCLOAK_EVENT_WEBHOOK_SECRET:?set KEYCLOAK_EVENT_WEBHOOK_SECRET}
+    volumes:
+      - ${KEYCLOAK_CA_BUNDLE_HOST_PATH:?set KEYCLOAK_CA_BUNDLE_HOST_PATH}:/etc/lockedin/keycloak-ca/ca.crt:ro
     ports:
       - "${BACKEND_PORT:-8000}:${BACKEND_CONTAINER_PORT:-8000}"
     depends_on:
@@ -40,7 +49,7 @@ services:
         condition: service_completed_successfully
 
   migration:
-    image: lockedin-backend-local:phase-b
+    image: lockedin-backend-local:phase-c
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -68,9 +77,12 @@ services:
       retries: 10
 
   keycloak:
-    image: quay.io/keycloak/keycloak:26.7.0@sha256:0f198be292568439d700cdbfb893e69a6009bb43a94a06a945b1d3d506c76b13
+    image: lockedin-keycloak-local:26.7.0-phase-c
+    build:
+      context: ./infrastructure/keycloak-provider
+      dockerfile: Dockerfile
     restart: unless-stopped
-    command: ["start"]
+    command: ["start", "--import-realm"]
     environment:
       KC_DB: postgres
       KC_DB_URL_HOST: keycloak-postgres
@@ -83,9 +95,17 @@ services:
       KC_HEALTH_ENABLED: "true"
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME:-admin}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD:?set KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD}
+      KEYCLOAK_API_CLIENT_SECRET: ${KEYCLOAK_API_CLIENT_SECRET:?set KEYCLOAK_API_CLIENT_SECRET}
+      LOCKDIN_KEYCLOAK_ISSUER: https://192.168.2.44/realms/lockdin
+      LOCKDIN_EVENT_WEBHOOK_URL: http://backend:8000/api/v1/auth/provider-events
+      LOCKDIN_EVENT_WEBHOOK_SECRET: ${KEYCLOAK_EVENT_WEBHOOK_SECRET:?set KEYCLOAK_EVENT_WEBHOOK_SECRET}
+    volumes:
+      - ./infrastructure/keycloak:/opt/keycloak/data/import:ro
     depends_on:
       keycloak-postgres:
         condition: service_healthy
+      backend:
+        condition: service_started
 
   mailpit:
     image: axllent/mailpit:v1.30.0@sha256:0059ef81e492a7192af3816281eed6859eb078bd7bdc58b76757c13e10e53a7d
