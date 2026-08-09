@@ -46,8 +46,9 @@ tests override them only with synthetic trusted principals.
 The pinned local Keycloak, separate Keycloak PostgreSQL volume, Mailpit, and Caddy TLS foundation
 were configured but not started or physically trusted as part of Phase B. Phase B did not implement
 Keycloak realm/client configuration, introspection, account bootstrap, token/session validation, or
-Flutter login. Phase C subsequently implemented the backend controls described below; Flutter login
-remains Phase D, and production-readiness claims remain prohibited.
+Flutter login. Phase C subsequently implemented the backend controls described below, and Phase D
+implemented the Flutter/native lifecycle with automated/build evidence. Production-readiness
+claims remain prohibited.
 
 ## Phase C backend implementation status
 
@@ -57,12 +58,32 @@ current-session and logout-all invalidation, OIDC back-channel logout, HMAC prov
 redacted security-audit persistence at Alembic head `20260808_02`. The provider SPI compiles inside
 a pinned Keycloak 26.7.0 image and Compose interpolation is validated.
 
-A disposable, volume-free Keycloak 26.7.0 realm import succeeded after the redirect contract was
-corrected to `com.lockdin.lockdinapp:/oauth2redirect`. Live discovery, realm security, mobile
+A disposable Keycloak 26.7.0 realm import succeeded after the redirect contract was corrected to
+`com.lockdin.lockdinapp:/oauth2redirect`. Live discovery, realm security, mobile
 client/PKCE/audience, API service-account role, session-limiter/reset-flow, and event-listener
-assertions passed. This is process/container evidence only: persistent full-stack startup, Mailpit
-delivery, physical Caddy/phone CA trust, Flutter Phase D login, and production readiness remain
-unverified.
+assertions pass. An isolated persistent-volume stack and Samsung SM-A528B also physically verified
+Mailpit verification delivery, Caddy/phone CA trust, AppAuth registration/sign-in, app redirect,
+token exchange/introspection, protected-session bootstrap, authenticated onboarding, and local
+sign-out persistence. Production readiness remains unverified.
+
+## Phase D mobile implementation status
+
+Phase D implements explicit AppAuth service configuration, Authorization Code with PKCE S256,
+platform-backed secure rotating-session storage, guarded auth/onboarding/product routes,
+single-flight refresh, one bounded 401 retry, coordinated local/server logout, stable account
+generation bindings, in-memory-only native bearer context, and active/unclaimed/quarantined queue
+selection. Flutter sync watermarks and warning dedupe keys are generation-scoped. The native usage
+queue schema is version 2 with a source-preserving v1 migration and composite owner/source
+uniqueness; pending enforcement events also carry owner generation.
+
+On August 8, 2026, Dart formatting, Flutter analysis, 52 Flutter tests, Android JVM tests, and a
+debug APK build passed; the backend remained 119 passed and 3 skipped. The physical-phone run
+verified registration and normal sign-in pages, `prompt=create`, verification-email delivery,
+email verification, AppAuth redirect return, token exchange/introspection, protected-session
+bootstrap, authenticated onboarding, and sign-out that remained cleared after an app-process
+restart. The SQLite migration has not been exercised against a real preexisting app database;
+successful renewal after a long-offline provider session, password-recovery delivery,
+backup/restore behavior, and production readiness remain unverified.
 
 ## Context and evidence
 
@@ -76,11 +97,11 @@ Every behavioral table has a non-null `profile_id` foreign key, and protected re
 include the server-derived profile scope. Exact `(issuer, subject)` identity links select the
 authorized account/profile; the synthetic default profile is never account-owned.
 
-The Android client has no authentication state or guarded route. Dio sends no credential. The
-native uploader posts directly to `/api/v1/usage/events` without using Dio, and its SQLite queue
-does not record an account/profile owner. Flutter and native SharedPreferences contain usage
-watermarks, cached rule/enforcement state, pending enforcement events, and the native uploader base
-URL. No secure credential-storage dependency is present.
+The Android client now has explicit authentication state and guarded routes. Protected Dio requests
+receive the current bearer through a bounded interceptor, while the native uploader receives its
+active owner generation and bearer only in process memory. Its SQLite queue and pending enforcement
+events record local owner generation. Flutter sync watermarks and Flutter/native warning dedupe are
+generation-scoped; the non-secret native base URL remains install-scoped.
 
 Historical documents describe email/password, optional Google OAuth, JWT or session-token ideas,
 and anonymous device-only mode. Those are requirements/design hypotheses, not current contracts.
@@ -148,12 +169,12 @@ an authentication factor or a client-controlled ownership boundary.
 
 | Store | Current data | Current ownership gap | Required lifecycle |
 | --- | --- | --- | --- |
-| Native SQLite `lockdin_usage_queue.db` | Raw queued usage slices, timestamps, time zone, retry metadata | No account or install-generation owner | Add immutable local owner state (`unclaimed` or account subject/generation); uploader sends only matching rows. |
-| Flutter SharedPreferences | Successful-sync timestamp and usage watermark | Global to app install | Namespace by local account generation and never advance one account from another account's upload. |
-| Native `lockdin_enforcement` SharedPreferences | Cached rule status, local usage, uploaded intervals, warnings, pending intervention/events, tone | Global to app install | Namespace or clear transactionally on account change; stop background upload before transition. |
-| Flutter SharedPreferences warning dedupe | Emitted-warning markers | Global to app install | Namespace by account generation. |
+| Native SQLite `lockdin_usage_queue.db` | Raw queued usage slices, owner generation, timestamps, time zone, retry metadata | v2 source/build evidence; real v1 database migration not exercised | Active owner drains only matching rows; `unclaimed` requires Import/Discard and other owners stay quarantined. |
+| Flutter SharedPreferences | Generation-scoped successful-sync timestamp and usage watermark | Automated coverage, not physical account-switch evidence | Never advance one account from another account's upload. |
+| Native `lockdin_enforcement` SharedPreferences | Cached rule state plus owner-tagged pending enforcement events | Transient auth context cleared on physical sign-out/relaunch; other-owner queue behavior remains automated only | Preserve other-owner queued events while clearing rebuildable account state. |
+| Flutter SharedPreferences warning dedupe | Generation-scoped emitted-warning markers | Automated key coverage, not physical warning evidence | Namespace by account generation. |
 | Native uploader SharedPreferences | Base URL | Not secret and not an owner | May remain install-scoped configuration; never store credentials here. |
-| Future credential storage | Not present | No approved store | Use platform-backed secure storage for session/refresh material; ordinary SharedPreferences is prohibited for long-lived secrets. |
+| Platform secure storage | One rotating session record plus stable issuer/subject generation bindings | Plugin-backed implementation; physical backup/restore behavior unverified | Ordinary SharedPreferences remains prohibited for tokens. |
 
 App/package identity and exact usage timestamps can reveal sensitive behavior. They are confidential
 behavioral data even when no email is stored beside them.

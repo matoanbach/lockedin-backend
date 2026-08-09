@@ -53,6 +53,52 @@ class MainActivity : FlutterActivity() {
                     }
                     result.success(null)
                 }
+                "configureAuthContext" -> {
+                    val owner = call.argument<String>("accountGeneration")
+                    val token = call.argument<String>("accessToken")
+                    if (owner.isNullOrBlank() || token.isNullOrBlank()) {
+                        result.error("invalid_auth_context", "Authentication context is incomplete.", null)
+                    } else {
+                        NativeUsageUploader.configureAuthContext(owner, token)
+                        result.success(null)
+                    }
+                }
+                "clearAuthContext" -> {
+                    NativeUsageUploader.clearAuthContext()
+                    result.success(null)
+                }
+                "getQueueOwnershipSummary" -> {
+                    val owner = call.argument<String>("accountGeneration")
+                    if (owner.isNullOrBlank()) {
+                        result.error("invalid_owner", "Account generation is required.", null)
+                    } else {
+                        val usage = UsageUploadQueueStore.ownershipCounts(this, owner)
+                        val enforcement = RuleEnforcementStore.pendingEnforcementOwnershipCounts(this, owner)
+                        result.success(
+                            mapOf(
+                                "activeCount" to usage.activeCount + enforcement.activeCount,
+                                "unclaimedCount" to usage.unclaimedCount + enforcement.unclaimedCount,
+                                "quarantinedCount" to usage.quarantinedCount + enforcement.quarantinedCount,
+                            ),
+                        )
+                    }
+                }
+                "resolveUnclaimedData" -> {
+                    val owner = call.argument<String>("accountGeneration")
+                    val decision = call.argument<String>("decision")
+                    if (owner.isNullOrBlank() || (decision != "import" && decision != "discard")) {
+                        result.error("invalid_data_decision", "A valid data decision is required.", null)
+                    } else {
+                        val shouldImport = decision == "import"
+                        UsageUploadQueueStore.resolveUnclaimed(this, owner, shouldImport)
+                        RuleEnforcementStore.resolveUnclaimedEnforcementEvents(this, owner, shouldImport)
+                        result.success(null)
+                    }
+                }
+                "resetAccountScopedState" -> {
+                    RuleEnforcementStore.resetAccountScopedState(this)
+                    result.success(null)
+                }
                 "cacheNotificationTone" -> {
                     val tone = call.argument<String>("tone")
                     if (!tone.isNullOrBlank()) {
@@ -74,7 +120,12 @@ class MainActivity : FlutterActivity() {
                     result.success(RuleEnforcementStore.consumePendingIntervention(this))
                 }
                 "consumePendingEnforcementEvents" -> {
-                    result.success(RuleEnforcementStore.consumePendingEnforcementEvents(this))
+                    result.success(
+                        RuleEnforcementStore.consumePendingEnforcementEvents(
+                            this,
+                            NativeUsageUploader.currentOwnerGeneration(),
+                        ),
+                    )
                 }
                 "consumePendingLaunchNavigation" -> {
                     result.success(consumePendingLaunchNavigation())

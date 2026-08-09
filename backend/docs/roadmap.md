@@ -26,10 +26,12 @@ The backend currently has working support for:
 
 ## Important Current Limits
 
-- Flutter login and platform credential storage are not implemented
-- the corrected mobile redirect URI is `com.lockdin.lockdinapp:/oauth2redirect`; disposable
-  volume-free realm import and live realm/client/flow/listener assertions pass, but persistent-stack,
-  Mailpit, physical Caddy/phone CA-trust, Flutter Phase D, and production evidence remain pending
+- Flutter login, platform credential storage, guarded routing, bounded renewal, logout, and
+  account-generation queue ownership are implemented with automated/build evidence
+- the corrected mobile redirect URI is `com.lockdin.lockdinapp:/oauth2redirect`; disposable realm
+  import and live realm/client/flow/listener assertions pass, and an isolated physical-phone run
+  verifies Mailpit delivery, Caddy/phone CA trust, AppAuth registration/sign-in, protected-session
+  bootstrap, and local sign-out persistence. Production evidence remains pending
 - health is liveness-oriented, not DB readiness-oriented
 - production hardening is still incomplete
 - one guarded Alembic migration head exists; disposable empty/legacy upgrades, fresh bootstrap,
@@ -46,7 +48,8 @@ The initiative is intentionally split into reviewable stages:
 3. implement the approved backend OIDC introspection, identity bootstrap, logout/revocation,
    provider-event, and audit contract - **implemented in Phase C with automated evidence**;
 4. implement Flutter auth state, platform-backed credential storage, guarded routing, and
-   account-scoped cache/queue lifecycle;
+   account-scoped cache/queue lifecycle - **implemented in Phase D with automated/build evidence
+   and isolated physical system-browser/device verification for fresh login and logout**;
 5. complete two-account isolation, adversarial auth, mobile lifecycle, TLS/secret, deployment, and
    rollback verification.
 

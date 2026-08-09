@@ -12,6 +12,13 @@ String describeApiError(Object error) {
       }
     }
 
+    final transportDetail = error.error?.toString() ?? '';
+    if (transportDetail.contains('CERTIFICATE_VERIFY_FAILED') ||
+        transportDetail.contains('HandshakeException')) {
+      return 'Could not establish a trusted HTTPS connection to '
+          '${ApiConfig.baseUrl}.';
+    }
+
     if (error.type == DioExceptionType.connectionTimeout ||
         error.type == DioExceptionType.receiveTimeout ||
         error.type == DioExceptionType.sendTimeout ||
@@ -23,6 +30,8 @@ String describeApiError(Object error) {
     if (statusCode != null) {
       return 'Request failed with status $statusCode.';
     }
+
+    return 'Something went wrong while talking to the backend.';
   }
 
   if (error is StateError || error is UnsupportedError) {

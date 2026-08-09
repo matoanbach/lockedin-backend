@@ -44,8 +44,11 @@ dependency remains fail-closed with `403`.
 The evidence-backed current exposure inventory and proposed public/protected/internal
 classification are in the
 [Authentication, Session, and Tenant-Isolation ADR](decisions/authentication-session-tenant-isolation.md).
-The generated OpenAPI document contains the `KeycloakAccessToken` HTTP bearer scheme. This is not
-evidence that a physical phone trusts the local CA or that the Flutter Phase D login exists.
+The generated OpenAPI document contains the `KeycloakAccessToken` HTTP bearer scheme. Phase D
+implements the Flutter login lifecycle, and the August 8 isolated physical-phone run verified
+AppAuth registration/sign-in, local-CA trust, redirect, token exchange, introspection, and a `200`
+response from protected `/api/v1/auth/session`. This evidence is local/demo-specific and does not
+establish production trust or readiness.
 
 ## Endpoint Summary
 

@@ -102,7 +102,11 @@ For new decisions, add a row above with this minimum evidence:
 ### 4.2 Verified control gaps
 
 - Real Keycloak introspection and restrictive claim validation execute before every protected
-  service. The Flutter client still lacks Phase D login/credential handling.
+  service. Phase D client credential handling has automated/build evidence plus isolated
+  physical-phone proof of TLS trust, AppAuth registration/sign-in, redirect, token
+  exchange/introspection, protected-session bootstrap, authenticated onboarding, and local sign-out
+  persistence. Backup/restore, real SQLite migration, successful long-offline renewal, and
+  production trust remain unverified.
 - Development database credentials are present in the default database URL, and Kubernetes database credential configuration is inconsistent with that URL.
 - Debug mode defaults to enabled; OpenAPI, Swagger UI, and ReDoc are always mounted.
 - Kubernetes ingress does not configure TLS or a production host.
@@ -262,10 +266,11 @@ Do not install unpinned `latest` scanner versions inside each pipeline run. Pin 
 
 #### Weak or Missing Authentication Mechanisms
 
-Authentication tests marked **design-gated** become runnable as their remaining Phase D controls
-are implemented under accepted
-[ADR-001](../../backend/docs/decisions/authentication-session-tenant-isolation.md). Their presence
-in this plan is not evidence that those controls exist.
+Phase D controls implemented under accepted
+[ADR-001](../../backend/docs/decisions/authentication-session-tenant-isolation.md) now have focused
+automated/build evidence. The August 8 isolated phone run supplies narrow deployed-provider and
+physical-device evidence where explicitly recorded below; the remaining test cases still require
+execution and their presence is not proof of that evidence.
 
 | ID | Test | Expected result | Current state |
 |---|---|---|---|
@@ -273,7 +278,7 @@ in this plan is not evidence that those controls exist.
 | AUTH-02 | Use missing, malformed, expired, revoked, wrong-audience, and wrong-issuer credentials. | Rejected without sensitive error detail. | Phase C authentication tests pass for missing/malformed credentials, restrictive claims, provider state, and local revocation; deployed-edge verification remains pending. |
 | AUTH-03 | Attempt read/update/delete using identifiers owned by a second synthetic user. | Denied at the service/repository boundary; no cross-tenant existence leak. | Exact identity resolution, the Phase B SQLite matrix, and the isolated PostgreSQL two-account request test pass; deployed authenticator regression remains pending. |
 | AUTH-04 | Modify object/profile identifiers in paths, bodies, and query parameters. | Server derives or verifies ownership rather than trusting the client. | Schemas expose no ownership-authority field and protected routes use the Phase C server-derived principal; deployed-edge verification remains pending. |
-| AUTH-05 | Exercise login, recovery, refresh, logout, and credential-revocation abuse cases. | Rate controls, session invalidation, audit events, and non-enumerating responses match the approved design. | Phase C current-session/logout-all, signed back-channel logout, provider-event, replay, and audit tests pass; Phase D login/recovery/mobile lifecycle and deployed-provider testing remain pending. |
+| AUTH-05 | Exercise login, recovery, refresh, logout, and credential-revocation abuse cases. | Rate controls, session invalidation, audit events, and non-enumerating responses match the approved design. | Phase C revocation/provider/audit tests pass. Phase D automated tests cover cancellation, bootstrap/route states, stable account generations, single-flight refresh, bounded 401 retry, 503 behavior, refresh failure, logout ordering, unclaimed choice, and scoped watermarks. The August 8 phone run verified fresh login, verification-email delivery, redirect, protected bootstrap, terminal reauthentication after an expired long-offline session, and local sign-out persistence. Successful renewal, password-recovery delivery, server-revocation abuse cases, and rate-control testing remain pending. |
 
 #### Password Entropy
 

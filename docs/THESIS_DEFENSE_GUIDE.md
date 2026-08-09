@@ -205,7 +205,9 @@ Remove personal data from research artifacts.
 Current limitations:
 
 - account/profile tenant foundation with an unowned default demo profile;
-- no working Keycloak authentication, mobile login, or admin/user roles;
+- Keycloak-backed mobile authentication is implemented with automated/build evidence and isolated
+  physical proof of AppAuth registration/sign-in, protected-session bootstrap, authenticated
+  onboarding, and local sign-out persistence; role-based admin/user workflows remain unimplemented;
 - no outbound accountability email;
 - no public-production security posture;
 - no production HTTPS/reverse-proxy runbook;

@@ -19,8 +19,38 @@ object NativeUsageUploader {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val completionCallbacks = mutableListOf<(Map<String, Any>) -> Unit>()
 
+    data class AuthContext(
+        val ownerGeneration: String,
+        val accessToken: String,
+        val version: Long,
+    )
+
+    @Volatile
+    private var authContext: AuthContext? = null
+
+    @Volatile
+    private var authContextVersion = 0L
+
     @Volatile
     private var isDrainingQueue = false
+
+    fun configureAuthContext(ownerGeneration: String, accessToken: String) {
+        require(ownerGeneration.isNotBlank())
+        require(accessToken.isNotBlank())
+        synchronized(this) {
+            authContextVersion += 1
+            authContext = AuthContext(ownerGeneration, accessToken, authContextVersion)
+        }
+    }
+
+    fun clearAuthContext() {
+        synchronized(this) {
+            authContextVersion += 1
+            authContext = null
+        }
+    }
+
+    fun currentOwnerGeneration(): String? = authContext?.ownerGeneration
 
     fun cacheBaseUrl(context: Context, baseUrl: String) {
         val normalized = baseUrl.trim().trimEnd('/')
@@ -35,8 +65,11 @@ object NativeUsageUploader {
         context: Context,
         slice: UsageSlicePayload,
     ) {
-        UsageUploadQueueStore.enqueue(context, slice)
-        flushPendingUploads(context)
+        val owner = authContext?.ownerGeneration ?: QueueOwnershipPolicy.UNCLAIMED_OWNER
+        UsageUploadQueueStore.enqueue(context, owner, slice)
+        if (authContext != null) {
+            flushPendingUploads(context)
+        }
     }
 
     fun flushPendingUploads(
@@ -72,19 +105,33 @@ object NativeUsageUploader {
         var uploadedCount = 0
         var failedCount = 0
         var lastError = ""
+        val contextSnapshot = authContext
+            ?: return emptySummary(context, null)
         val baseUrl = prefs(context).getString(KEY_BASE_URL, DEFAULT_ANDROID_BASE_URL)
             ?: DEFAULT_ANDROID_BASE_URL
 
         while (uploadedCount < MAX_UPLOADS_PER_DRAIN) {
-            val batch = UsageUploadQueueStore.nextBatch(context, 1)
+            if (authContext != contextSnapshot) {
+                lastError = "auth_context_changed"
+                break
+            }
+            val batch = UsageUploadQueueStore.nextBatch(
+                context,
+                contextSnapshot.ownerGeneration,
+                1,
+            )
             if (batch.isEmpty()) {
                 break
             }
 
             val item = batch.first()
-            val responseCode = uploadSingleSlice(baseUrl, item)
+            val responseCode = uploadSingleSlice(baseUrl, contextSnapshot.accessToken, item)
+            if (authContext != contextSnapshot) {
+                lastError = "auth_context_changed"
+                break
+            }
             if (responseCode in 200..299) {
-                UsageUploadQueueStore.delete(context, item.id)
+                UsageUploadQueueStore.delete(context, item.id, contextSnapshot.ownerGeneration)
                 RuleEnforcementStore.recordUploadedInterval(
                     context,
                     item.appId,
@@ -95,7 +142,7 @@ object NativeUsageUploader {
                 continue
             }
 
-            UsageUploadQueueStore.markFailure(context, item.id)
+            UsageUploadQueueStore.markFailure(context, item.id, contextSnapshot.ownerGeneration)
             failedCount += 1
             lastError = if (responseCode >= 0) {
                 "HTTP $responseCode"
@@ -108,12 +155,30 @@ object NativeUsageUploader {
         return mapOf(
             "uploadedCount" to uploadedCount,
             "failedCount" to failedCount,
-            "pendingCount" to UsageUploadQueueStore.pendingCount(context),
+            "pendingCount" to UsageUploadQueueStore.pendingCount(
+                context,
+                contextSnapshot.ownerGeneration,
+            ),
             "lastError" to lastError,
         )
     }
 
-    private fun uploadSingleSlice(baseUrl: String, slice: QueuedUsageSlice): Int {
+    private fun emptySummary(context: Context, ownerGeneration: String?): Map<String, Any> = mapOf(
+        "uploadedCount" to 0,
+        "failedCount" to 0,
+        "pendingCount" to if (ownerGeneration == null) {
+            0
+        } else {
+            UsageUploadQueueStore.pendingCount(context, ownerGeneration)
+        },
+        "lastError" to if (ownerGeneration == null) "authentication_required" else "",
+    )
+
+    private fun uploadSingleSlice(
+        baseUrl: String,
+        accessToken: String,
+        slice: QueuedUsageSlice,
+    ): Int {
         val connection = (URL("$baseUrl/api/v1/usage/events").openConnection() as HttpURLConnection)
         return try {
             connection.requestMethod = "POST"
@@ -121,6 +186,7 @@ object NativeUsageUploader {
             connection.readTimeout = 10_000
             connection.doOutput = true
             connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("Authorization", "Bearer $accessToken")
 
             val body = JSONObject().apply {
                 put(

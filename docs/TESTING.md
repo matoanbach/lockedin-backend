@@ -330,6 +330,33 @@ missing dates as zero-usage successful days when calculating goals met and longe
 synchronization or data-gap day can therefore be counted as successful. This behavior was not
 changed during analytics clarification.
 
+## Physical Phase D Authentication Evidence — August 8, 2026
+
+An isolated Docker project with newly created disposable volumes was exercised from a Samsung
+SM-A528B without clearing or uninstalling the existing app. A purpose-specific local CA was trusted
+for the test and the phone reached the isolated Caddy edge over an ADB loopback reverse. No
+preexisting LockdIn or Keycloak database volume participated.
+
+| Step | Physical and stack result |
+| --- | --- |
+| Flutter bootstrap and TLS | Flutter retrieved configuration through CA-validated HTTPS on the phone. |
+| Registration | AppAuth opened Chrome on the real Keycloak registration form; `prompt=create` was observed. |
+| Verification delivery | The isolated Mailpit instance received one matching `Verify email` message; the synthetic account became verified. |
+| Normal sign-in | AppAuth opened the email/password form, accepted the verified synthetic identity, and redirected to `com.lockdin.lockdin_app`. |
+| Token and protected session | Sanitized edge evidence recorded token exchange `200`, introspection `200`, and `GET /api/v1/auth/session` `200`. |
+| Authenticated app state | LockdIn displayed authenticated onboarding and completed it into the Dashboard. No unclaimed-data choice appeared. |
+| Long-offline session | An older stored session attempted refresh and received `400`; the app entered terminal reauthentication and cleared native auth context instead of reusing the stale session. This is failure-path evidence, not successful-refresh evidence. |
+| Sign-out | Settings sign-out returned to the welcome screen; after force-stop/relaunch, Sign in and Create account remained visible and authenticated routes did not return. |
+
+The run also exposed and fixed two disposable-realm integration defects: the custom browser flow
+now nests required executions under a supported alternative subflow, and the mobile client includes
+Keycloak's built-in `basic` scope so token introspection supplies the required `sub` claim. The
+backend continued to reject tokens without `sub`; validation was not weakened.
+
+This evidence does **not** establish successful refresh after a long-offline provider session,
+password-recovery delivery, real SQLite v1-to-v2 migration against preexisting phone data,
+backup/restore behavior, shared/external deployment safety, or production readiness.
+
 ## Edge Cases Covered in Code
 
 - duplicate source IDs and replay;

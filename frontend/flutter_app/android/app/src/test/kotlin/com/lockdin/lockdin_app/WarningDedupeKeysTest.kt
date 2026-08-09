@@ -8,12 +8,13 @@ class WarningDedupeKeysTest {
     @Test
     fun nativeLimitMarkerMapsToFlutterRuleAlertKey() {
         assertEquals(
-            "flutter.rule_alert.rule-123.2026-07-27.warning_limit_reached",
+            "flutter.rule_alert.account-a.rule-123.2026-07-27.warning_limit_reached",
             WarningDedupeKeys.flutterFromNative(
                 WarningDedupeKeys.native(
                     ruleId = "rule-123",
                     usageDate = "2026-07-27",
                     eventType = "warning_limit_reached",
+                    ownerGeneration = "account-a",
                 ),
             ),
         )
@@ -22,9 +23,9 @@ class WarningDedupeKeysTest {
     @Test
     fun nativeApproachingMarkerMapsToFlutterRuleAlertKey() {
         assertEquals(
-            "flutter.rule_alert.rule-123.2026-07-27.warning_approaching_limit",
+            "flutter.rule_alert.account-a.rule-123.2026-07-27.warning_approaching_limit",
             WarningDedupeKeys.flutterFromNative(
-                "2026-07-27|rule-123|warning_approaching_limit",
+                "account-a|2026-07-27|rule-123|warning_approaching_limit",
             ),
         )
     }
@@ -34,8 +35,8 @@ class WarningDedupeKeysTest {
         for (marker in listOf(
             "",
             "2026-07-27",
-            "2026-07-27||warning_limit_reached",
-            "2026-07-27|rule-123|intervention_blocked",
+            "account-a|2026-07-27||warning_limit_reached",
+            "account-a|2026-07-27|rule-123|intervention_blocked",
         )) {
             assertNull(WarningDedupeKeys.flutterFromNative(marker))
         }

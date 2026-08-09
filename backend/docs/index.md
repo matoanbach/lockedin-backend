@@ -103,7 +103,9 @@ Project-wide user, evaluator, testing, and thesis-defense guides are indexed in 
 - the backend is a modular monolith, not a microservice system
 - startup does not create or select a default profile; protected tenant scope comes from a trusted
   `CurrentPrincipal`
-- protected routes introspect Keycloak bearer tokens on every request; Flutter login remains Phase D
+- protected routes introspect Keycloak bearer tokens on every request; Phase D implements Flutter
+  login and bounded token renewal, with direct physical proof of fresh login, protected-session
+  bootstrap, and local sign-out persistence but not successful long-offline renewal
 - Alembic owns upgrades, while top-level `database/initdb/` is the aligned fresh-bootstrap snapshot
 - local Postgres uses host port `5433`
 

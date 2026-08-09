@@ -43,6 +43,7 @@ def test_mobile_client_is_public_pkce_with_exact_audience_and_no_offline_grant()
     assert mobile["directAccessGrantsEnabled"] is False
     assert mobile["serviceAccountsEnabled"] is False
     assert mobile["redirectUris"] == ["com.lockdin.lockdinapp:/oauth2redirect"]
+    assert mobile["defaultClientScopes"] == ["basic", "profile", "email"]
     assert mobile["optionalClientScopes"] == []
     assert mobile["attributes"]["pkce.code.challenge.method"] == "S256"
     assert mobile["attributes"]["oauth2.device.authorization.grant.enabled"] == "false"
@@ -96,3 +97,30 @@ def test_session_limiter_reset_and_compose_import_wiring() -> None:
     assert "KEYCLOAK_API_CLIENT_SECRET: ${KEYCLOAK_API_CLIENT_SECRET:?" in compose
     assert "KEYCLOAK_EVENT_WEBHOOK_SECRET: ${KEYCLOAK_EVENT_WEBHOOK_SECRET:?" in compose
     assert "KEYCLOAK_CA_BUNDLE_HOST_PATH:?" in compose
+
+
+def test_browser_flow_nests_required_session_limit_after_authentication() -> None:
+    realm = _realm()
+    flows = {flow["alias"]: flow for flow in realm["authenticationFlows"]}
+
+    browser = flows[realm["browserFlow"]]["authenticationExecutions"]
+    assert {execution["requirement"] for execution in browser} == {"ALTERNATIVE"}
+    assert browser[-1]["flowAlias"] == "LockdIn Authenticate With Session Limit"
+
+    limited = flows["LockdIn Authenticate With Session Limit"][
+        "authenticationExecutions"
+    ]
+    assert [execution["requirement"] for execution in limited] == [
+        "REQUIRED",
+        "REQUIRED",
+    ]
+    assert limited[0]["flowAlias"] == "LockdIn Real Authentication"
+    assert limited[1]["authenticator"] == "user-session-limits"
+
+    real_authentication = flows["LockdIn Real Authentication"][
+        "authenticationExecutions"
+    ]
+    assert {execution["requirement"] for execution in real_authentication} == {
+        "ALTERNATIVE"
+    }
+    assert real_authentication[-1]["flowAlias"] == "LockdIn Browser Forms"

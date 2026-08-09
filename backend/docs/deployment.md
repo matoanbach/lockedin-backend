@@ -75,12 +75,13 @@ Behavior:
 - requires an operator-supplied CA bundle mounted read-only into the backend
 
 Compose interpolation and the custom Keycloak/provider image build are validated. With the
-corrected redirect `com.lockdin.lockdinapp:/oauth2redirect`, a completely disposable, volume-free
-Keycloak 26.7.0 realm import succeeded and live realm/client/flow/listener assertions passed. This
-is process/container evidence only. The stack has not been started against persistent project
-volumes, Mailpit delivery has not been exercised, the local CA has not been physically trusted by
-Caddy/phone use, the Flutter Phase D login is not implemented, and production readiness is not
-established.
+corrected redirect `com.lockdin.lockdinapp:/oauth2redirect`, a completely disposable Keycloak
+26.7.0 realm import and live realm/client/flow/listener assertions pass. A separate isolated stack
+with newly created disposable volumes was then exercised from a Samsung SM-A528B. That run verified
+Mailpit verification delivery, physical Caddy/phone CA trust, Flutter AppAuth registration and
+sign-in, protected-session bootstrap, authenticated onboarding, and local sign-out persistence.
+It did not use or validate preexisting project volumes, successful long-offline renewal, password
+recovery delivery, or production readiness.
 
 ## Backend-Only Compose
 
@@ -149,9 +150,12 @@ Current gaps include:
 - no DB-aware readiness endpoint yet
 - protected product routes use per-request introspection and local session/account revocation; the
   corrected redirect URI is `com.lockdin.lockdinapp:/oauth2redirect`
-- the Flutter client has no login or credential flow and therefore cannot call protected routes
-- local Caddy TLS/CA trust lacks physical evidence; PostgreSQL migration/bootstrap/restore paths
-  have isolated disposable-container evidence but have not been run against a deployment volume
+- the Flutter AppAuth/credential flow and protected-route integration have physical local/demo
+  evidence for fresh login, redirect, protected bootstrap, and local logout clearing; successful
+  long-offline renewal remains unverified
+- local Caddy TLS/CA trust has isolated physical-phone evidence; PostgreSQL
+  migration/bootstrap/restore paths have isolated disposable-container evidence but have not been
+  run against a target deployment volume
 - no explicit production settings split yet
 - limited deployment hardening and observability
 

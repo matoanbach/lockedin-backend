@@ -127,16 +127,21 @@ The backend portion of the accepted authentication architecture is implemented a
 contains the evidence baseline, endpoint/data inventory, threat model, account/profile alternatives,
 mobile queue lifecycle, tenant-enforcement design, acceptance matrix, and migration/rollback plan.
 
+The Phase B foundation, Phase C backend boundary, and Phase D Flutter/native lifecycle are now
+implemented with automated evidence.
+
 The ADR is **accepted for local implementation**, and its Phase B foundation is implemented. D1–D6 approve local/demo-only exposure,
 self-hosted Keycloak OIDC with no external identity-service charge, verification/recovery, direct
 Keycloak-token sessions with server-side revocation checks, physical-phone local TLS,
-existing/pre-login data handling, and role-based operational ownership. Phase D Flutter login and
-account-scoped mobile storage are not implemented. The corrected redirect is
-`com.lockdin.lockdinapp:/oauth2redirect`; a disposable, volume-free Keycloak 26.7.0 realm import
-succeeded and live realm/client/flow/listener assertions passed. That is process/container evidence
-only, not persistent full-stack, Mailpit-delivery, physical Caddy/phone CA-trust, Flutter-login, or
-production-readiness evidence. Acting role holders,
-contacts, access, and runbooks still require verification before release or external exposure.
+existing/pre-login data handling, and role-based operational ownership. Phase D uses AppAuth PKCE,
+secure storage, guarded routes, bounded renewal, and account-generation-scoped queues. The corrected redirect is
+`com.lockdin.lockdinapp:/oauth2redirect`; a disposable Keycloak 26.7.0 realm import and live
+realm/client/flow/listener assertions pass. An isolated persistent-volume stack and Samsung
+SM-A528B also physically verified local-CA trust, AppAuth registration/sign-in, Mailpit verification
+delivery, app redirect, token exchange/introspection, a protected session, authenticated
+onboarding, and local sign-out persistence. Production readiness remains unverified. Acting role
+holders, contacts, access, and runbooks still require verification before release or external
+exposure.
 
 ## Serialization Model
 
@@ -165,10 +170,9 @@ Routes translate those into HTTP responses.
 
 These are not implemented in the current active architecture:
 
-- Flutter Authorization Code/PKCE login and account-scoped mobile queue lifecycle
 - Supabase integration
 - microservices
-- physical Keycloak/Mailpit/local-CA and mobile trust evidence
+- production AppAuth/Keycloak/Mailpit/TLS trust and operational-readiness evidence
 
 ## Related Pages
 

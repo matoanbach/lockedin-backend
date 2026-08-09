@@ -3,16 +3,19 @@
 This runbook is designed for a 7–10 minute live demonstration. Rehearse it using the same device,
 network, database, and build planned for the evaluation.
 
-The current Phase C branch is intentionally not an end-to-end mobile demo build. Backend token,
-identity, session, callback, and audit behavior has automated evidence, but Flutter login remains
-Phase D and physical realm/TLS/Mailpit evidence is not complete. Do not bypass that boundary. Use
-a previously approved Phase A build for the behavioral walkthrough, or present Phase C through its
-automated auth/tenant tests and provider-image evidence.
+The Phase D source connects Flutter to the Phase C backend boundary with AppAuth PKCE, secure
+storage, guarded routes, renewal, logout, and account-owned queues. Automated tests and a debug APK
+build pass. An isolated August 8 physical-phone run also verified CA trust, registration and normal
+sign-in pages, Mailpit verification delivery, redirect, token exchange/introspection, protected
+session bootstrap, authenticated onboarding, and local sign-out persistence. Rehearse with a fresh
+disposable identity before presenting this as a live login demo; no reusable evaluator credential
+is stored in this repository.
 
 ## Demo Identity and Roles
 
-The Phase A demo build has no login or account roles. The Phase C backend has a runtime
-authenticator and account/profile provisioning, but the Flutter client has no login integration.
+The Phase A demo build has no login or account roles. The Phase D client has physically verified
+local/demo login integration, but the evidence set intentionally contains no reusable evaluator
+credentials.
 
 | Demo identity | Credentials | Effective access |
 | --- | --- | --- |
@@ -20,7 +23,8 @@ authenticator and account/profile provisioning, but the Flutter client has no lo
 
 Do not advertise admin/user role differences. Explain that the demonstrated Phase A build focused
 on usage reconstruction, rules, analytics, and Android enforcement. Phase C establishes backend
-authentication; Phase D is still required for working mobile login and multi-account use.
+authentication; Phase D implements the mobile lifecycle and has controlled isolated physical proof
+for fresh sign-in and sign-out.
 
 ## Preparation Checklist
 
@@ -85,8 +89,8 @@ Show the dashboard and briefly identify the client/backend interaction.
 3. Point out that dashboard totals come from backend aggregates, not hard-coded UI values.
 
 Expected result on the approved Phase A demo build: dashboard loads without a spinner or error.
-On the Phase C branch, a `401` is expected until the client supplies a valid Keycloak bearer token;
-the current Flutter client does not yet implement that Phase D flow.
+For Phase D, the expected flow is system-browser sign-in followed by guarded onboarding/dashboard,
+but use it live only after the exact realm, redirect, TLS trust, and test credentials are verified.
 
 ### 3. Usage synchronization — 90 seconds
 
@@ -196,6 +200,8 @@ End with:
 
 > The prototype demonstrates reliable usage ingestion, idempotent synchronization, rules,
 > analytics, accessible display options, and Android soft enforcement. Phase B adds fail-closed
-> tenant and infrastructure foundations, but working Keycloak authentication, mobile login,
-> physically verified TLS trust, formal usability research, release signing, and stronger
-> operations remain explicit next steps.
+> tenant and infrastructure foundations, and Phase D implements the mobile authentication lifecycle
+> with automated/build evidence plus isolated physical proof of AppAuth registration/sign-in, TLS
+> trust, Mailpit verification delivery, protected-session bootstrap, and local sign-out persistence.
+> Successful long-offline renewal, real SQLite migration, formal usability research, release
+> signing, and stronger operations remain explicit next steps.

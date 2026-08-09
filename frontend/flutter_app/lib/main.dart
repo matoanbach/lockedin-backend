@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'features/analytics/data/analytics_provider.dart';
+import 'features/auth/data/auth_models.dart';
+import 'features/auth/data/auth_provider.dart';
 import 'core/notifications/local_notification_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
@@ -35,11 +37,30 @@ class _LockdInAppState extends ConsumerState<LockdInApp>
   DateTime? _lastResumeRefreshStartedAt;
   ProviderSubscription<RuleAlert?>? _ruleAlertSubscription;
   ProviderSubscription<PendingIntervention?>? _liveInterventionSubscription;
+  ProviderSubscription<AsyncValue<LockdInAuthState>>? _authSubscription;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _authSubscription = ref.listenManual<AsyncValue<LockdInAuthState>>(
+      authControllerProvider,
+      (previous, next) {
+        final previousPhase = previous?.asData?.value.phase;
+        final nextPhase = next.asData?.value.phase;
+        if (previousPhase == nextPhase) return;
+        if (nextPhase == AuthPhase.authenticated) {
+          _didHandleInitialForeground = false;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) unawaited(_startAuthenticatedLifecycle());
+          });
+        } else if (nextPhase != null) {
+          _didHandleInitialForeground = false;
+          _clearAccountBackedState();
+        }
+      },
+      fireImmediately: true,
+    );
     _ruleAlertSubscription = ref.listenManual<RuleAlert?>(ruleAlertProvider, (
       previous,
       next,
@@ -71,6 +92,7 @@ class _LockdInAppState extends ConsumerState<LockdInApp>
   void dispose() {
     _ruleAlertSubscription?.close();
     _liveInterventionSubscription?.close();
+    _authSubscription?.close();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -85,15 +107,6 @@ class _LockdInAppState extends ConsumerState<LockdInApp>
   @override
   Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
-    final preferences = ref.watch(preferencesControllerProvider);
-
-    if (!_didHandleInitialForeground &&
-        preferences.asData?.value.hasCompletedOnboarding == true) {
-      _didHandleInitialForeground = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        unawaited(_handleInitialAppForeground());
-      });
-    }
 
     return MaterialApp.router(
       title: 'LockdIn',
@@ -101,6 +114,30 @@ class _LockdInAppState extends ConsumerState<LockdInApp>
       theme: AppTheme.darkTheme,
       routerConfig: router,
     );
+  }
+
+  Future<void> _startAuthenticatedLifecycle() async {
+    if (!_isAuthenticated) return;
+    final preferences = await ref.read(preferencesControllerProvider.future);
+    if (!_isAuthenticated || !preferences.hasCompletedOnboarding) return;
+    if (_didHandleInitialForeground) return;
+    _didHandleInitialForeground = true;
+    await _handleInitialAppForeground();
+  }
+
+  bool get _isAuthenticated =>
+      ref.read(authControllerProvider).asData?.value.phase ==
+      AuthPhase.authenticated;
+
+  void _clearAccountBackedState() {
+    ref.read(ruleAlertProvider.notifier).clear();
+    ref.read(liveInterventionProvider.notifier).clear();
+    ref.invalidate(preferencesControllerProvider);
+    ref.invalidate(dashboardAnalyticsProvider);
+    ref.invalidate(trendsAnalyticsProvider);
+    ref.invalidate(weeklySummaryProvider);
+    ref.invalidate(ruleStatusesProvider);
+    ref.invalidate(usageSyncControllerProvider);
   }
 
   void _refreshBackendBackedViews() {
@@ -155,6 +192,7 @@ class _LockdInAppState extends ConsumerState<LockdInApp>
   }
 
   Future<void> _handleInitialAppForeground() async {
+    if (!_isAuthenticated) return;
     final preferences = ref.read(preferencesControllerProvider).asData?.value;
     if (preferences == null || !preferences.hasCompletedOnboarding) {
       return;
@@ -171,6 +209,7 @@ class _LockdInAppState extends ConsumerState<LockdInApp>
   }
 
   Future<void> _handleAppResume() async {
+    if (!_isAuthenticated) return;
     final now = DateTime.now();
     if (_resumeRefreshInFlight) {
       return;

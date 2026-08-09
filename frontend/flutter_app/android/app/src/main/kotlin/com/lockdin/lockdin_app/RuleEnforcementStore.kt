@@ -310,8 +310,10 @@ object RuleEnforcementStore {
         usageDate: String,
         eventType: String,
     ): Boolean {
+        val owner = NativeUsageUploader.currentOwnerGeneration()
+            ?: QueueOwnershipPolicy.UNCLAIMED_OWNER
         return loadWarningEmissions(context).optBoolean(
-            WarningDedupeKeys.native(ruleId, usageDate, eventType),
+            WarningDedupeKeys.native(ruleId, usageDate, eventType, owner),
             false,
         )
     }
@@ -322,19 +324,24 @@ object RuleEnforcementStore {
         usageDate: String,
         eventType: String,
     ) {
+        val owner = NativeUsageUploader.currentOwnerGeneration()
+            ?: QueueOwnershipPolicy.UNCLAIMED_OWNER
         val emissions = loadWarningEmissions(context)
-        emissions.put(WarningDedupeKeys.native(ruleId, usageDate, eventType), true)
+        emissions.put(WarningDedupeKeys.native(ruleId, usageDate, eventType, owner), true)
         prefs(context).edit().putString(KEY_WARNING_EMISSIONS, emissions.toString()).apply()
         flutterPrefs(context)
             .edit()
-            .putBoolean(WarningDedupeKeys.flutter(ruleId, usageDate, eventType), true)
+            .putBoolean(WarningDedupeKeys.flutter(ruleId, usageDate, eventType, owner), true)
             .apply()
     }
 
     fun queuePendingEnforcementEvent(context: Context, event: PendingEnforcementEvent) {
+        val owner = NativeUsageUploader.currentOwnerGeneration()
+            ?: QueueOwnershipPolicy.UNCLAIMED_OWNER
         val events = loadPendingEnforcementEvents(context)
         events.put(
             JSONObject().apply {
+                put("ownerGeneration", owner)
                 put("ruleId", event.ruleId)
                 put("appId", event.appId)
                 put("eventType", event.eventType)
@@ -347,13 +354,27 @@ object RuleEnforcementStore {
         prefs(context).edit().putString(KEY_PENDING_ENFORCEMENT_EVENTS, events.toString()).apply()
     }
 
-    fun consumePendingEnforcementEvents(context: Context): List<Map<String, Any?>> {
+    fun consumePendingEnforcementEvents(
+        context: Context,
+        activeOwner: String?,
+    ): List<Map<String, Any?>> {
+        if (activeOwner == null) {
+            return emptyList()
+        }
         val storedEvents = loadPendingEnforcementEvents(context)
-        prefs(context).edit().remove(KEY_PENDING_ENFORCEMENT_EVENTS).apply()
         val consumed = mutableListOf<Map<String, Any?>>()
+        val retained = JSONArray()
 
         for (index in 0 until storedEvents.length()) {
             val item = storedEvents.optJSONObject(index) ?: continue
+            val owner = item.optString(
+                "ownerGeneration",
+                QueueOwnershipPolicy.UNCLAIMED_OWNER,
+            )
+            if (owner != activeOwner) {
+                retained.put(item)
+                continue
+            }
             consumed += mapOf(
                 "ruleId" to item.optString("ruleId"),
                 "appId" to item.optString("appId"),
@@ -365,7 +386,68 @@ object RuleEnforcementStore {
             )
         }
 
+        prefs(context)
+            .edit()
+            .putString(KEY_PENDING_ENFORCEMENT_EVENTS, retained.toString())
+            .apply()
+
         return consumed
+    }
+
+    fun pendingEnforcementOwnershipCounts(
+        context: Context,
+        activeOwner: String,
+    ): QueueOwnershipCounts {
+        val owners = mutableListOf<String>()
+        val events = loadPendingEnforcementEvents(context)
+        for (index in 0 until events.length()) {
+            val item = events.optJSONObject(index) ?: continue
+            owners += item.optString(
+                "ownerGeneration",
+                QueueOwnershipPolicy.UNCLAIMED_OWNER,
+            )
+        }
+        return QueueOwnershipPolicy.counts(owners, activeOwner)
+    }
+
+    fun resolveUnclaimedEnforcementEvents(
+        context: Context,
+        activeOwner: String,
+        import: Boolean,
+    ) {
+        val events = loadPendingEnforcementEvents(context)
+        val resolved = JSONArray()
+        for (index in 0 until events.length()) {
+            val item = events.optJSONObject(index) ?: continue
+            val owner = item.optString(
+                "ownerGeneration",
+                QueueOwnershipPolicy.UNCLAIMED_OWNER,
+            )
+            if (owner != QueueOwnershipPolicy.UNCLAIMED_OWNER) {
+                resolved.put(item)
+            } else if (import) {
+                item.put("ownerGeneration", activeOwner)
+                resolved.put(item)
+            }
+        }
+        prefs(context)
+            .edit()
+            .putString(KEY_PENDING_ENFORCEMENT_EVENTS, resolved.toString())
+            .apply()
+    }
+
+    fun resetAccountScopedState(context: Context) {
+        prefs(context)
+            .edit()
+            .remove(KEY_RULE_STATUSES)
+            .remove(KEY_PENDING_INTERVENTION)
+            .remove(KEY_LAST_INTERVENED_PACKAGE)
+            .remove(KEY_LAST_INTERVENED_AT)
+            .remove(KEY_LOCAL_USAGE_MILLIS)
+            .remove(KEY_LIVE_UPLOADED_INTERVALS)
+            .remove(KEY_WARNING_EMISSIONS)
+            .remove(KEY_NOTIFICATION_TONE)
+            .apply()
     }
 
     fun canonicalizeAppId(appId: String): String {

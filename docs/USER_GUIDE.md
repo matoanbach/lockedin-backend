@@ -24,14 +24,16 @@ Optional permissions:
 - **Picture-in-Picture**: belongs to individual media apps such as YouTube; LockdIn does not need
   to change this setting.
 
-LockdIn does not currently have a login screen. The backend supplies one default development
-profile, so no username or password is required.
+The Phase D build has a **Sign in or create account** screen. It opens the configured Keycloak page
+in the system browser; LockdIn never asks for the password inside the app. Use only a prepared local
+test identity. The seeded default profile is demo-only and is not an authenticated account.
 
 ## First Launch
 
-1. Start the backend and confirm the health endpoint works.
-2. Open LockdIn.
-3. Read the welcome screen and continue.
+1. Start the backend and authentication provider, then confirm the health endpoint works.
+2. Open LockdIn and complete system-browser sign-in with a prepared test identity.
+3. If prompted about usage recorded before sign-in, choose **Import** or **Discard**; it will not
+   upload until you decide. Then read the welcome screen and continue.
 4. Review each requested Android permission. Android opens the relevant system Settings page;
    return to LockdIn after making your choice.
 5. Choose a default daily limit.
@@ -104,9 +106,7 @@ counted as successful.
 
 ## Accountability
 
-The Accountability screen stores a contact email inside the current principal's profile. On the
-Phase B branch, the Flutter client has no login flow yet, so protected product screens receive
-`401` until Phases C and D supply backend authentication and mobile credentials.
+The Accountability screen stores a contact email inside the authenticated principal's profile.
 
 1. Open **Accountability**.
 2. Enter a valid email address.
@@ -125,6 +125,8 @@ The settings area provides links for:
 - Accessibility service;
 - text size, high contrast, and larger tap targets;
 - privacy information.
+- sign out/account switching, which stops uploads, clears secure session material and account-scoped
+  caches, and preserves other-account queued rows in quarantine.
 
 Changing an Android permission is a user-controlled system action. LockdIn opens Settings but does
 not silently grant the permission.
@@ -133,7 +135,8 @@ not silently grant the permission.
 
 | Message or state | Meaning | What to do |
 | --- | --- | --- |
-| `Backend unavailable` | The app cannot load protected data; this also covers the expected `401` while the Flutter client has no Phase D login token | Verify the configured URL and backend; use a Phase A demo build for the behavioral walkthrough, or wait for Phase D rather than bypassing authentication |
+| `Authentication unavailable` | The app cannot validate the saved session or reach the configured authentication boundary | Verify backend/provider availability and retry; do not bypass the route guard |
+| `Sign in again` | Renewal failed or the saved credential is no longer usable | Complete system-browser sign-in again |
 | `Could not connect to the backend at ...` | Network or backend connection failed | Check Wi-Fi, host IP, firewall, container health, and frontend `.env` |
 | `Grant Usage Access before syncing...` | Android usage permission is missing | Open Device Permissions and grant Usage Access |
 | `Live usage uploads are still pending...` | Accessibility events remain queued | Keep the backend reachable and retry |
@@ -166,11 +169,15 @@ watermarks, and pending state.
 
 ## Frequently Asked Questions
 
-### Why is there no login?
+### How does login work?
 
-The Phase C backend has account/profile ownership, Keycloak token/session authentication, and
-tenant-scoped protected routes. The seeded default profile remains demo-only and unowned. Phase D
-adds Flutter login, credential storage, and account-owned queues.
+The system browser handles Keycloak login using Authorization Code + PKCE. LockdIn stores rotating
+tokens in platform-backed secure storage, validates the backend session, and enables only rows owned
+by that account generation. An isolated August 8, 2026 Samsung SM-A528B run physically verified the
+registration and normal sign-in pages, redirect back to LockdIn, protected-session bootstrap,
+authenticated onboarding, and sign-out that remained cleared after an app-process restart. A
+successful refresh after a long-offline provider session, backup/restore behavior, and real SQLite
+v1-to-v2 migration remain unverified.
 
 ### Why does a short session sometimes appear as one minute?
 
