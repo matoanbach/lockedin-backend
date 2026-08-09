@@ -46,6 +46,10 @@ def test_mobile_client_is_public_pkce_with_exact_audience_and_no_offline_grant()
     assert mobile["defaultClientScopes"] == ["basic", "profile", "email"]
     assert mobile["optionalClientScopes"] == []
     assert mobile["attributes"]["pkce.code.challenge.method"] == "S256"
+    assert (
+        mobile["attributes"]["post.logout.redirect.uris"]
+        == "com.lockdin.lockdinapp:/oauth2redirect"
+    )
     assert mobile["attributes"]["oauth2.device.authorization.grant.enabled"] == "false"
     assert mobile["attributes"]["oidc.ciba.grant.enabled"] == "false"
     assert mobile["attributes"]["backchannel.logout.session.required"] == "true"

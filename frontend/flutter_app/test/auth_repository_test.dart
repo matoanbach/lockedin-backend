@@ -226,9 +226,10 @@ void main() {
       events: events,
     );
     final native = FakeNativeAuthBridge(events: events);
+    final oidc = FakeOidcClient(tokens('login'), events: events);
     final repository = buildRepository(
       storage: storage,
-      oidc: FakeOidcClient(tokens('login')),
+      oidc: oidc,
       native: native,
       requestEvents: events,
     );
@@ -238,9 +239,48 @@ void main() {
     await repository.logout();
 
     expect(events.first, 'clear');
-    expect(events, containsAllInOrder(['backend:logout', 'delete', 'reset']));
+    expect(
+      events,
+      containsAllInOrder([
+        'backend:logout',
+        'provider:end-session',
+        'delete',
+        'reset',
+      ]),
+    );
+    expect(oidc.endSessionCalls, 1);
     expect(storage.session, isNull);
   });
+
+  test(
+    'provider logout failure cannot prevent authoritative local logout',
+    () async {
+      final events = <String>[];
+      final storage = FakeAuthStorage(
+        session: StoredAuthSession(config: config, tokens: tokens('initial')),
+        events: events,
+      );
+      final oidc = FakeOidcClient(
+        tokens('login'),
+        events: events,
+        failEndSession: true,
+      );
+      final repository = buildRepository(
+        storage: storage,
+        oidc: oidc,
+        native: FakeNativeAuthBridge(events: events),
+        requestEvents: events,
+      );
+      await repository.bootstrap();
+      events.clear();
+
+      await repository.logout();
+
+      expect(oidc.endSessionCalls, 1);
+      expect(events, containsAllInOrder(['delete', 'reset']));
+      expect(storage.session, isNull);
+    },
+  );
 
   test('terminal reauthentication clears the native auth context', () async {
     final native = FakeNativeAuthBridge();
@@ -390,13 +430,28 @@ class FakeAuthStorage implements AuthStorage {
 }
 
 class FakeOidcClient implements OidcClient {
-  FakeOidcClient(this.signInTokens, {this.cancelSignIn = false});
+  FakeOidcClient(
+    this.signInTokens, {
+    this.cancelSignIn = false,
+    this.events,
+    this.failEndSession = false,
+  });
 
   final AuthTokenSet signInTokens;
   final bool cancelSignIn;
+  final List<String>? events;
+  final bool failEndSession;
   Completer<AuthTokenSet>? refreshCompleter;
   int refreshCalls = 0;
   int createAccountRequests = 0;
+  int endSessionCalls = 0;
+
+  @override
+  Future<void> endSession(AuthConfig config, AuthTokenSet current) async {
+    endSessionCalls += 1;
+    events?.add('provider:end-session');
+    if (failEndSession) throw Exception('provider logout failed');
+  }
 
   @override
   Future<AuthTokenSet> refresh(AuthConfig config, AuthTokenSet current) {

@@ -172,7 +172,7 @@ class _DevicePermissionsScreenState
               Spacing.verticalMd,
               _SettingsNavItem(
                 icon: Icons.logout,
-                label: 'Sign out or switch account',
+                label: 'Sign out',
                 onTap: () => _confirmLogout(context),
               ),
               Spacing.verticalLg,

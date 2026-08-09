@@ -185,12 +185,53 @@ void main() {
       );
       expect(find.text('Goal Progress'), findsOneWidget);
       expect(find.text('Best Streak'), findsOneWidget);
+      expect(
+        find.text('Best streak so far: 7 days under goal'),
+        findsOneWidget,
+      );
       expect(find.text('Achievements Unlocked'), findsNothing);
       expect(find.textContaining('HLR'), findsNothing);
       expect(find.text('Rate Your Experience'), findsNothing);
       expect(find.text('Submit Feedback'), findsNothing);
     },
   );
+
+  testWidgets('Weekly Summary uses singular day copy for a one-day streak', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          weeklySummaryProvider.overrideWith(
+            (_) async => const WeeklySummaryData(
+              screenTimeReductionPercent: 0,
+              totalWeekHours: 1,
+              dailyAverageHours: 0.1,
+              goalsMetDays: 1,
+              longestStreakDays: 1,
+            ),
+          ),
+        ],
+        child: const MaterialApp(home: AnalyticsSummaryScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Best streak so far: 1 day under goal'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+
+    expect(find.text('day'), findsOneWidget);
+    expect(find.text('Met goals 1 day this week'), findsOneWidget);
+    expect(find.text('Best streak so far: 1 day under goal'), findsOneWidget);
+    expect(find.textContaining('1 days'), findsNothing);
+  });
 
   testWidgets('Dashboard Add Rule opens the creation form directly', (
     tester,

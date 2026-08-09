@@ -200,7 +200,7 @@ class _StatsGrid extends StatelessWidget {
             _StatCard(
               value: '${summary.longestStreakDays}',
               label: 'Longest streak',
-              change: 'days',
+              change: _dayUnit(summary.longestStreakDays),
               isPositive: null,
             ),
           ],
@@ -282,7 +282,8 @@ class _AchievementsSection extends StatelessWidget {
         _AchievementCard(
           icon: Icons.star,
           title: 'Goal Progress',
-          description: 'Met goals ${summary.goalsMetDays} days this week',
+          description:
+              'Met goals ${summary.goalsMetDays} ${_dayUnit(summary.goalsMetDays)} this week',
           gradientColors: [
             AppColors.warning.withValues(alpha: 0.1),
             Colors.orange.withValues(alpha: 0.1),
@@ -296,7 +297,7 @@ class _AchievementsSection extends StatelessWidget {
           title: 'Best Streak',
           description: summary.longestStreakDays == 0
               ? 'Your streak will appear once usage syncs in.'
-              : 'Best streak so far: ${summary.longestStreakDays} days under goal',
+              : 'Best streak so far: ${summary.longestStreakDays} ${_dayUnit(summary.longestStreakDays)} under goal',
           gradientColors: [
             AppColors.info.withValues(alpha: 0.1),
             AppColors.primary.withValues(alpha: 0.1),
@@ -308,6 +309,8 @@ class _AchievementsSection extends StatelessWidget {
     );
   }
 }
+
+String _dayUnit(int days) => days == 1 ? 'day' : 'days';
 
 class _AchievementCard extends StatelessWidget {
   const _AchievementCard({

@@ -63,6 +63,7 @@
       "optionalClientScopes": [],
       "attributes": {
         "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "com.lockdin.lockdinapp:/oauth2redirect",
         "oauth2.device.authorization.grant.enabled": "false",
         "oidc.ciba.grant.enabled": "false",
         "backchannel.logout.url": "http://backend:8000/api/v1/auth/backchannel-logout",

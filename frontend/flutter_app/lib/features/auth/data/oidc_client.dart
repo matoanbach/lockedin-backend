@@ -5,6 +5,7 @@ import 'auth_models.dart';
 abstract interface class OidcClient {
   Future<AuthTokenSet> signIn(AuthConfig config, {bool createAccount = false});
   Future<AuthTokenSet> refresh(AuthConfig config, AuthTokenSet current);
+  Future<void> endSession(AuthConfig config, AuthTokenSet current);
 }
 
 class AppAuthOidcClient implements OidcClient {
@@ -37,7 +38,7 @@ class AppAuthOidcClient implements OidcClient {
           config.redirectUri,
           scopes: config.scopes,
           serviceConfiguration: _serviceConfiguration(config),
-          promptValues: createAccount ? const ['create'] : null,
+          promptValues: createAccount ? const ['create'] : const ['login'],
         ),
       );
       return _tokensFromResponse(
@@ -67,6 +68,21 @@ class AppAuthOidcClient implements OidcClient {
       refreshToken: response.refreshToken ?? current.refreshToken,
       idToken: response.idToken ?? current.idToken,
       expiresAt: response.accessTokenExpirationDateTime,
+    );
+  }
+
+  @override
+  Future<void> endSession(AuthConfig config, AuthTokenSet current) async {
+    final idToken = current.idToken;
+    if (idToken == null || idToken.isEmpty) {
+      throw const ReauthenticationRequired();
+    }
+    await appAuth.endSession(
+      EndSessionRequest(
+        idTokenHint: idToken,
+        postLogoutRedirectUrl: config.redirectUri,
+        serviceConfiguration: _serviceConfiguration(config),
+      ),
     );
   }
 

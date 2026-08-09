@@ -197,6 +197,11 @@ class AuthRepository {
           // Local logout is authoritative even when revocation is unavailable.
         }
       }
+      try {
+        await oidcClient.endSession(current.config, current.tokens);
+      } on Object {
+        // Local logout remains authoritative when provider logout is unavailable.
+      }
     }
     await storage.deleteSession();
     await nativeBridge.resetAccountScopedState();
