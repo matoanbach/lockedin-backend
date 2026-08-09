@@ -24,10 +24,11 @@ The backend also has a focused onboarding set under [`backend/docs`](../backend/
 
 The Phase C backend identity/session boundary is implemented: every protected request is
 introspected, restrictive provider claims are validated, exact immutable identities provision or
-resolve one non-demo tenant, and local revocation/audit controls are enforced. The Flutter mobile
-login flow is not implemented. Therefore:
+resolve one non-demo tenant, and local revocation/audit controls are enforced. Phase D now adds the
+Flutter/native authentication lifecycle, guarded routes, secure rotating tokens, bounded renewal,
+logout/account switching, and account-generation-scoped queues. Therefore:
 
-- there are no evaluator credentials to distribute;
+- evaluator credentials still depend on the prepared local Keycloak realm and must not be invented;
 - protected API requests require a valid introspected Keycloak bearer token;
 - the seeded default profile remains demo-only, unowned, and unavailable through protected routes;
 - aggregate rebuild requires a separate operator dependency;
@@ -36,12 +37,14 @@ login flow is not implemented. Therefore:
 The approved local next-state design is recorded in the
 [Authentication, Session, and Tenant-Isolation ADR](../backend/docs/decisions/authentication-session-tenant-isolation.md).
 Its Phase C backend controls are reflected in runtime, schema, tests, and generated OpenAPI. The
-corrected redirect URI is `com.lockdin.lockdinapp:/oauth2redirect`; a disposable, volume-free
-Keycloak 26.7.0 realm import succeeded and live realm/client/flow/listener assertions passed. This
-is process/container evidence only: persistent full-stack startup, Mailpit delivery, physical
-Caddy/phone CA trust, Flutter Phase D login, and production readiness remain unverified.
-Role-based operational ownership is approved; acting people and runbooks still require
-verification before release completion or external exposure.
+corrected redirect URI is `com.lockdin.lockdinapp:/oauth2redirect`; disposable realm import and live
+realm/client/flow/listener assertions pass. On August 8, 2026, an isolated persistent-volume stack
+and Samsung SM-A528B physically verified Mailpit verification delivery, Caddy/phone CA trust,
+AppAuth registration/sign-in, redirect to LockdIn, token exchange/introspection, protected-session
+bootstrap, authenticated onboarding, and local sign-out persistence. Flutter analysis, 52 Flutter
+tests, Android JVM tests, a debug APK build, and the backend suite also pass. Production readiness
+is not established. Role-based operational ownership is approved; acting people and runbooks still
+require verification before release completion or external exposure.
 
 ## Historical Documents
 

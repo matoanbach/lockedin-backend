@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Local HTTP is accepted only in debug builds. Release builds keep Android's HTTPS default. -->
-    <base-config cleartextTrafficPermitted="true" />
+    <!-- Local HTTP and operator-installed demo CAs are accepted only in debug builds. -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
 </network-security-config>

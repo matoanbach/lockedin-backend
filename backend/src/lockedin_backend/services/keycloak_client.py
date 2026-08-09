@@ -94,10 +94,11 @@ class KeycloakClient:
             with self._request_slot(), self._client() as client:
                 response = client.post(
                     self.settings.keycloak_revocation_url,
-                    data={"token": access_token, "token_type_hint": "access_token"},
-                    auth=httpx.BasicAuth(
-                        self.settings.keycloak_api_client_id, self._secret()
-                    ),
+                    data={
+                        "token": access_token,
+                        "token_type_hint": "access_token",
+                        "client_id": self.settings.keycloak_mobile_client_id,
+                    },
                 )
         except (httpx.HTTPError, KeycloakUnavailable) as exc:
             raise KeycloakUnavailable("Keycloak token revocation failed") from exc

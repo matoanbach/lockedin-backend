@@ -16,10 +16,16 @@ import 'package:lockdin_app/features/settings/presentation/screens/accessibility
 import 'package:lockdin_app/features/analytics/presentation/screens/analytics_summary_screen.dart';
 import 'package:lockdin_app/features/settings/presentation/screens/privacy_policy_screen.dart';
 import 'package:lockdin_app/core/router/route_back_fallback.dart';
+import 'package:lockdin_app/features/auth/data/auth_models.dart';
+import 'package:lockdin_app/features/auth/data/auth_provider.dart';
+import 'package:lockdin_app/features/auth/presentation/auth_screen.dart';
+import 'package:lockdin_app/features/auth/presentation/unclaimed_data_screen.dart';
 
 /// Route names for type-safe navigation.
 abstract class AppRoutes {
   static const String bootstrap = '/';
+  static const String authLogin = '/auth/login';
+  static const String authDataChoice = '/auth/data-choice';
 
   // Onboarding
   static const String onboardingWelcome = '/onboarding';
@@ -50,17 +56,34 @@ final rootNavigatorKeyProvider = Provider<GlobalKey<NavigatorState>>((ref) {
 
 final routerProvider = Provider<GoRouter>((ref) {
   final navigatorKey = ref.watch(rootNavigatorKeyProvider);
+  final auth = ref.watch(authControllerProvider);
 
   return GoRouter(
     navigatorKey: navigatorKey,
     initialLocation: AppRoutes.bootstrap,
     debugLogDiagnostics: true,
+    redirect: (context, state) => authRedirectFor(
+      auth: auth.asData?.value ?? const LockdInAuthState.initializing(),
+      location: state.matchedLocation,
+    ),
     routes: [
       GoRoute(
         path: AppRoutes.bootstrap,
         name: 'bootstrap',
         pageBuilder: (context, state) =>
             const MaterialPage(child: AppBootstrapScreen()),
+      ),
+      GoRoute(
+        path: AppRoutes.authLogin,
+        name: 'auth-login',
+        pageBuilder: (context, state) =>
+            const MaterialPage(child: AuthScreen()),
+      ),
+      GoRoute(
+        path: AppRoutes.authDataChoice,
+        name: 'auth-data-choice',
+        pageBuilder: (context, state) =>
+            const MaterialPage(child: UnclaimedDataScreen()),
       ),
 
       // === Onboarding Routes ===
@@ -192,6 +215,25 @@ final routerProvider = Provider<GoRouter>((ref) {
     ),
   );
 });
+
+String? authRedirectFor({
+  required LockdInAuthState auth,
+  required String location,
+}) {
+  final isLogin = location == AppRoutes.authLogin;
+  final isDataChoice = location == AppRoutes.authDataChoice;
+  return switch (auth.phase) {
+    AuthPhase.initializing =>
+      location == AppRoutes.bootstrap ? null : AppRoutes.bootstrap,
+    AuthPhase.signedOut ||
+    AuthPhase.verificationRequired ||
+    AuthPhase.reauthenticationRequired => isLogin ? null : AppRoutes.authLogin,
+    AuthPhase.accountTransition =>
+      isDataChoice ? null : AppRoutes.authDataChoice,
+    AuthPhase.authenticated =>
+      (isLogin || isDataChoice) ? AppRoutes.bootstrap : null,
+  };
+}
 
 /// Slide transition from right.
 Widget _slideTransition(

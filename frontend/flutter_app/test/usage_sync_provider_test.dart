@@ -221,6 +221,53 @@ void main() {
     final preferences = await SharedPreferences.getInstance();
     expect(preferences.getInt('usage_sync.last_successful_at'), isNull);
   });
+
+  test('production watermark keys are scoped by account generation', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          if (call.method == 'getPermissionStatus') {
+            return permissionStatus(accessibility: false);
+          }
+          if (call.method == 'collectUsageEventBatch') {
+            return {
+              'events': [usageEvent('scoped')],
+              'hasMore': false,
+            };
+          }
+          fail('Unexpected native method ${call.method}');
+        });
+    final dio = Dio()
+      ..interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) => handler.resolve(
+            Response<Map<String, dynamic>>(
+              requestOptions: options,
+              data: const {
+                'receivedCount': 1,
+                'createdCount': 1,
+                'duplicateCount': 0,
+              },
+            ),
+          ),
+        ),
+      );
+
+    await UsageSyncRepository(
+      dio,
+      accountGeneration: () => 'generation-a',
+    ).syncRecentUsage();
+
+    final preferences = await SharedPreferences.getInstance();
+    expect(
+      preferences.getInt('usage_sync.last_successful_at.generation-a'),
+      isNotNull,
+    );
+    expect(
+      preferences.getInt('usage_sync.watermark_at.generation-a'),
+      isNotNull,
+    );
+    expect(preferences.getInt('usage_sync.last_successful_at'), isNull);
+  });
 }
 
 Map<String, dynamic> permissionStatus({required bool accessibility}) => {

@@ -11,6 +11,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:lockdin_app/features/preferences/data/preferences_models.dart';
 import 'package:lockdin_app/features/preferences/data/preferences_provider.dart';
+import 'package:lockdin_app/features/auth/data/auth_models.dart';
+import 'package:lockdin_app/features/auth/data/auth_provider.dart';
 import 'package:lockdin_app/main.dart';
 import 'package:lockdin_app/shared/models/models.dart';
 
@@ -28,6 +30,21 @@ class _TestPreferencesController extends PreferencesController {
   }
 }
 
+class _TestAuthController extends AuthController {
+  @override
+  Future<LockdInAuthState> build() async => const LockdInAuthState(
+    phase: AuthPhase.authenticated,
+    session: MobileSession(
+      accountId: 'account',
+      profileId: 'profile',
+      issuer: 'issuer',
+      subject: 'subject',
+      sid: 'sid',
+      accountGeneration: 'generation',
+    ),
+  );
+}
+
 void main() {
   testWidgets('App smoke test', (WidgetTester tester) async {
     tester.view.physicalSize = const Size(1440, 2560);
@@ -38,6 +55,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          authControllerProvider.overrideWith(_TestAuthController.new),
           preferencesControllerProvider.overrideWith(
             _TestPreferencesController.new,
           ),

@@ -7,12 +7,21 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/notifications/local_notification_service.dart';
 import '../../analytics/data/analytics_provider.dart';
+import '../../auth/data/auth_provider.dart';
 import '../../enforcement/data/live_intervention_provider.dart';
 import '../../enforcement/data/rule_alert_provider.dart';
 import '../../rules/data/rules_provider.dart';
 
 final usageSyncRepositoryProvider = Provider<UsageSyncRepository>((ref) {
-  return UsageSyncRepository(ref.watch(dioProvider));
+  return UsageSyncRepository(
+    ref.watch(dioProvider),
+    accountGeneration: () => ref
+        .read(authControllerProvider)
+        .asData
+        ?.value
+        .session
+        ?.accountGeneration,
+  );
 });
 
 final devicePermissionsProvider =
@@ -226,9 +235,10 @@ class UsageSyncController extends AsyncNotifier<UsageSyncResult?> {
 }
 
 class UsageSyncRepository {
-  UsageSyncRepository(this._dio);
+  UsageSyncRepository(this._dio, {this.accountGeneration});
 
   final Dio _dio;
+  final String? Function()? accountGeneration;
   static const MethodChannel _channel = MethodChannel('lockdin/usage');
   static const String _lastSuccessfulSyncAtKey =
       'usage_sync.last_successful_at';
@@ -337,7 +347,9 @@ class UsageSyncRepository {
     }
 
     final preferences = await SharedPreferences.getInstance();
-    final lastSyncMillis = preferences.getInt(_lastSuccessfulSyncAtKey);
+    final lastSyncMillis = preferences.getInt(
+      _scopedKey(_lastSuccessfulSyncAtKey),
+    );
     if (lastSyncMillis != null) {
       final lastSyncAt = DateTime.fromMillisecondsSinceEpoch(lastSyncMillis);
       if (DateTime.now().difference(lastSyncAt) < cooldown) {
@@ -390,8 +402,8 @@ class UsageSyncRepository {
     final requestedDays = days.clamp(1, _maximumQueryDays);
     final earliestStart = queryEnd.subtract(Duration(days: requestedDays));
     final savedWatermarkMillis =
-        preferences.getInt(_usageWatermarkAtKey) ??
-        preferences.getInt(_lastSuccessfulSyncAtKey);
+        preferences.getInt(_scopedKey(_usageWatermarkAtKey)) ??
+        preferences.getInt(_scopedKey(_lastSuccessfulSyncAtKey));
     final savedWatermark = savedWatermarkMillis == null
         ? null
         : DateTime.fromMillisecondsSinceEpoch(savedWatermarkMillis);
@@ -475,13 +487,13 @@ class UsageSyncRepository {
   Future<void> _storeSuccessfulSync(UsageSyncResult result) async {
     final preferences = await SharedPreferences.getInstance();
     await preferences.setInt(
-      _lastSuccessfulSyncAtKey,
+      _scopedKey(_lastSuccessfulSyncAtKey),
       result.syncedAt.millisecondsSinceEpoch,
     );
     final usageWatermark = result.usageWatermark;
     if (usageWatermark != null) {
       await preferences.setInt(
-        _usageWatermarkAtKey,
+        _scopedKey(_usageWatermarkAtKey),
         usageWatermark.millisecondsSinceEpoch,
       );
     }
@@ -489,6 +501,16 @@ class UsageSyncRepository {
 
   bool get _isAndroid =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
+  String _scopedKey(String key) {
+    final generationProvider = accountGeneration;
+    if (generationProvider == null) return key;
+    final generation = generationProvider();
+    if (generation == null || generation.isEmpty) {
+      throw StateError('Authenticated account generation is unavailable.');
+    }
+    return '$key.$generation';
+  }
 
   static const int _maximumQueryDays = 3;
   static const int _maximumBatches = 50;

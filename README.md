@@ -32,26 +32,33 @@ yet hardened for public production use.
 - interactive Swagger/ReDoc API documentation and exportable OpenAPI JSON
 - per-request Keycloak token introspection, immutable identity provisioning, session revocation,
   and redacted security audit
+- system-browser Authorization Code login with AppAuth-managed PKCE S256, platform-backed secure
+  token storage, guarded routes, bounded renewal, and coordinated logout/account switching
+- account-generation-scoped Flutter state plus active/unclaimed/quarantined native upload queues
 
 ## Current Scope
 
-Phase C adds per-request Keycloak introspection, restrictive token validation, exact immutable
-identity linking, first-login tenant provisioning, current/logout-all revocation, signed provider
-callbacks, and redacted audit persistence. The Flutter mobile login flow remains Phase D.
+Phase C supplies the backend identity/session boundary. Phase D now implements the Flutter and
+Android authentication lifecycle in source and automated tests: system-browser AppAuth login,
+secure session storage, guarded routes, single-flight refresh with one bounded 401 retry,
+account-generation ownership, explicit unclaimed-data import/discard, and coordinated logout.
 Therefore:
 
 - health and root liveness remain public;
 - user-facing API routes require an introspected Keycloak bearer token;
 - aggregate rebuild returns `403` unless an internal operator dependency is installed;
-- there is still no Flutter login, end-user role system, or outbound accountability email;
+- there is still no end-user role system or outbound accountability email;
 - the stack has no public-production security guarantee.
 
 The seeded `default` profile is synthetic demo data and is never an account owner. The corrected
-mobile redirect URI is `com.lockdin.lockdinapp:/oauth2redirect`. A disposable, volume-free
-Keycloak 26.7.0 realm import succeeded, and live realm/client/flow/listener assertions passed. This
-is process/container evidence only: persistent full-stack startup, Mailpit delivery, physical
-Caddy/phone CA trust, Flutter Phase D login, and production readiness remain unverified. Keep the
-application on a trusted local/demo network.
+mobile redirect URI is `com.lockdin.lockdinapp:/oauth2redirect`. On August 8, 2026, an isolated
+disposable stack and a Samsung SM-A528B physically verified CA-trusted Flutter bootstrap, AppAuth
+registration and normal sign-in pages, `prompt=create`, Mailpit verification delivery, email
+verification, redirect to LockdIn, token exchange, token introspection, a protected
+`/api/v1/auth/session` response, authenticated onboarding, and sign-out that persisted across an
+app-process restart. Flutter analysis, 52 Flutter tests, Android JVM tests, a debug APK build, and
+the backend suite also pass. This does not establish production readiness; keep the application on
+a trusted local/demo network.
 
 ## Documentation
 
@@ -65,7 +72,7 @@ application on a trusted local/demo network.
 | [API Reference](backend/docs/api.md) | Endpoints, parameters, requests, responses, validation, and errors |
 | [Media Capture Checklist](docs/MEDIA_CAPTURE_CHECKLIST.md) | Real screenshot/video requirements and privacy checks |
 | [Security Testing Plan](docs/security/security-testing-plan.md) | Security scope, cases, tools, and readiness work |
-| [Authentication Architecture ADR](backend/docs/decisions/authentication-session-tenant-isolation.md) | Local-demo identity, session, tenant, mobile-data, and migration decisions; Phase B foundation is implemented |
+| [Authentication Architecture ADR](backend/docs/decisions/authentication-session-tenant-isolation.md) | Local-demo identity, session, tenant, mobile-data, and migration decisions; Phase B-D implementation status |
 | [Infrastructure Foundation](infrastructure/README.md) | Pinned images, digests, local TLS boundary, volumes, and update procedure |
 | [Backend Onboarding](backend/docs/index.md) | Backend architecture and maintenance guide |
 
@@ -382,7 +389,9 @@ Treat this as explicit test debt, not evidence that the older SRS target was ach
 
 ## Known Limitations
 
-- no Phase D mobile login UI or account-scoped mobile credential/queue lifecycle;
+- Phase D mobile authentication has direct physical evidence for AppAuth registration/sign-in,
+  phone CA trust, protected-session bootstrap, and local sign-out persistence. Successful renewal
+  after a long-offline provider session and real legacy SQLite migration remain unverified;
 - local/demo deployment posture;
 - no accountability email delivery;
 - soft enforcement can be bypassed through Android controls;

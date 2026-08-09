@@ -11,6 +11,25 @@ integration for LockdIn.
 - Windows Developer Mode for plugin symlinks when building on Windows
 - a running LockdIn backend
 
+The Android application requires API 24 or newer because the resolved AppAuth 12.0.2 Android
+library declares that minimum.
+
+## Authentication Status
+
+The client fetches `/api/v1/auth/config`, opens the system browser through AppAuth for Authorization
+Code + PKCE S256, stores rotating tokens in platform-backed secure storage, validates the backend
+session, and guards onboarding/product routes. Access tokens are injected only into protected
+requests; renewal is single-flight and a 401 is retried at most once. Native upload credentials stay
+in process memory. Pre-login rows remain unclaimed until Import or Discard, and other-account rows
+remain quarantined.
+
+These paths have analyzer, 52-test Flutter, Android JVM, and debug-build evidence. On August 8,
+2026, a Samsung SM-A528B also physically verified CA-trusted bootstrap, AppAuth registration and
+normal sign-in pages, redirect back to LockdIn, token exchange, protected-session bootstrap,
+authenticated onboarding, and sign-out that remained cleared after an app-process restart. A
+successful refresh after a long-offline provider session, real SQLite v1-to-v2 migration,
+backup/restore behavior, and production release behavior have not been verified.
+
 ## Configure the Backend URL
 
 From this directory:
@@ -74,6 +93,8 @@ The current Android release build uses debug signing and is not ready for app-st
 | Screen | Route |
 | --- | --- |
 | Bootstrap | `/` |
+| Sign in / reauthenticate | `/auth/login` |
+| Unclaimed data choice | `/auth/data-choice` |
 | Welcome | `/onboarding` |
 | Permission guidance | `/onboarding/permissions` |
 | Default limit | `/onboarding/default-rule` |

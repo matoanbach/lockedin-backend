@@ -7,6 +7,7 @@ import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../../../usage/data/usage_sync_provider.dart';
+import '../../../auth/data/auth_provider.dart';
 
 class DevicePermissionsScreen extends ConsumerStatefulWidget {
   const DevicePermissionsScreen({super.key});
@@ -168,12 +169,43 @@ class _DevicePermissionsScreenState
                 label: 'Privacy & Data',
                 onTap: () => context.push(AppRoutes.privacyPolicy),
               ),
+              Spacing.verticalMd,
+              _SettingsNavItem(
+                icon: Icons.logout,
+                label: 'Sign out',
+                onTap: () => _confirmLogout(context),
+              ),
               Spacing.verticalLg,
             ],
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _confirmLogout(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Sign out of LockdIn?'),
+        content: const Text(
+          'Uploads will stop and this account’s cached state will be cleared. Queued data owned by other accounts stays quarantined.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Sign out'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await ref.read(authControllerProvider.notifier).logout();
+    }
   }
 }
 

@@ -7,12 +7,33 @@ import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../../../preferences/data/preferences_provider.dart';
+import '../../../auth/data/auth_models.dart';
+import '../../../auth/data/auth_provider.dart';
 
 class AppBootstrapScreen extends ConsumerWidget {
   const AppBootstrapScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final auth = ref.watch(authControllerProvider);
+    if (auth.hasError) {
+      return _BootstrapScaffold(
+        title: 'Authentication unavailable',
+        message: describeApiError(auth.error!),
+        isLoading: false,
+        action: SecondaryButton(
+          onPressed: () => ref.invalidate(authControllerProvider),
+          label: 'Retry',
+        ),
+      );
+    }
+    if (auth.asData?.value.phase != AuthPhase.authenticated) {
+      return const _BootstrapScaffold(
+        title: 'Securing your session',
+        message: 'Checking your saved LockdIn sign-in securely.',
+        isLoading: true,
+      );
+    }
     final preferences = ref.watch(preferencesControllerProvider);
 
     return preferences.when(

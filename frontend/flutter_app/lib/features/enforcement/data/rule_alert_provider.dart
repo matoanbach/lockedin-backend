@@ -10,6 +10,7 @@ import '../../../core/notifications/local_notification_service.dart';
 import '../../../core/router/app_router.dart';
 import '../../../shared/models/models.dart';
 import '../../preferences/data/preferences_provider.dart';
+import '../../auth/data/auth_provider.dart';
 import '../../rules/data/rules_provider.dart';
 
 final enforcementRepositoryProvider = Provider<EnforcementRepository>((ref) {
@@ -48,7 +49,16 @@ class RuleAlertController extends Notifier<RuleAlert?> {
     final ruleStatuses =
         statuses ?? await ref.read(rulesRepositoryProvider).listRuleStatuses();
     final preferences = await SharedPreferences.getInstance();
-    final dedupePreferences = RuleAlertDedupePreferences(preferences);
+    final generation = ref
+        .read(authControllerProvider)
+        .asData
+        ?.value
+        .session
+        ?.accountGeneration;
+    final dedupePreferences = RuleAlertDedupePreferences(
+      preferences,
+      accountGeneration: generation,
+    );
     await dedupePreferences.reload();
     final sortedStatuses = [...ruleStatuses]..sort(_comparePriority);
 
@@ -152,16 +162,27 @@ class RuleAlertController extends Notifier<RuleAlert?> {
 }
 
 class RuleAlertDedupePreferences {
-  const RuleAlertDedupePreferences(this._preferences);
+  const RuleAlertDedupePreferences(this._preferences, {this.accountGeneration});
 
   final SharedPreferences _preferences;
+  final String? accountGeneration;
 
   Future<void> reload() => _preferences.reload();
 
-  bool wasIssued(String dedupeKey) => _preferences.getBool(dedupeKey) == true;
+  bool wasIssued(String dedupeKey) =>
+      _preferences.getBool(_scopedKey(dedupeKey)) == true;
 
   Future<bool> markIssued(String dedupeKey) =>
-      _preferences.setBool(dedupeKey, true);
+      _preferences.setBool(_scopedKey(dedupeKey), true);
+
+  String _scopedKey(String key) {
+    final generation = accountGeneration;
+    if (generation == null || generation.isEmpty) return key;
+    const prefix = 'rule_alert.';
+    return key.startsWith(prefix)
+        ? '$prefix$generation.${key.substring(prefix.length)}'
+        : '$generation.$key';
+  }
 }
 
 RuleAlert buildRuleAlert(RuleStatusData status, NotificationTone tone) {

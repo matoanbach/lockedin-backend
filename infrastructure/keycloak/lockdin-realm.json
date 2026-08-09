@@ -59,10 +59,11 @@
       "fullScopeAllowed": false,
       "redirectUris": ["com.lockdin.lockdinapp:/oauth2redirect"],
       "webOrigins": [],
-      "defaultClientScopes": ["profile", "email"],
+      "defaultClientScopes": ["basic", "profile", "email"],
       "optionalClientScopes": [],
       "attributes": {
         "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "com.lockdin.lockdinapp:/oauth2redirect",
         "oauth2.device.authorization.grant.enabled": "false",
         "oidc.ciba.grant.enabled": "false",
         "backchannel.logout.url": "http://backend:8000/api/v1/auth/backchannel-logout",
@@ -151,17 +152,26 @@
           "userSetupAllowed": false
         },
         {
-          "authenticator": "identity-provider-redirector",
-          "authenticatorFlow": false,
+          "flowAlias": "LockdIn Authenticate With Session Limit",
+          "authenticatorFlow": true,
           "requirement": "ALTERNATIVE",
           "priority": 20,
           "userSetupAllowed": false
-        },
+        }
+      ]
+    },
+    {
+      "alias": "LockdIn Authenticate With Session Limit",
+      "description": "Fresh authentication followed by the mobile session limit.",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
         {
-          "flowAlias": "LockdIn Browser Forms",
+          "flowAlias": "LockdIn Real Authentication",
           "authenticatorFlow": true,
-          "requirement": "ALTERNATIVE",
-          "priority": 30,
+          "requirement": "REQUIRED",
+          "priority": 10,
           "userSetupAllowed": false
         },
         {
@@ -169,7 +179,30 @@
           "authenticatorConfig": "LockdIn max three mobile sessions",
           "authenticatorFlow": false,
           "requirement": "REQUIRED",
-          "priority": 40,
+          "priority": 20,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "LockdIn Real Authentication",
+      "description": "Identity-provider or username/password authentication.",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "identity-provider-redirector",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "flowAlias": "LockdIn Browser Forms",
+          "authenticatorFlow": true,
+          "requirement": "ALTERNATIVE",
+          "priority": 20,
           "userSetupAllowed": false
         }
       ]

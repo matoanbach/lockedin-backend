@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
@@ -9,6 +10,9 @@ from lockedin_backend.core.principal import CurrentPrincipal, OperatorPrincipal
 from lockedin_backend.db.session import get_db
 from lockedin_backend.services.identity_service import IdentityService, PrincipalRejected
 from lockedin_backend.services.keycloak_client import KeycloakUnavailable
+
+
+logger = logging.getLogger(__name__)
 
 
 bearer_scheme = HTTPBearer(auto_error=False, scheme_name="KeycloakAccessToken")
@@ -54,7 +58,10 @@ def get_current_principal(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Authentication service unavailable",
         ) from exc
-    except (InvalidAccessToken, PrincipalRejected):
+    except InvalidAccessToken as exc:
+        logger.warning("Rejected provider access token: %s", exc)
+        raise _authentication_required()
+    except PrincipalRejected:
         raise _authentication_required()
 
 
