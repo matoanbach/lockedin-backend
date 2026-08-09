@@ -38,7 +38,10 @@ from lockedin_backend.models import (
     SecurityAuditEvent,
 )
 from lockedin_backend.services.identity_service import IdentityService, PrincipalRejected
-from lockedin_backend.services.keycloak_client import KeycloakUnavailable
+from lockedin_backend.services.keycloak_client import (
+    KeycloakRejected,
+    KeycloakUnavailable,
+)
 from tests.conftest import TEST_ACCOUNT_ID, TEST_ISSUER, TEST_PROFILE_ID, TEST_SUBJECT
 
 
@@ -336,11 +339,18 @@ def _overridden_app(session_factory, fake: FakeKeycloakClient, principal: Curren
     return app
 
 
+@pytest.mark.parametrize(
+    "provider_error",
+    [
+        pytest.param(KeycloakUnavailable("synthetic outage"), id="unavailable"),
+        pytest.param(KeycloakRejected("synthetic rejection"), id="rejected"),
+    ],
+)
 def test_current_logout_is_local_even_when_provider_fails(
-    session_factory, current_principal
+    session_factory, current_principal, provider_error
 ) -> None:
     fake = FakeKeycloakClient()
-    fake.revocation_error = KeycloakUnavailable("synthetic outage")
+    fake.revocation_error = provider_error
     app = _overridden_app(session_factory, fake, current_principal)
     raw_token = access_token(marker="sensitive-token-marker")
     with TestClient(app) as client:
@@ -348,6 +358,7 @@ def test_current_logout_is_local_even_when_provider_fails(
             "/api/v1/auth/logout", headers={"Authorization": f"Bearer {raw_token}"}
         )
     assert response.status_code == 204
+    assert fake.revoked_tokens == [raw_token]
     with session_factory() as db:
         revoked = db.scalar(
             select(RevokedProviderSession).where(
