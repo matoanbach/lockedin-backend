@@ -31,11 +31,17 @@ from lockedin_backend.core.provider_events import (
 from lockedin_backend.core.settings import Settings
 from lockedin_backend.models import (
     Account,
+    AccountabilityContact,
+    EnforcementEvent,
     ExternalIdentity,
     Preferences,
     Profile,
     RevokedProviderSession,
+    Rule,
     SecurityAuditEvent,
+    UsageDailyAppAggregate,
+    UsageDailyCategoryAggregate,
+    UsageEvent,
 )
 from lockedin_backend.services.identity_service import IdentityService, PrincipalRejected
 from lockedin_backend.services.keycloak_client import (
@@ -94,10 +100,13 @@ class FakeKeycloakClient:
         self.introspection_error: Exception | None = None
         self.revocation_error: Exception | None = None
         self.logout_error: Exception | None = None
+        self.deletion_error: Exception | None = None
+        self.jwks_error: Exception | None = None
         self.jwks: dict = {"keys": []}
         self.introspection_calls = 0
         self.revoked_tokens: list[str] = []
         self.logged_out_subjects: list[str] = []
+        self.deleted_subjects: list[str] = []
 
     def introspect(self, token: str) -> dict:
         self.introspection_calls += 1
@@ -115,9 +124,14 @@ class FakeKeycloakClient:
         if self.logout_error:
             raise self.logout_error
 
+    def delete_user(self, subject: str) -> None:
+        self.deleted_subjects.append(subject)
+        if self.deletion_error:
+            raise self.deletion_error
+
     def fetch_jwks(self) -> dict:
-        if self.introspection_error:
-            raise self.introspection_error
+        if self.jwks_error:
+            raise self.jwks_error
         return self.jwks
 
 
@@ -231,6 +245,32 @@ def test_first_login_provisions_once_and_each_request_introspects(session_factor
         assert identity.account.profile.is_active is True
         assert identity.account.profile.preferences is not None
         assert db.scalar(select(func.count()).select_from(ExternalIdentity)) == 2
+
+
+def test_account_deletion_cannot_provision_an_unknown_identity(session_factory) -> None:
+    fake = FakeKeycloakClient()
+    app = create_app(
+        session_factory=session_factory,
+        app_settings=settings(),
+        keycloak_client=fake,
+    )
+
+    with TestClient(app) as client:
+        response = client.delete(
+            "/api/v1/auth/account",
+            headers={
+                "Authorization": f"Bearer {access_token()}",
+                "X-LockdIn-Account-Id": "untrusted-client-account",
+                "X-LockdIn-ID-Token": recent_id_token(
+                    subject="new-provider-subject"
+                ),
+            },
+        )
+
+    assert response.status_code == 401
+    assert fake.deleted_subjects == []
+    with session_factory() as db:
+        assert db.scalar(select(func.count()).select_from(ExternalIdentity)) == 1
 
 
 def test_same_email_different_subjects_never_link(session_factory) -> None:
@@ -425,9 +465,236 @@ def test_logout_all_provider_failure_keeps_local_boundary(
         assert audit.outcome == "local_applied_provider_failed"
 
 
+def test_account_deletion_removes_provider_and_profile_owned_data(
+    session_factory, current_principal
+) -> None:
+    fake = FakeKeycloakClient()
+    fake.jwks = {"keys": [PUBLIC_JWK]}
+    app = _overridden_app(session_factory, fake, current_principal)
+    with TestClient(app) as client:
+        assert client.post(
+            "/api/v1/rules",
+            json={
+                "appId": "com.example.delete",
+                "appName": "Delete Test",
+                "limitMinutes": 15,
+            },
+        ).status_code == 201
+        assert client.post(
+            "/api/v1/accountability/contacts",
+            json={"email": "delete-test@example.com", "consentConfirmed": True},
+        ).status_code == 201
+        assert client.post(
+            "/api/v1/usage/events",
+            json={
+                "events": [
+                    {
+                        "sourceEventId": "account-deletion-test",
+                        "appId": "com.example.delete",
+                        "appName": "Delete Test",
+                        "category": "Other",
+                        "startedAt": "2026-08-08T12:00:00Z",
+                        "endedAt": "2026-08-08T12:01:00Z",
+                        "timezone": "UTC",
+                    }
+                ]
+            },
+        ).status_code == 200
+        with session_factory() as db:
+            db.add(
+                SecurityAuditEvent(
+                    event_type="synthetic_pre_delete",
+                    outcome="success",
+                    account_id=current_principal.account_id,
+                    issuer=current_principal.issuer,
+                    provider_sid="synthetic-provider-session",
+                    provider_event_id="synthetic-provider-event",
+                    source_category="test",
+                )
+            )
+            db.commit()
+
+        response = client.delete(
+            "/api/v1/auth/account",
+            headers={
+                "Authorization": f"Bearer {access_token()}",
+                "X-LockdIn-Account-Id": current_principal.account_id,
+                "X-LockdIn-ID-Token": recent_id_token(),
+            },
+        )
+
+    assert response.status_code == 204
+    assert fake.deleted_subjects == [current_principal.subject]
+    with session_factory() as db:
+        assert db.get(Account, current_principal.account_id) is None
+        assert db.get(Profile, current_principal.profile_id) is None
+        for model in (
+            ExternalIdentity,
+            Preferences,
+            Rule,
+            AccountabilityContact,
+            UsageEvent,
+            UsageDailyAppAggregate,
+            UsageDailyCategoryAggregate,
+            EnforcementEvent,
+            RevokedProviderSession,
+        ):
+            assert db.scalar(select(func.count()).select_from(model)) == 0
+        audits = db.scalars(select(SecurityAuditEvent)).all()
+        assert any(event.event_type == "account_deleted" for event in audits)
+        assert all(event.account_id is None for event in audits)
+        assert all(event.provider_sid is None for event in audits)
+        assert all(event.provider_event_id is None for event in audits)
+
+
+@pytest.mark.parametrize(
+    "provider_error",
+    [
+        pytest.param(KeycloakUnavailable("synthetic outage"), id="unavailable"),
+        pytest.param(KeycloakRejected("synthetic rejection"), id="rejected"),
+    ],
+)
+def test_account_deletion_provider_failure_preserves_local_data(
+    session_factory, current_principal, provider_error
+) -> None:
+    fake = FakeKeycloakClient()
+    fake.jwks = {"keys": [PUBLIC_JWK]}
+    fake.deletion_error = provider_error
+    app = _overridden_app(session_factory, fake, current_principal)
+
+    with TestClient(app) as client:
+        response = client.delete(
+            "/api/v1/auth/account",
+            headers={
+                "Authorization": f"Bearer {access_token()}",
+                "X-LockdIn-Account-Id": current_principal.account_id,
+                "X-LockdIn-ID-Token": recent_id_token(),
+            },
+        )
+
+    assert response.status_code == 503
+    with session_factory() as db:
+        assert db.get(Account, current_principal.account_id) is not None
+        assert db.get(Profile, current_principal.profile_id) is not None
+
+
+def test_account_deletion_rejects_a_different_reauthenticated_account(
+    session_factory, current_principal
+) -> None:
+    fake = FakeKeycloakClient()
+    app = _overridden_app(session_factory, fake, current_principal)
+
+    with TestClient(app) as client:
+        response = client.delete(
+            "/api/v1/auth/account",
+            headers={
+                "Authorization": f"Bearer {access_token()}",
+                "X-LockdIn-Account-Id": "different-active-account",
+                "X-LockdIn-ID-Token": recent_id_token(),
+            },
+        )
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": "Reauthenticated account does not match the active account"
+    }
+    assert fake.deleted_subjects == []
+    with session_factory() as db:
+        assert db.get(Account, current_principal.account_id) is not None
+
+
+def test_account_deletion_jwks_outage_preserves_local_data(
+    session_factory, current_principal
+) -> None:
+    fake = FakeKeycloakClient()
+    fake.jwks_error = KeycloakUnavailable("synthetic JWKS outage")
+    app = _overridden_app(session_factory, fake, current_principal)
+
+    with TestClient(app) as client:
+        response = client.delete(
+            "/api/v1/auth/account",
+            headers={
+                "Authorization": f"Bearer {access_token()}",
+                "X-LockdIn-Account-Id": current_principal.account_id,
+                "X-LockdIn-ID-Token": recent_id_token(),
+            },
+        )
+
+    assert response.status_code == 503
+    assert fake.deleted_subjects == []
+    with session_factory() as db:
+        assert db.get(Account, current_principal.account_id) is not None
+        assert db.get(Profile, current_principal.profile_id) is not None
+
+
+@pytest.mark.parametrize(
+    "proof",
+    [
+        pytest.param(
+            lambda: recent_id_token(
+                authenticated_at=int(
+                    (datetime.now(timezone.utc) - timedelta(minutes=10)).timestamp()
+                )
+            ),
+            id="stale",
+        ),
+        pytest.param(
+            lambda: recent_id_token(subject="different-provider-subject"),
+            id="wrong-subject",
+        ),
+    ],
+)
+def test_account_deletion_rejects_invalid_reauthentication_proof(
+    session_factory, current_principal, caplog, proof
+) -> None:
+    fake = FakeKeycloakClient()
+    fake.jwks = {"keys": [PUBLIC_JWK]}
+    app = _overridden_app(session_factory, fake, current_principal)
+    id_token = proof()
+
+    with TestClient(app) as client:
+        response = client.delete(
+            "/api/v1/auth/account",
+            headers={
+                "Authorization": f"Bearer {access_token()}",
+                "X-LockdIn-Account-Id": current_principal.account_id,
+                "X-LockdIn-ID-Token": id_token,
+            },
+        )
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Recent reauthentication is required"}
+    assert fake.deleted_subjects == []
+    assert id_token not in caplog.text
+    with session_factory() as db:
+        assert db.get(Account, current_principal.account_id) is not None
+        assert db.get(Profile, current_principal.profile_id) is not None
+
+
 PRIVATE_KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 PUBLIC_JWK = jwt.algorithms.RSAAlgorithm.to_jwk(PRIVATE_KEY.public_key(), as_dict=True)
 PUBLIC_JWK.update({"kid": "synthetic-signing-key", "use": "sig", "alg": "RS256"})
+
+
+def recent_id_token(
+    *,
+    subject: str = TEST_SUBJECT,
+    authenticated_at: int | None = None,
+) -> str:
+    now = int(datetime.now(timezone.utc).timestamp())
+    return jwt.encode(
+        {
+            "iss": TEST_ISSUER,
+            "aud": "lockdin-mobile",
+            "sub": subject,
+            "iat": now,
+            "exp": now + 300,
+            "auth_time": authenticated_at if authenticated_at is not None else now,
+        },
+        PRIVATE_KEY,
+        algorithm="RS256",
+        headers={"kid": "synthetic-signing-key"},
+    )
 
 
 def logout_token(**overrides) -> str:

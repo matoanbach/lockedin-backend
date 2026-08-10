@@ -60,6 +60,7 @@ Authentication endpoints:
 | `GET` | `/api/v1/auth/session` | Resolve the authenticated account/session | `200` | `401`, `503` |
 | `POST` | `/api/v1/auth/logout` | Revoke the current provider/local session | `204` | `401` |
 | `POST` | `/api/v1/auth/logout-all` | Advance the account boundary and terminate provider sessions | `204` | `401`, `503` |
+| `DELETE` | `/api/v1/auth/account` | After fresh provider reauthentication, delete the matching provider identity and LockdIn tenant | `204` | `401`, `409`, `503` |
 | `POST` | `/api/v1/auth/backchannel-logout` | Verify an OIDC logout token and revoke it replay-safely | `204` | `400`, `503` |
 | `POST` | `/api/v1/auth/provider-events` | Verify an internal HMAC provider event | `204` | `400`, `503` |
 
@@ -273,7 +274,15 @@ still pending.
     {
       "name": "Video & Entertainment",
       "minutes": 60,
-      "durationMilliseconds": 3600000
+      "durationMilliseconds": 3600000,
+      "apps": [
+        {
+          "appId": "com.google.android.youtube",
+          "appName": "YouTube",
+          "minutes": 60,
+          "durationMilliseconds": 3600000
+        }
+      ]
     }
   ],
   "weeklyUsageHours": [1.0, 0.5, 2.0, 1.25, 0.75, 0.0, 2.0],
@@ -332,7 +341,9 @@ read time. Known package IDs receive stable display names and categories. Unknow
 useful stored names and categories, with the package ID and `Other` used only when stored metadata
 is blank. This taxonomy describes app types; it does not measure whether usage is productive.
 `durationMilliseconds` preserves positive sub-minute category duration while `minutes` continues
-to report completed minutes.
+to report completed minutes. Each dashboard category also includes its contributing apps for the
+same local-calendar day so clients can provide a category drill-down without changing tenant or
+time boundaries.
 
 ## Enforcement
 

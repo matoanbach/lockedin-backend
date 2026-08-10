@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     keycloak_clock_skew_seconds: int = Field(default=30, ge=0, le=300)
     keycloak_session_max_seconds: int = Field(default=8 * 60 * 60, ge=300)
     keycloak_backchannel_max_age_seconds: int = Field(default=5 * 60, ge=30)
+    keycloak_recent_auth_max_age_seconds: int = Field(default=5 * 60, ge=30, le=900)
     keycloak_event_webhook_secret: SecretStr | None = Field(default=None)
     keycloak_event_max_age_seconds: int = Field(default=60, ge=10, le=300)
 

@@ -7,6 +7,7 @@ import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/theme.dart';
 import '../../../../shared/widgets/widgets.dart';
 import '../../../usage/data/usage_sync_provider.dart';
+import '../../../auth/data/auth_models.dart';
 import '../../../auth/data/auth_provider.dart';
 
 class DevicePermissionsScreen extends ConsumerStatefulWidget {
@@ -20,6 +21,8 @@ class DevicePermissionsScreen extends ConsumerStatefulWidget {
 class _DevicePermissionsScreenState
     extends ConsumerState<DevicePermissionsScreen>
     with WidgetsBindingObserver {
+  bool _isDeletingAccount = false;
+
   @override
   void initState() {
     super.initState();
@@ -175,6 +178,17 @@ class _DevicePermissionsScreenState
                 label: 'Sign out',
                 onTap: () => _confirmLogout(context),
               ),
+              Spacing.verticalMd,
+              _SettingsNavItem(
+                icon: Icons.delete_forever_outlined,
+                label: _isDeletingAccount
+                    ? 'Deleting account…'
+                    : 'Delete account',
+                accentColor: AppColors.error,
+                onTap: _isDeletingAccount
+                    ? () {}
+                    : () => _confirmDeleteAccount(context),
+              ),
               Spacing.verticalLg,
             ],
           ),
@@ -205,6 +219,78 @@ class _DevicePermissionsScreenState
     );
     if (confirmed == true) {
       await ref.read(authControllerProvider.notifier).logout();
+    }
+  }
+
+  Future<void> _confirmDeleteAccount(BuildContext context) async {
+    final confirmationController = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          scrollable: true,
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 24,
+          ),
+          title: const Text('Permanently delete account?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'This deletes your LockdIn identity, backend usage, preferences, rules, contacts, and local queued data for this account. De-identified security records may be retained.',
+              ),
+              Spacing.verticalLg,
+              const Text('Type DELETE to continue.'),
+              Spacing.verticalSm,
+              TextField(
+                controller: confirmationController,
+                autofocus: true,
+                autocorrect: false,
+                enableSuggestions: false,
+                textCapitalization: TextCapitalization.characters,
+                decoration: const InputDecoration(labelText: 'Confirmation'),
+                onChanged: (_) => setDialogState(() {}),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: confirmationController.text == 'DELETE'
+                  ? () => Navigator.of(dialogContext).pop(true)
+                  : null,
+              style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+              child: const Text('Delete account'),
+            ),
+          ],
+        ),
+      ),
+    );
+    confirmationController.dispose();
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isDeletingAccount = true);
+    try {
+      await ref.read(authControllerProvider.notifier).deleteAccount();
+    } on AuthCancelled {
+      if (mounted) {
+        ScaffoldMessenger.of(this.context).showSnackBar(
+          const SnackBar(content: Text('Account deletion was cancelled.')),
+        );
+      }
+    } on Object catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          this.context,
+        ).showSnackBar(SnackBar(content: Text(describeApiError(error))));
+      }
+    } finally {
+      if (mounted) setState(() => _isDeletingAccount = false);
     }
   }
 }
@@ -456,11 +542,13 @@ class _SettingsNavItem extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.accentColor,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final Color? accentColor;
 
   @override
   Widget build(BuildContext context) {
@@ -472,9 +560,12 @@ class _SettingsNavItem extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, color: AppColors.purple400, size: 20),
+              Icon(icon, color: accentColor ?? AppColors.purple400, size: 20),
               Spacing.horizontalMd,
-              Text(label, style: AppTextStyles.bodyMedium),
+              Text(
+                label,
+                style: AppTextStyles.bodyMedium.copyWith(color: accentColor),
+              ),
             ],
           ),
           const Icon(Icons.chevron_right, color: AppColors.textMuted, size: 20),

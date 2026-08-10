@@ -6,25 +6,45 @@ class UsageData {
   final int minutes;
   final int durationMilliseconds;
   final Color color;
+  final List<CategoryAppUsage> apps;
 
   const UsageData({
     required this.name,
     required this.minutes,
     this.durationMilliseconds = 0,
     required this.color,
+    this.apps = const [],
   });
 
-  String get formattedTime {
-    final hours = minutes ~/ 60;
-    final mins = minutes % 60;
-    if (hours > 0) {
-      return '${hours}h ${mins > 0 ? '${mins}m' : ''}';
-    }
-    if (minutes == 0 && durationMilliseconds > 0) {
-      return '<1m';
-    }
-    return '${mins}m';
+  String get formattedTime =>
+      formatUsageDuration(minutes, durationMilliseconds);
+}
+
+class CategoryAppUsage {
+  const CategoryAppUsage({
+    required this.appId,
+    required this.appName,
+    required this.minutes,
+    required this.durationMilliseconds,
+  });
+
+  final String appId;
+  final String appName;
+  final int minutes;
+  final int durationMilliseconds;
+
+  String get formattedTime =>
+      formatUsageDuration(minutes, durationMilliseconds);
+}
+
+String formatUsageDuration(int minutes, int durationMilliseconds) {
+  final hours = minutes ~/ 60;
+  final mins = minutes % 60;
+  if (hours > 0) {
+    return '${hours}h ${mins > 0 ? '${mins}m' : ''}';
   }
+  if (minutes == 0 && durationMilliseconds > 0) return '<1m';
+  return '${mins}m';
 }
 
 /// Lockdown rule model.

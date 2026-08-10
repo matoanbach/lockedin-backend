@@ -72,6 +72,9 @@ def test_api_client_and_provider_event_contract_are_narrow() -> None:
         user for user in realm["users"] if user.get("serviceAccountClientId") == "lockdin-api"
     )
     assert service_account["clientRoles"] == {"realm-management": ["manage-users"]}
+    assert realm["clientScopeMappings"]["lockdin-api"] == [
+        {"client": "realm-management", "roles": ["manage-users"]}
+    ]
     assert "lockdin-security-events" in realm["eventsListeners"]
     assert realm["enabledEventTypes"] == ["UPDATE_PASSWORD"]
     assert realm["adminEventsDetailsEnabled"] is False

@@ -57,6 +57,16 @@ void main() {
     expect(arguments['promptValues'], ['create']);
   });
 
+  test('account deletion requests fresh provider authentication', () async {
+    await const AppAuthOidcClient().signIn(
+      config,
+      requireFreshAuthentication: true,
+    );
+
+    final arguments = Map<String, Object?>.from(calls.single.arguments as Map);
+    expect(arguments['additionalParameters'], {'max_age': '0'});
+  });
+
   test('end session uses the ID token and registered app redirect', () async {
     await const AppAuthOidcClient().endSession(
       config,

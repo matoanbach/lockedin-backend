@@ -3,11 +3,11 @@
 | Field | Value |
 | --- | --- |
 | ADR | ADR-001 / SEC-DEC-002 |
-| Status | **Accepted for local implementation — D1–D6 approved** |
+| Status | **Accepted for local implementation — D1–D7 approved** |
 | Date | 2026-08-01 |
-| Last updated | 2026-08-03 |
-| Evidence baseline | Git commit `88ec6954ef2f781a0038509e2a6ae4cdc5549ee0` |
-| Scope | Phase A architecture plus Phase B tenant/infrastructure foundation status; no production authentication |
+| Last updated | 2026-08-09 |
+| Evidence baseline | PR #45 merge commit `a718188af2b09df3b8d2d90ae0121cb9959dddae` |
+| Scope | Phase A architecture through Phase D local implementation and physical validation; no production-readiness claim |
 | Owners | Product/account behavior and risk acceptance: Project owner; security findings and incident response: Security owner; Keycloak administration/upgrades: Identity operator; deployment/local TLS: Deployment operator; backup/restore: Database operator |
 
 ## Decision gate
@@ -18,7 +18,8 @@ redirect route as proof of an implemented or approved identity system.
 
 The following product and operating decisions cannot be inferred from the repository. D1–D5 and
 the physical-phone TLS demo path were approved by the project owner on 2026-08-03. The project
-owner subsequently approved role-based, rather than named-person, D6 assignments:
+owner subsequently approved role-based, rather than named-person, D6 assignments and approved the
+single-account mobile scope in D7 on 2026-08-09:
 
 | ID | Required decision | Status and decision/default | Why approval is required |
 | --- | --- | --- | --- |
@@ -28,12 +29,13 @@ owner subsequently approved role-based, rather than named-person, D6 assignments
 | D4 | Session architecture and lifetime | **Approved:** accept Keycloak access tokens directly; do not issue a second LockdIn bearer credential. Use per-request introspection plus a minimal LockdIn revocation registry. The exact client, claim, lifetime, logout, and physical-phone TLS contract is below. | This gives next-request local revocation without implementing a second credential family, at the cost of a Keycloak availability dependency. |
 | D5 | Existing default-profile and pre-login device data | **Approved:** keep the default profile demo-only and unclaimed. Quarantine pre-login queues until explicit Import or Discard. Other-account rows remain quarantined until that account returns or the user explicitly deletes them. | Automatically assigning sensitive history to a registrant is unsafe. |
 | D6 | Operational owners | **Approved as role-based assignments:** Project owner owns product/account behavior and risk acceptance; Security owner owns security findings and incident response; Identity operator owns Keycloak administration/upgrades; Deployment operator owns deployment/local TLS; Database operator owns backup/restore. One person may hold multiple roles, but the acting people must be identified in the private project runbook before an actual release or incident exercise. | The repository cannot name people, but it can assign accountable roles approved by the project owner. |
+| D7 | Accounts per mobile installation | **Approved:** the current app supports one account binding per installation. A returning device offers only sign-in for that account; a different account is rejected until the bound account is deleted. Same-device multi-account switching is deferred to future development. Existing quarantined owner rows remain isolated as a defensive migration safeguard. | Multi-account UX and lifecycle behavior are outside the current acceptance scope, while tenant and queue isolation must still fail safely. |
 
-The current application remains a trusted local/demo deployment under D1. D1–D6 complete the Phase
+The current application remains a trusted local/demo deployment under D1. D1–D7 complete the Phase
 A decision gate for local implementation. Role names do not prove operational readiness: the
 acting people, contacts, access, and runbooks still require verification before an actual release,
-incident exercise, or any shared/external exposure. Authentication remains unimplemented until
-working controls and evidence exist.
+incident exercise, or any shared/external exposure. The implemented and validated local controls
+do not expand the deployment beyond the approved trusted local/demo boundary.
 
 ## Phase B implementation status
 
@@ -76,14 +78,57 @@ selection. Flutter sync watermarks and warning dedupe keys are generation-scoped
 queue schema is version 2 with a source-preserving v1 migration and composite owner/source
 uniqueness; pending enforcement events also carry owner generation.
 
-On August 8, 2026, Dart formatting, Flutter analysis, 52 Flutter tests, Android JVM tests, and a
-debug APK build passed; the backend remained 119 passed and 3 skipped. The physical-phone run
-verified registration and normal sign-in pages, `prompt=create`, verification-email delivery,
+At PR #45's merge commit on August 9, 2026, Flutter analysis, all 58 Flutter tests, Android JVM
+tests/builds, and all 123 backend tests passed with 3 expected backend skips. PR #45 CI passed the
+backend, Flutter analysis/test, Android APK, and Windows build jobs. The August 8 physical-phone
+run verified registration and normal sign-in pages, `prompt=create`, verification-email delivery,
 email verification, AppAuth redirect return, token exchange/introspection, protected-session
 bootstrap, authenticated onboarding, and sign-out that remained cleared after an app-process
-restart. The SQLite migration has not been exercised against a real preexisting app database;
-successful renewal after a long-offline provider session, password-recovery delivery,
-backup/restore behavior, and production readiness remain unverified.
+restart. August 9 follow-up validation retained the logout/revocation regression evidence from
+the merged work and added successful physical refresh evidence: a protected session request
+returned `200` more than 300 seconds after a fresh protected-request baseline, without a browser
+or provider reauthentication transition.
+
+The August 9 physical run also exercised the authentic native SQLite v1-to-v2 upgrade on an
+isolated application ID. One synthetic v1 row survived with all non-owner fields preserved, its
+owner became `unclaimed`, the legacy table was absent, and the unique index became exactly
+`(owner_generation, source_event_id)`. A separate authenticated instrumentation run proved that
+only the active-owner synthetic queue row uploaded successfully; unclaimed and quarantined rows
+remained pending, and teardown restored the exact baseline counts. A constrained backend count
+query corroborated the received synthetic rows as active/unclaimed/quarantined = `1/0/0`.
+
+These checks used disposable test-only routing because ADB could not reverse privileged device
+port 443: device port 8443 reached a loopback-only Caddy edge, and a raw TCP sidecar sharing the
+backend network namespace forwarded backend loopback 8443 to that edge so introspection could use
+the unchanged external issuer. TLS termination, CA trust, hostname validation, issuer validation,
+and per-request introspection remained enabled. This topology is validation scaffolding, not a
+production deployment design. Password-recovery delivery, backup/restore behavior, Phase E
+security/release controls, shared/external deployment safety, and production readiness remain
+unverified.
+
+The uncommitted August 9–10 follow-up adds a same-account, freshly reauthenticated deletion path.
+The provider identity is removed before the profile-owned LockdIn tenant; account-linked audit
+fields are cleared while a de-identified deletion outcome is retained. Android cleanup deletes
+only the active account generation's usage and enforcement queues, sync watermarks, and warning
+keys. After authoritative deletion it clears every installation binding, consistent with the
+current one-account-per-installation scope. A mismatched or previously unknown reauthenticated
+identity cannot select or provision an account through the deletion route. Returning devices offer
+only sign-in for the account already used on the installation; successful deletion restores first-
+account creation. Dashboard category responses now include the same-day contributing apps for an
+interactive drill-down.
+Provider deletion and local/backend cleanup cannot be made atomic across those systems. After a
+successful deletion response, the app remains coherently signed out and reports a non-sensitive
+warning if device cleanup is incomplete. A backend failure after provider deletion, or a device
+cleanup failure after a successful response, requires Phase E operator reconciliation rather than
+an unsupported claim of cross-system atomicity.
+Automated validation passes with 132 backend tests and 3 expected skips, 70 Flutter tests, clean
+Flutter analysis, and successful Android JVM tests/build. On August 10, the Samsung SM-A528B
+physically completed fresh browser authentication and received `204` from the deletion route; the
+app reached **Welcome to LockdIn**, restored **Create account**, retained its main SQLite file, and
+the deleted provider credentials were rejected. The run also exposed and fixed router replacement
+during auth transitions and stale installation-binding retention. A public external
+deletion-request resource, approved retention policy, backup-deletion procedure, password recovery,
+category-drill-down physical acceptance, and all Phase E gates remain outstanding.
 
 ## Context and evidence
 
@@ -169,7 +214,7 @@ an authentication factor or a client-controlled ownership boundary.
 
 | Store | Current data | Current ownership gap | Required lifecycle |
 | --- | --- | --- | --- |
-| Native SQLite `lockdin_usage_queue.db` | Raw queued usage slices, owner generation, timestamps, time zone, retry metadata | v2 source/build evidence; real v1 database migration not exercised | Active owner drains only matching rows; `unclaimed` requires Import/Discard and other owners stay quarantined. |
+| Native SQLite `lockdin_usage_queue.db` | Raw queued usage slices, owner generation, timestamps, time zone, retry metadata | Physical isolated-package v1-to-v2 migration and authenticated active/unclaimed/quarantined queue-selection evidence | Active owner drains only matching rows; `unclaimed` requires Import/Discard and other owners stay quarantined. |
 | Flutter SharedPreferences | Generation-scoped successful-sync timestamp and usage watermark | Automated coverage, not physical account-switch evidence | Never advance one account from another account's upload. |
 | Native `lockdin_enforcement` SharedPreferences | Cached rule state plus owner-tagged pending enforcement events | Transient auth context cleared on physical sign-out/relaunch; other-owner queue behavior remains automated only | Preserve other-owner queued events while clearing rebuildable account state. |
 | Flutter SharedPreferences warning dedupe | Generation-scoped emitted-warning markers | Automated key coverage, not physical warning evidence | Namespace by account generation. |
@@ -397,6 +442,11 @@ server-derived profile is active. If Keycloak is unavailable or a response is am
 requests fail closed before service execution. The Phase C implementation must use bounded
 timeouts/concurrency and expose no introspection secret or token in logs.
 
+Account deletion uses the same confidential client's service account. Its `manage-users` assignment
+and its explicit `realm-management` client-role scope mapping are both required because
+`fullScopeAllowed` remains disabled. The narrow scope mapping prevents a valid service token from
+being authenticated but forbidden at the provider administration endpoint.
+
 The minimal LockdIn revocation registry stores provider session identifiers and account-level
 not-before timestamps; it does not store raw Keycloak credentials. Current-device logout revokes
 the current `sid`, invokes the supported Keycloak logout path, stops uploads, and clears local
@@ -562,8 +612,9 @@ authentication and must not drive the auth guard.
 - Rows collected while signed out are `unclaimed`; they are never uploaded automatically.
 - On first sign-in, present an explicit, plain-language import-or-discard choice for unclaimed rows.
   Import atomically relabels only those rows to the active account generation and records consent.
-- On account switch, uploader and collectors stop, in-flight requests finish or are cancelled, and
-  only rows matching the new active generation can drain.
+- The current client rejects an account switch while an account binding remains on the installation.
+  A future multi-account implementation must stop uploaders and collectors, finish or cancel
+  in-flight requests, and drain only rows matching the newly active generation.
 - Rows for a different account stay quarantined until that account returns or the user explicitly
   deletes them. Product must approve a bounded retention policy.
 - Source-event idempotency remains per server profile. Client source IDs must remain stable during
@@ -620,14 +671,14 @@ Additional required regression coverage:
 
 ## Rollout stages and production gate
 
-1. **Phase A — this ADR:** D1–D6, the inventories, threats, tests, and migration requirements are
+1. **Phase A — this ADR:** D1–D7, the inventories, threats, tests, and migration requirements are
    accepted for local implementation. No authentication code is part of this documentation change.
 2. **Phase B — tenant foundation:** migration mechanism, account/profile ownership, principal
    dependency, protected routers, profile-scoped service signatures, and two-account isolation.
 3. **Phase C — backend identity/session:** approved signup/OIDC, verification, login, renewal,
    logout/revocation, recovery, throttling, audit events, OpenAPI, and operational controls.
 4. **Phase D — Flutter:** auth state, platform-backed storage, guarded routes, contract-driven UI,
-   queue ownership, logout/account switching, and lifecycle tests.
+   queue ownership, logout, one-account-per-installation enforcement, and lifecycle tests.
 5. **Phase E — security/release:** adversarial tests, production TLS and secret verification,
    controlled security gates, deployment hardening, backup/restore evidence, and controlled
    physical testing.

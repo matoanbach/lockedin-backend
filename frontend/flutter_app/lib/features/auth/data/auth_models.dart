@@ -196,11 +196,19 @@ class LockdInAuthState {
     this.session,
     this.queueSummary = const QueueOwnershipSummary.empty(),
     this.message,
+    this.hasKnownAccount = false,
   });
 
   const LockdInAuthState.initializing() : this(phase: AuthPhase.initializing);
 
-  const LockdInAuthState.signedOut() : this(phase: AuthPhase.signedOut);
+  const LockdInAuthState.signedOut({
+    bool hasKnownAccount = false,
+    String? message,
+  }) : this(
+         phase: AuthPhase.signedOut,
+         hasKnownAccount: hasKnownAccount,
+         message: message,
+       );
 
   const LockdInAuthState.reauthenticationRequired({String? message})
     : this(phase: AuthPhase.reauthenticationRequired, message: message);
@@ -209,6 +217,7 @@ class LockdInAuthState {
   final MobileSession? session;
   final QueueOwnershipSummary queueSummary;
   final String? message;
+  final bool hasKnownAccount;
 
   bool get canUseProtectedRoutes => phase == AuthPhase.authenticated;
   bool get hasPendingUnclaimedData => queueSummary.unclaimedCount > 0;
@@ -222,4 +231,8 @@ class AuthCancelled implements Exception {
 
 class ReauthenticationRequired implements Exception {
   const ReauthenticationRequired();
+}
+
+class AccountSwitchNotSupported implements Exception {
+  const AccountSwitchNotSupported();
 }

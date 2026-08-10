@@ -52,7 +52,11 @@ def get_current_principal(
     try:
         payload = keycloak_client.introspect(access_token)
         claims = validate_introspection(access_token, payload, settings)
-        return IdentityService().resolve_principal(db, claims)
+        return IdentityService().resolve_principal(
+            db,
+            claims,
+            allow_provisioning=request.url.path == "/api/v1/auth/session",
+        )
     except KeycloakUnavailable as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

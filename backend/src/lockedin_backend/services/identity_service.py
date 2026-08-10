@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -73,11 +74,14 @@ class IdentityService:
         claims: AccessTokenClaims,
         *,
         now: datetime | None = None,
+        allow_provisioning: bool = True,
     ) -> CurrentPrincipal:
         identity = self.repository.get_external_identity(
             db, issuer=claims.issuer, subject=claims.subject
         )
         if identity is None:
+            if not allow_provisioning:
+                raise PrincipalRejected("Identity is unavailable")
             try:
                 identity = self._create_identity(db, claims)
             except IntegrityError:
@@ -109,6 +113,46 @@ class IdentityService:
             subject=claims.subject,
             sid=claims.sid,
         )
+
+
+class AccountDeletionService:
+    """Remove one account tenant while retaining only de-identified audit evidence."""
+
+    def __init__(self, repository: IdentityRepository | None = None) -> None:
+        self.repository = repository or IdentityRepository()
+
+    def delete_account(self, db: Session, principal: CurrentPrincipal) -> None:
+        account = self.repository.get_account(db, principal.account_id)
+        if account is None or account.profile_id != principal.profile_id:
+            raise PrincipalRejected("Account is unavailable")
+
+        profile = account.profile
+        audit_events = db.scalars(
+            select(SecurityAuditEvent).where(
+                SecurityAuditEvent.account_id == account.id
+            )
+        ).all()
+        for audit_event in audit_events:
+            audit_event.account_id = None
+            audit_event.provider_sid = None
+            audit_event.provider_event_id = None
+
+        db.delete(account)
+        db.flush()
+        db.delete(profile)
+        db.flush()
+        db.add(
+            SecurityAuditEvent(
+                event_type="account_deleted",
+                outcome="success",
+                account_id=None,
+                issuer=principal.issuer,
+                provider_sid=None,
+                provider_event_id=None,
+                source_category="api",
+            )
+        )
+        db.commit()
 
 
 class SessionService:

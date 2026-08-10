@@ -14,6 +14,7 @@ class AuthScreen extends ConsumerWidget {
     final auth = ref.watch(authControllerProvider);
     final authState = auth.asData?.value;
     final needsRenewal = authState?.phase == AuthPhase.reauthenticationRequired;
+    final hasKnownAccount = authState?.hasKnownAccount ?? false;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -42,6 +43,8 @@ class AuthScreen extends ConsumerWidget {
                     needsRenewal
                         ? authState?.message ??
                               'Your session needs to be renewed.'
+                        : hasKnownAccount
+                        ? 'Sign in with the account already used on this device.'
                         : 'Sign in or create an account securely in your system browser.',
                     style: AppTextStyles.bodyMedium.copyWith(
                       color: AppColors.textTertiary,
@@ -74,7 +77,7 @@ class AuthScreen extends ConsumerWidget {
                           : 'Sign in',
                     ),
                   ),
-                  if (!needsRenewal) ...[
+                  if (!needsRenewal && !hasKnownAccount) ...[
                     Spacing.verticalMd,
                     SizedBox(
                       width: double.infinity,

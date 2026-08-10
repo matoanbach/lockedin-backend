@@ -436,6 +436,51 @@ object RuleEnforcementStore {
             .apply()
     }
 
+    fun deleteAccountData(context: Context, ownerGeneration: String) {
+        val retainedEvents = JSONArray()
+        val pendingEvents = loadPendingEnforcementEvents(context)
+        for (index in 0 until pendingEvents.length()) {
+            val item = pendingEvents.optJSONObject(index) ?: continue
+            val owner = item.optString(
+                "ownerGeneration",
+                QueueOwnershipPolicy.UNCLAIMED_OWNER,
+            )
+            if (owner != ownerGeneration) {
+                retainedEvents.put(item)
+            }
+        }
+
+        val retainedWarnings = JSONObject()
+        val warnings = loadWarningEmissions(context)
+        val warningKeys = warnings.keys()
+        while (warningKeys.hasNext()) {
+            val key = warningKeys.next()
+            if (!key.startsWith("$ownerGeneration|")) {
+                retainedWarnings.put(key, warnings.opt(key))
+            }
+        }
+
+        prefs(context)
+            .edit()
+            .putString(KEY_PENDING_ENFORCEMENT_EVENTS, retainedEvents.toString())
+            .putString(KEY_WARNING_EMISSIONS, retainedWarnings.toString())
+            .apply()
+
+        val flutterPreferences = flutterPrefs(context)
+        val flutterEditor = flutterPreferences.edit()
+        val warningPrefix = "flutter.rule_alert.$ownerGeneration."
+        val exactAccountKeys = setOf(
+            "flutter.usage_sync.last_successful_at.$ownerGeneration",
+            "flutter.usage_sync.watermark_at.$ownerGeneration",
+        )
+        flutterPreferences.all.keys
+            .filter { key -> key.startsWith(warningPrefix) || key in exactAccountKeys }
+            .forEach(flutterEditor::remove)
+        flutterEditor.apply()
+
+        resetAccountScopedState(context)
+    }
+
     fun resetAccountScopedState(context: Context) {
         prefs(context)
             .edit()

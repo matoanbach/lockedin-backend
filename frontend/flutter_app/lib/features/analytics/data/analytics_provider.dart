@@ -50,6 +50,17 @@ class AnalyticsRepository {
               categoryBreakdown[index]['name'] as String? ?? 'Other',
               index,
             ),
+            apps: _listFromJson(categoryBreakdown[index]['apps'])
+                .map(
+                  (item) => CategoryAppUsage(
+                    appId: item['appId'] as String? ?? '',
+                    appName: item['appName'] as String? ?? 'Unknown App',
+                    minutes: (item['minutes'] as num?)?.toInt() ?? 0,
+                    durationMilliseconds:
+                        (item['durationMilliseconds'] as num?)?.toInt() ?? 0,
+                  ),
+                )
+                .toList(),
           ),
       ],
       weeklyUsageHours: _listFromJson(

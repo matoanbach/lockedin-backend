@@ -128,11 +128,7 @@ class KeycloakClient:
 
     def logout_user(self, subject: str) -> None:
         service_token = self._service_account_token()
-        url = (
-            f"{self.settings.keycloak_server_url}/admin/realms/"
-            f"{quote(self.settings.keycloak_realm, safe='')}/users/"
-            f"{quote(subject, safe='')}/logout"
-        )
+        url = f"{self._admin_user_url(subject)}/logout"
         try:
             with self._request_slot(), self._client() as client:
                 response = client.post(
@@ -143,6 +139,26 @@ class KeycloakClient:
             raise KeycloakUnavailable("Keycloak user logout failed") from exc
         if response.status_code != 204:
             raise KeycloakRejected("Keycloak rejected user logout")
+
+    def delete_user(self, subject: str) -> None:
+        service_token = self._service_account_token()
+        try:
+            with self._request_slot(), self._client() as client:
+                response = client.delete(
+                    self._admin_user_url(subject),
+                    headers={"Authorization": f"Bearer {service_token}"},
+                )
+        except (httpx.HTTPError, KeycloakUnavailable) as exc:
+            raise KeycloakUnavailable("Keycloak user deletion failed") from exc
+        if response.status_code != 204:
+            raise KeycloakRejected("Keycloak rejected user deletion")
+
+    def _admin_user_url(self, subject: str) -> str:
+        return (
+            f"{self.settings.keycloak_server_url}/admin/realms/"
+            f"{quote(self.settings.keycloak_realm, safe='')}/users/"
+            f"{quote(subject, safe='')}"
+        )
 
     def fetch_jwks(self) -> dict[str, Any]:
         try:
