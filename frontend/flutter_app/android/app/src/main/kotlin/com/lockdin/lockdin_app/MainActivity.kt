@@ -99,6 +99,16 @@ class MainActivity : FlutterActivity() {
                     RuleEnforcementStore.resetAccountScopedState(this)
                     result.success(null)
                 }
+                "deleteAccountData" -> {
+                    val owner = call.argument<String>("accountGeneration")
+                    if (owner.isNullOrBlank()) {
+                        result.error("invalid_owner", "Account generation is required.", null)
+                    } else {
+                        UsageUploadQueueStore.deleteOwnedData(this, owner)
+                        RuleEnforcementStore.deleteAccountData(this, owner)
+                        result.success(null)
+                    }
+                }
                 "cacheNotificationTone" -> {
                     val tone = call.argument<String>("tone")
                     if (!tone.isNullOrBlank()) {

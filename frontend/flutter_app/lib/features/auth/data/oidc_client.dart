@@ -3,7 +3,11 @@ import 'package:flutter_appauth/flutter_appauth.dart';
 import 'auth_models.dart';
 
 abstract interface class OidcClient {
-  Future<AuthTokenSet> signIn(AuthConfig config, {bool createAccount = false});
+  Future<AuthTokenSet> signIn(
+    AuthConfig config, {
+    bool createAccount = false,
+    bool requireFreshAuthentication = false,
+  });
   Future<AuthTokenSet> refresh(AuthConfig config, AuthTokenSet current);
   Future<void> endSession(AuthConfig config, AuthTokenSet current);
 }
@@ -25,6 +29,7 @@ class AppAuthOidcClient implements OidcClient {
   Future<AuthTokenSet> signIn(
     AuthConfig config, {
     bool createAccount = false,
+    bool requireFreshAuthentication = false,
   }) async {
     if (config.codeChallengeMethod != 'S256' ||
         config.scopes.contains('offline_access')) {
@@ -39,6 +44,9 @@ class AppAuthOidcClient implements OidcClient {
           scopes: config.scopes,
           serviceConfiguration: _serviceConfiguration(config),
           promptValues: createAccount ? const ['create'] : const ['login'],
+          additionalParameters: requireFreshAuthentication
+              ? const {'max_age': '0'}
+              : null,
         ),
       );
       return _tokensFromResponse(

@@ -56,14 +56,20 @@ final rootNavigatorKeyProvider = Provider<GlobalKey<NavigatorState>>((ref) {
 
 final routerProvider = Provider<GoRouter>((ref) {
   final navigatorKey = ref.watch(rootNavigatorKeyProvider);
-  final auth = ref.watch(authControllerProvider);
+  late final GoRouter router;
+  final authSubscription = ref.listen<AsyncValue<LockdInAuthState>>(
+    authControllerProvider,
+    (previous, next) => router.refresh(),
+  );
 
-  return GoRouter(
+  router = GoRouter(
     navigatorKey: navigatorKey,
     initialLocation: AppRoutes.bootstrap,
     debugLogDiagnostics: true,
     redirect: (context, state) => authRedirectFor(
-      auth: auth.asData?.value ?? const LockdInAuthState.initializing(),
+      auth:
+          ref.read(authControllerProvider).asData?.value ??
+          const LockdInAuthState.initializing(),
       location: state.matchedLocation,
     ),
     routes: [
@@ -214,6 +220,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
     ),
   );
+  ref.onDispose(() {
+    authSubscription.close();
+    router.dispose();
+  });
+  return router;
 });
 
 String? authRedirectFor({

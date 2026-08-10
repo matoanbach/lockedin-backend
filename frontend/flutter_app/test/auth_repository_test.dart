@@ -47,6 +47,21 @@ void main() {
     },
   );
 
+  test('bootstrap remembers that this device has used an account', () async {
+    final storage = FakeAuthStorage()
+      ..bindings = {'known-binding': 'known-generation'};
+    final repository = buildRepository(
+      storage: storage,
+      oidc: FakeOidcClient(tokens('unused')),
+      native: FakeNativeAuthBridge(),
+    );
+
+    final state = await repository.bootstrap();
+
+    expect(state.phase, AuthPhase.signedOut);
+    expect(state.hasKnownAccount, isTrue);
+  });
+
   test(
     'AppAuth cancellation returns to signed out without an error state',
     () async {
@@ -92,6 +107,56 @@ void main() {
       AuthPhase.authenticated,
     );
   });
+
+  test('a returning device rejects a different account', () async {
+    final storage = FakeAuthStorage()
+      ..bindings = {'existing-account-binding': 'existing-generation'};
+    final native = FakeNativeAuthBridge();
+    final repository = buildRepository(
+      storage: storage,
+      oidc: FakeOidcClient(tokens('different-account')),
+      native: native,
+    );
+
+    await expectLater(
+      repository.signIn(),
+      throwsA(isA<AccountSwitchNotSupported>()),
+    );
+
+    expect(storage.session, isNull);
+    expect(storage.bindings, {
+      'existing-account-binding': 'existing-generation',
+    });
+    expect(native.events.last, 'clear');
+  });
+
+  test(
+    'different-account rejection keeps a coherent signed-out state',
+    () async {
+      final storage = FakeAuthStorage()
+        ..bindings = {'existing-account-binding': 'existing-generation'};
+      final repository = buildRepository(
+        storage: storage,
+        oidc: FakeOidcClient(tokens('different-account')),
+        native: FakeNativeAuthBridge(),
+      );
+      final container = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+      expect(
+        (await container.read(authControllerProvider.future)).hasKnownAccount,
+        isTrue,
+      );
+
+      await container.read(authControllerProvider.notifier).signIn();
+
+      final state = container.read(authControllerProvider).asData?.value;
+      expect(state?.phase, AuthPhase.signedOut);
+      expect(state?.hasKnownAccount, isTrue);
+      expect(state?.message, contains('supports one LockdIn account'));
+    },
+  );
 
   test('configuration connection failure shows the backend address', () async {
     final repository = buildRepository(
@@ -282,6 +347,146 @@ void main() {
     },
   );
 
+  test(
+    'account deletion reauthenticates and clears installation bindings and local data',
+    () async {
+      final events = <String>[];
+      final storage = FakeAuthStorage(
+        session: StoredAuthSession(config: config, tokens: tokens('initial')),
+        events: events,
+      )..bindings = {'stale-binding': 'stale-generation'};
+      final repository = buildRepository(
+        storage: storage,
+        oidc: FakeOidcClient(tokens('reauthenticated'), events: events),
+        native: FakeNativeAuthBridge(events: events),
+        requestEvents: events,
+      );
+      final oidc = repository.oidcClient as FakeOidcClient;
+      final authenticated = await repository.bootstrap();
+      final activeGeneration = authenticated.session!.accountGeneration;
+      expect(storage.bindings, hasLength(2));
+      events.clear();
+
+      final signedOut = await repository.deleteAccount();
+
+      expect(signedOut.phase, AuthPhase.signedOut);
+      expect(signedOut.hasKnownAccount, isFalse);
+      expect(storage.session, isNull);
+      expect(storage.bindings, isEmpty);
+      expect(oidc.freshAuthenticationRequests, 1);
+      expect(
+        events,
+        containsAllInOrder([
+          'clear',
+          'provider:sign-in',
+          'backend:delete-account',
+          'delete-account-data:$activeGeneration',
+          'delete',
+        ]),
+      );
+    },
+  );
+
+  test('failed account deletion restores native authenticated work', () async {
+    final events = <String>[];
+    final repository = buildRepository(
+      storage: FakeAuthStorage(
+        session: StoredAuthSession(config: config, tokens: tokens('initial')),
+      ),
+      oidc: FakeOidcClient(tokens('reauthenticated'), events: events),
+      native: FakeNativeAuthBridge(events: events),
+      requestEvents: events,
+      failAccountDeletion: true,
+    );
+    final authenticated = await repository.bootstrap();
+    events.clear();
+
+    await expectLater(repository.deleteAccount(), throwsA(isA<DioException>()));
+
+    expect(events.first, 'clear');
+    expect(
+      events.last,
+      'configure:${authenticated.session!.accountGeneration}',
+    );
+  });
+
+  test(
+    'server success signs out and warns when native deletion cleanup fails',
+    () async {
+      final events = <String>[];
+      final storage = FakeAuthStorage(
+        session: StoredAuthSession(config: config, tokens: tokens('initial')),
+        events: events,
+      );
+      final native = FakeNativeAuthBridge(
+        events: events,
+        failDeleteAccountData: true,
+      );
+      final repository = buildRepository(
+        storage: storage,
+        oidc: FakeOidcClient(tokens('reauthenticated'), events: events),
+        native: native,
+        requestEvents: events,
+      );
+      final authenticated = await repository.bootstrap();
+      final activeGeneration = authenticated.session!.accountGeneration;
+      events.clear();
+
+      final signedOut = await repository.deleteAccount();
+
+      expect(signedOut.phase, AuthPhase.signedOut);
+      expect(signedOut.message, contains('some data on this device'));
+      expect(storage.session, isNull);
+      expect(storage.bindings.values, isNot(contains(activeGeneration)));
+      expect(events, contains('delete'));
+      expect(events.last, 'clear');
+    },
+  );
+
+  test(
+    'successful deletion wins over concurrent auth failure callbacks',
+    () async {
+      final storage = FakeAuthStorage(
+        session: StoredAuthSession(config: config, tokens: tokens('initial')),
+      );
+      final oidc = FakeOidcClient(tokens('reauthenticated'));
+      final repository = buildRepository(
+        storage: storage,
+        oidc: oidc,
+        native: FakeNativeAuthBridge(),
+      );
+      final container = ProviderContainer(
+        overrides: [authRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+      expect(
+        (await container.read(authControllerProvider.future)).phase,
+        AuthPhase.authenticated,
+      );
+      final reauthentication = Completer<AuthTokenSet>();
+      oidc.signInCompleter = reauthentication;
+
+      final deletion = container
+          .read(authControllerProvider.notifier)
+          .deleteAccount();
+      await Future<void>.delayed(Duration.zero);
+      container.read(authControllerProvider.notifier).requireReauthentication();
+      expect(
+        container.read(authControllerProvider).asData?.value.phase,
+        AuthPhase.authenticated,
+      );
+
+      reauthentication.complete(tokens('reauthenticated'));
+      await deletion;
+      container.read(authControllerProvider.notifier).requireReauthentication();
+
+      expect(
+        container.read(authControllerProvider).asData?.value.phase,
+        AuthPhase.signedOut,
+      );
+    },
+  );
+
   test('terminal reauthentication clears the native auth context', () async {
     final native = FakeNativeAuthBridge();
     final repository = buildRepository(
@@ -319,6 +524,7 @@ AuthRepository buildRepository({
   List<String>? requestEvents,
   bool failConfigConnection = false,
   bool failConfigTls = false,
+  bool failAccountDeletion = false,
 }) {
   final dio = Dio(BaseOptions(baseUrl: 'https://api.example'));
   dio.interceptors.add(
@@ -385,6 +591,37 @@ AuthRepository buildRepository({
           );
           return;
         }
+        if (options.path.endsWith('/auth/account')) {
+          expect(
+            options.headers.containsKey('X-LockdIn-Account-Id') &&
+                options.headers['X-LockdIn-Account-Id'] is String &&
+                (options.headers['X-LockdIn-Account-Id'] as String).isNotEmpty,
+            isTrue,
+          );
+          expect(
+            options.headers.containsKey('X-LockdIn-ID-Token') &&
+                options.headers['X-LockdIn-ID-Token'] is String &&
+                (options.headers['X-LockdIn-ID-Token'] as String).isNotEmpty,
+            isTrue,
+          );
+          requestEvents?.add('backend:delete-account');
+          if (failAccountDeletion) {
+            handler.reject(
+              DioException(
+                requestOptions: options,
+                response: Response<void>(
+                  requestOptions: options,
+                  statusCode: 503,
+                ),
+              ),
+            );
+          } else {
+            handler.resolve(
+              Response<void>(requestOptions: options, statusCode: 204),
+            );
+          }
+          return;
+        }
         handler.reject(DioException(requestOptions: options));
       },
     ),
@@ -442,8 +679,10 @@ class FakeOidcClient implements OidcClient {
   final List<String>? events;
   final bool failEndSession;
   Completer<AuthTokenSet>? refreshCompleter;
+  Completer<AuthTokenSet>? signInCompleter;
   int refreshCalls = 0;
   int createAccountRequests = 0;
+  int freshAuthenticationRequests = 0;
   int endSessionCalls = 0;
 
   @override
@@ -463,10 +702,15 @@ class FakeOidcClient implements OidcClient {
   Future<AuthTokenSet> signIn(
     AuthConfig config, {
     bool createAccount = false,
+    bool requireFreshAuthentication = false,
   }) async {
     if (cancelSignIn) throw const AuthCancelled();
+    events?.add('provider:sign-in');
     if (createAccount) createAccountRequests += 1;
-    return signInTokens;
+    if (requireFreshAuthentication) freshAuthenticationRequests += 1;
+    return signInCompleter == null
+        ? signInTokens
+        : await signInCompleter!.future;
   }
 }
 
@@ -474,10 +718,12 @@ class FakeNativeAuthBridge implements NativeAuthBridge {
   FakeNativeAuthBridge({
     this.summary = const QueueOwnershipSummary.empty(),
     List<String>? events,
+    this.failDeleteAccountData = false,
   }) : events = events ?? <String>[];
 
   QueueOwnershipSummary summary;
   final List<String> events;
+  final bool failDeleteAccountData;
 
   @override
   Future<void> clearAuthContext() async => events.add('clear');
@@ -495,6 +741,12 @@ class FakeNativeAuthBridge implements NativeAuthBridge {
 
   @override
   Future<void> resetAccountScopedState() async => events.add('reset');
+
+  @override
+  Future<void> deleteAccountData(String accountGeneration) async {
+    events.add('delete-account-data:$accountGeneration');
+    if (failDeleteAccountData) throw Exception('local deletion failed');
+  }
 
   @override
   Future<void> resolveUnclaimedData(

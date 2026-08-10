@@ -1,8 +1,33 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lockdin_app/core/router/app_router.dart';
 import 'package:lockdin_app/features/auth/data/auth_models.dart';
+import 'package:lockdin_app/features/auth/data/auth_provider.dart';
+
+const _authenticated = LockdInAuthState(
+  phase: AuthPhase.authenticated,
+  session: MobileSession(
+    accountId: 'account',
+    profileId: 'profile',
+    issuer: 'issuer',
+    subject: 'subject',
+    sid: 'sid',
+    accountGeneration: 'generation',
+  ),
+);
+
+class _ControllableAuthController extends AuthController {
+  @override
+  Future<LockdInAuthState> build() async => _authenticated;
+
+  void completeDeletion() {
+    state = const AsyncData(LockdInAuthState.signedOut());
+  }
+}
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('signed-out users can only reach login', () {
     expect(
       authRedirectFor(
@@ -53,5 +78,24 @@ void main() {
       authRedirectFor(auth: auth, location: AppRoutes.authDataChoice),
       isNull,
     );
+  });
+
+  test('auth changes refresh one stable router instance', () async {
+    final container = ProviderContainer(
+      overrides: [
+        authControllerProvider.overrideWith(_ControllableAuthController.new),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(authControllerProvider.future);
+    final router = container.read(routerProvider);
+
+    final controller =
+        container.read(authControllerProvider.notifier)
+            as _ControllableAuthController;
+    controller.completeDeletion();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(container.read(routerProvider), same(router));
   });
 }

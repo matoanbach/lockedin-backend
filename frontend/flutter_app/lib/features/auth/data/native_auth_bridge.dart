@@ -17,6 +17,7 @@ abstract interface class NativeAuthBridge {
     UnclaimedDataDecision decision,
   );
   Future<void> resetAccountScopedState();
+  Future<void> deleteAccountData(String accountGeneration);
 }
 
 class MethodChannelNativeAuthBridge implements NativeAuthBridge {
@@ -77,5 +78,13 @@ class MethodChannelNativeAuthBridge implements NativeAuthBridge {
   Future<void> resetAccountScopedState() async {
     if (!_isAndroid) return;
     await _channel.invokeMethod<void>('resetAccountScopedState');
+  }
+
+  @override
+  Future<void> deleteAccountData(String accountGeneration) async {
+    if (!_isAndroid) return;
+    await _channel.invokeMethod<void>('deleteAccountData', {
+      'accountGeneration': accountGeneration,
+    });
   }
 }

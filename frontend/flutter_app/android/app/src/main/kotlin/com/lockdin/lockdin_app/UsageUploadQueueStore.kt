@@ -146,6 +146,14 @@ object UsageUploadQueueStore {
     fun pendingCount(context: Context, ownerGeneration: String): Int =
         countWhere(context, "$COLUMN_OWNER_GENERATION = ?", arrayOf(ownerGeneration))
 
+    fun deleteOwnedData(context: Context, ownerGeneration: String) {
+        helper(context).writableDatabase.delete(
+            TABLE_NAME,
+            "$COLUMN_OWNER_GENERATION = ?",
+            arrayOf(ownerGeneration),
+        )
+    }
+
     fun resolveUnclaimed(context: Context, activeOwner: String, import: Boolean) {
         val db = helper(context).writableDatabase
         db.beginTransaction()

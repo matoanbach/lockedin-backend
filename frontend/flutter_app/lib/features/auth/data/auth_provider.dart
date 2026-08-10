@@ -31,6 +31,8 @@ final authControllerProvider =
     AsyncNotifierProvider<AuthController, LockdInAuthState>(AuthController.new);
 
 class AuthController extends AsyncNotifier<LockdInAuthState> {
+  bool _accountDeletionInProgress = false;
+
   AuthRepository get _repository => ref.read(authRepositoryProvider);
 
   @override
@@ -38,20 +40,27 @@ class AuthController extends AsyncNotifier<LockdInAuthState> {
 
   Future<void> signIn({bool createAccount = false}) async {
     final previousPhase = state.asData?.value.phase;
+    final previousHasKnownAccount =
+        state.asData?.value.hasKnownAccount ?? false;
     state = const AsyncLoading();
     try {
       state = AsyncData(await _repository.signIn(createAccount: createAccount));
     } on AuthCancelled {
-      state = const AsyncData(LockdInAuthState.signedOut());
+      state = AsyncData(
+        LockdInAuthState.signedOut(hasKnownAccount: previousHasKnownAccount),
+      );
     } on Object catch (error) {
       state = AsyncData(
         LockdInAuthState(
           phase: previousPhase == AuthPhase.reauthenticationRequired
               ? AuthPhase.reauthenticationRequired
               : AuthPhase.signedOut,
-          message: error is DioException
+          message: error is AccountSwitchNotSupported
+              ? 'This device supports one LockdIn account. Sign in with the account already used here, or delete it before using a different account.'
+              : error is DioException
               ? describeApiError(error)
               : 'Sign-in could not be completed. Check the authentication service and try again.',
+          hasKnownAccount: previousHasKnownAccount,
         ),
       );
     }
@@ -72,11 +81,24 @@ class AuthController extends AsyncNotifier<LockdInAuthState> {
   }
 
   Future<void> logout() async {
-    await _repository.logout();
-    state = const AsyncData(LockdInAuthState.signedOut());
+    state = AsyncData(await _repository.logout());
+  }
+
+  Future<void> deleteAccount() async {
+    if (_accountDeletionInProgress) return;
+    _accountDeletionInProgress = true;
+    try {
+      state = AsyncData(await _repository.deleteAccount());
+    } finally {
+      _accountDeletionInProgress = false;
+    }
   }
 
   void requireReauthentication() {
+    if (_accountDeletionInProgress ||
+        state.asData?.value.phase == AuthPhase.signedOut) {
+      return;
+    }
     unawaited(_repository.stopAuthenticatedWork());
     state = const AsyncData(
       LockdInAuthState.reauthenticationRequired(

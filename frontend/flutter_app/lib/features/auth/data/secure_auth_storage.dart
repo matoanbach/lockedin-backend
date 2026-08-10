@@ -65,6 +65,9 @@ class SecureAuthStorage implements AuthStorage {
 
   @override
   Future<void> writeAccountBindings(Map<String, String> bindings) {
+    if (bindings.isEmpty) {
+      return _storage.delete(key: _bindingsKey);
+    }
     return _storage.write(key: _bindingsKey, value: jsonEncode(bindings));
   }
 

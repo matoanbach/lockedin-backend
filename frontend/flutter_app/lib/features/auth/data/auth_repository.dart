@@ -37,7 +37,9 @@ class AuthRepository {
     final stored = await storage.readSession();
     if (stored == null) {
       await nativeBridge.clearAuthContext();
-      return const LockdInAuthState.signedOut();
+      return LockdInAuthState.signedOut(
+        hasKnownAccount: (await storage.readAccountBindings()).isNotEmpty,
+      );
     }
     _storedSession = stored;
     try {
@@ -80,6 +82,17 @@ class AuthRepository {
     final subject = _requiredString(json, 'subject');
     if (issuer != stored.config.issuer) {
       throw const ReauthenticationRequired();
+    }
+    final bindings = await storage.readAccountBindings();
+    final bindingKey = _accountBindingKey(issuer, subject);
+    if (transitioningAccount &&
+        bindings.isNotEmpty &&
+        !bindings.containsKey(bindingKey)) {
+      await storage.deleteSession();
+      _storedSession = null;
+      _mobileSession = null;
+      await nativeBridge.clearAuthContext();
+      throw const AccountSwitchNotSupported();
     }
     final generation = await accountGenerationFor(issuer, subject);
     final session = MobileSession(
@@ -182,7 +195,7 @@ class AuthRepository {
     );
   }
 
-  Future<void> logout() async {
+  Future<LockdInAuthState> logout() async {
     final current = _storedSession;
     await nativeBridge.clearAuthContext();
     if (current != null) {
@@ -207,13 +220,92 @@ class AuthRepository {
     await nativeBridge.resetAccountScopedState();
     _storedSession = null;
     _mobileSession = null;
+    return LockdInAuthState.signedOut(
+      hasKnownAccount: (await storage.readAccountBindings()).isNotEmpty,
+    );
+  }
+
+  Future<LockdInAuthState> deleteAccount() async {
+    final current = _storedSession;
+    final session = _mobileSession;
+    if (current == null || session == null) {
+      throw const ReauthenticationRequired();
+    }
+
+    await nativeBridge.clearAuthContext();
+    try {
+      final reauthenticatedTokens = await oidcClient.signIn(
+        current.config,
+        requireFreshAuthentication: true,
+      );
+      final reauthenticationProof = reauthenticatedTokens.idToken;
+      if (reauthenticationProof == null || reauthenticationProof.isEmpty) {
+        throw const ReauthenticationRequired();
+      }
+      await _authorizedRequest(
+        'DELETE',
+        '/api/v1/auth/account',
+        reauthenticatedTokens.accessToken,
+        additionalHeaders: {
+          'X-LockdIn-Account-Id': session.accountId,
+          'X-LockdIn-ID-Token': reauthenticationProof,
+        },
+      );
+    } on Object catch (error, stackTrace) {
+      try {
+        await nativeBridge.configureAuthContext(
+          accountGeneration: session.accountGeneration,
+          accessToken: current.tokens.accessToken,
+        );
+      } on Object {
+        // Preserve the original deletion or cancellation result.
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+
+    _storedSession = null;
+    _mobileSession = null;
+    var localCleanupIncomplete = false;
+    try {
+      await nativeBridge.deleteAccountData(session.accountGeneration);
+    } on Object {
+      localCleanupIncomplete = true;
+    }
+    try {
+      await storage.writeAccountBindings(const <String, String>{});
+    } on Object {
+      localCleanupIncomplete = true;
+    }
+    try {
+      await storage.deleteSession();
+    } on Object {
+      localCleanupIncomplete = true;
+    }
+    try {
+      await nativeBridge.clearAuthContext();
+    } on Object {
+      localCleanupIncomplete = true;
+    }
+
+    var hasKnownAccount = true;
+    try {
+      hasKnownAccount = (await storage.readAccountBindings()).isNotEmpty;
+    } on Object {
+      localCleanupIncomplete = true;
+    }
+    return LockdInAuthState.signedOut(
+      hasKnownAccount: hasKnownAccount,
+      message: localCleanupIncomplete
+          ? 'Your account was deleted, but some data on this device could not be cleared. Restart the app before signing in again.'
+          : null,
+    );
   }
 
   Future<void> stopAuthenticatedWork() => nativeBridge.clearAuthContext();
 
   Future<String> accountGenerationFor(String issuer, String subject) async {
     final bindings = await storage.readAccountBindings();
-    final key = base64Url.encode(utf8.encode('$issuer\u0000$subject'));
+    final key = _accountBindingKey(issuer, subject);
     final existing = bindings[key];
     if (existing != null && existing.isNotEmpty) return existing;
     final bytes = List<int>.generate(32, (_) => _secureRandom.nextInt(256));
@@ -221,6 +313,9 @@ class AuthRepository {
     await storage.writeAccountBindings({...bindings, key: generation});
     return generation;
   }
+
+  String _accountBindingKey(String issuer, String subject) =>
+      base64Url.encode(utf8.encode('$issuer\u0000$subject'));
 
   Future<AuthConfig> _fetchConfig() async {
     final response = await publicDio.get<Object>('/api/v1/auth/config');
@@ -230,13 +325,14 @@ class AuthRepository {
   Future<Response<Object?>> _authorizedRequest(
     String method,
     String path,
-    String accessToken,
-  ) {
+    String accessToken, {
+    Map<String, String> additionalHeaders = const {},
+  }) {
     return publicDio.request<Object?>(
       path,
       options: Options(
         method: method,
-        headers: {'Authorization': 'Bearer $accessToken'},
+        headers: {'Authorization': 'Bearer $accessToken', ...additionalHeaders},
       ),
     );
   }
