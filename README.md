@@ -329,10 +329,17 @@ days on first sync. The client stores two separate values:
 The watermark advances only to the latest successfully uploaded completed session. If Android has
 not yet published a stop event, a later sync can recover that session in full.
 
+Automatic UsageStats synchronization runs when the authenticated app opens or resumes; it is not a
+scheduled daily background job. With Usage Access granted and Accessibility disabled, reopening
+LockdIn can recover at most the previous three days. Leaving the app unopened longer can therefore
+leave older unsynchronized days incomplete in Weekly Summary, which reads the latest seven calendar
+days from backend history and does not synthesize missing usage.
+
 When Accessibility tracking is active, the live upload queue is the usage source and UsageStats
-fallback pauses. When fallback resumes, every uploaded live interval in the time window is
-subtracted across package boundaries. This prevents Android sources from assigning the same
-transition time to different apps and double counting it.
+fallback pauses. The enabled service can capture and queue foreground intervals while the Flutter
+UI is closed, then upload them when synchronization is available. When fallback resumes, every
+uploaded live interval in the time window is subtracted across package boundaries. This prevents
+Android sources from assigning the same transition time to different apps and double counting it.
 
 ## Demo Data
 

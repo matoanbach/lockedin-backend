@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from lockedin_backend.api.dependencies.principal import (
@@ -12,7 +12,7 @@ from lockedin_backend.schemas.usage import (
     UsageIngestionRequest,
     UsageIngestionResponse,
 )
-from lockedin_backend.services.usage_service import UsageOverlapError, usage_service
+from lockedin_backend.services.usage_service import usage_service
 
 
 router = APIRouter(prefix="/usage", tags=["usage"])
@@ -25,14 +25,7 @@ def ingest_usage_events(
     principal: CurrentPrincipal = Depends(get_current_principal),
     db: Session = Depends(get_db),
 ) -> UsageIngestionResponse:
-    try:
-        return usage_service.ingest_events(db, principal.profile_id, payload)
-    except UsageOverlapError as exc:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(exc),
-        ) from exc
+    return usage_service.ingest_events(db, principal.profile_id, payload)
 
 
 @operator_router.post("/aggregates/rebuild", response_model=UsageAggregateRebuildResponse)

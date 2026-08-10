@@ -86,6 +86,11 @@ be partially implemented and its implemented subset may still be awaiting physic
 - Weekly Summary goal/streak calculations currently treat missing dates as zero-usage successful
   days once any usage history exists. Synchronization or data-gap days can therefore inflate those
   two summaries; the semantic limitation remains unchanged.
+- UsageStats synchronization runs on authenticated app open/resume and recovers at most three days.
+  With Accessibility disabled, leaving LockdIn unopened longer can therefore leave older dates
+  incomplete in the seven-day Weekly Summary. No current acceptance criterion requires a scheduled
+  daily background analytics job; optional Accessibility live capture reduces this gap when the
+  user enables it and keeps Usage Access granted.
 
 ## High-Level Requirements
 

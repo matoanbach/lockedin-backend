@@ -115,11 +115,22 @@ The UI shows a clear connection error. Failed uploads do not move the successful
 Accessibility events remain queued locally, and later synchronization retries when the backend is
 reachable.
 
+### What happens if the user does not open LockdIn for several days?
+
+Automatic UsageStats synchronization is tied to the authenticated app open/resume lifecycle, not a
+scheduled daily background job. With Accessibility disabled, the fallback query recovers at most
+three days, so a longer absence can leave older unsynchronized dates incomplete in the seven-day
+Weekly Summary. This is an accepted prototype limitation: the current Phase 4 scope explicitly
+does not require a fully continuous background analytics pipeline. If the user separately enables
+Accessibility and keeps Usage Access granted, live foreground intervals can be queued while the UI
+is closed and uploaded later.
+
 ### What prevents malformed usage data?
 
 Pydantic validates count, encoded size, string lengths, time-zone awareness, valid IANA zones,
 ordering, maximum six-hour duration, 90-day age, five-minute future tolerance, and within-request
-same-app overlap. The service checks stored overlap and returns `409`.
+same-app overlap. The service subtracts already stored same-app intervals, persists only uncovered
+fragments, and treats fully covered input as duplicate rather than double-counting it.
 
 ### What if the same request is retried?
 

@@ -202,6 +202,18 @@ minutes. Display rounding does not mean the raw interval was recorded as a full 
 Android may publish its final stop event after LockdIn first checks. LockdIn keeps its completed
 session watermark behind unfinished activity so a later sync can recover the full session.
 
+### Will usage still appear if I do not open LockdIn for several days?
+
+With Usage Access granted and Accessibility disabled, LockdIn synchronizes when the authenticated
+app opens or resumes and can recover at most the previous three days. Reopening it within that
+window should add the recovered sessions to Weekly Summary. If it remains unopened longer, earlier
+unsynchronized days can be incomplete because Weekly Summary displays backend-synchronized history
+rather than estimating missing usage.
+
+When the optional Accessibility service is enabled, it can capture and queue foreground intervals
+while the LockdIn UI is closed. Those intervals are included after they are uploaded. Usage Access
+must remain granted for either collection path.
+
 ### Why can Accessibility and UsageStats disagree about the foreground app?
 
 Android sources may attribute a transition to different packages. LockdIn subtracts all already
