@@ -7,12 +7,15 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.media.AudioManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import android.util.Log
+import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityNodeInfo
 import java.time.Instant
 import java.time.ZoneId
 import kotlin.math.absoluteValue
@@ -201,8 +204,7 @@ class LockdinAccessibilityService : AccessibilityService() {
             ),
         )
 
-        performGlobalAction(GLOBAL_ACTION_HOME)
-        launchLockdinIntervention()
+        launchLockdinIntervention(packageName)
         stopMonitoring()
         Log.d(
             tag,
@@ -393,7 +395,7 @@ class LockdinAccessibilityService : AccessibilityService() {
         return content.title to content.body
     }
 
-    private fun launchLockdinIntervention() {
+    private fun launchLockdinIntervention(targetPackageName: String) {
         monitorHandler.postDelayed(
             {
                 startActivity(
@@ -405,8 +407,57 @@ class LockdinAccessibilityService : AccessibilityService() {
                         )
                     },
                 )
+                suppressTargetPictureInPicture(targetPackageName, attempt = 0)
             },
             RETURN_TO_LOCKDIN_DELAY_MILLIS,
+        )
+    }
+
+    private fun suppressTargetPictureInPicture(targetPackageName: String, attempt: Int) {
+        monitorHandler.postDelayed(
+            {
+                val pictureInPictureWindow = windows.firstOrNull { window ->
+                    PictureInPictureInterventionPolicy.matchesTargetWindow(
+                        targetPackageName = targetPackageName,
+                        windowPackageName = window.root?.packageName?.toString(),
+                        isInPictureInPictureMode =
+                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                                window.isInPictureInPictureMode,
+                    )
+                }
+
+                if (pictureInPictureWindow == null) {
+                    if (PictureInPictureInterventionPolicy.shouldRetry(attempt)) {
+                        suppressTargetPictureInPicture(targetPackageName, attempt + 1)
+                    }
+                    return@postDelayed
+                }
+
+                pauseActiveMedia()
+                val root = pictureInPictureWindow.root
+                val dismissed = root != null &&
+                    root.actionList.any { it.id == AccessibilityNodeInfo.ACTION_DISMISS } &&
+                    root.performAction(AccessibilityNodeInfo.ACTION_DISMISS)
+                Log.d(
+                    tag,
+                    "Handled target PiP package=$targetPackageName paused=true dismissed=$dismissed attempt=$attempt",
+                )
+
+                if (!dismissed && PictureInPictureInterventionPolicy.shouldRetry(attempt)) {
+                    suppressTargetPictureInPicture(targetPackageName, attempt + 1)
+                }
+            },
+            PICTURE_IN_PICTURE_RETRY_MILLIS,
+        )
+    }
+
+    private fun pauseActiveMedia() {
+        val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        audioManager.dispatchMediaKeyEvent(
+            KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PAUSE),
+        )
+        audioManager.dispatchMediaKeyEvent(
+            KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PAUSE),
         )
     }
 
@@ -482,5 +533,6 @@ class LockdinAccessibilityService : AccessibilityService() {
         private const val MAX_UPLOAD_BACKFILL_MILLIS =
             MAX_SLICES_PER_FLUSH * MINUTE_MILLIS
         private const val RETURN_TO_LOCKDIN_DELAY_MILLIS = 150L
+        private const val PICTURE_IN_PICTURE_RETRY_MILLIS = 250L
     }
 }

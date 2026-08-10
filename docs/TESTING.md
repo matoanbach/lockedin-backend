@@ -418,6 +418,40 @@ acceptance. Category drill-down has not yet been accepted on a physical device. 
 multi-account switching is explicitly deferred. The repository still lacks a public external web
 deletion-request resource and production retention, backup-deletion, and recovery procedures.
 
+## Physical Picture-in-Picture Soft-Intervention Regression — August 10, 2026
+
+The PiP regression debug APK was built with `--dart-define-from-file=.env`, produced SHA-256
+`1CF4A20CD31D777A40C76B8CC5953F3076D44BFAF9713447F3344A2AC24912B9`, and was installed in
+place on the Samsung SM-A528B with application data and Usage Access preserved. The user manually
+renewed the authenticated session and enabled the LockdIn Accessibility service; ADB confirmed the
+service was enabled and bound with interactive-window retrieval before the test.
+
+For the accepted final-APK run, the user extended the existing YouTube rule from two to five
+minutes instead of deleting retained usage history. Native evaluation began at
+`usedMillis=195932`, emitted the approaching warning at `usedMillis=240961`, and crossed the
+five-minute threshold at `usedMillis=301048`. The same evaluation queued the intervention for
+`com.google.android.youtube`; LockdIn came to the foreground and displayed its intervention dialog.
+
+Android briefly reported the target-owned YouTube window in pinned/PiP mode. On the first bounded
+check, LockdIn dispatched the media-pause key and Android accepted the PiP root's advertised
+dismiss action. The exact native log was
+`Handled target PiP package=com.google.android.youtube paused=true dismissed=true attempt=0`.
+The user observed no YouTube PiP remaining over LockdIn. The post-intervention window state showed
+LockdIn as the resumed, focused, visible fullscreen app and YouTube as invisible and fullscreen,
+not pinned.
+
+This physically verifies both parts of the soft regression handling in the accepted final APK:
+launching LockdIn directly no longer leaves YouTube playing visibly over the intervention, and a
+target-owned PiP window that appeared transiently was paused and dismissed when Android advertised
+that action. It does not establish that LockdIn can forcibly close every third-party PiP window.
+Android exposes PiP-window detection, media-pause dispatch, and node dismissal only when the
+window advertises dismissal, so the fallback remains a user-revocable soft intervention rather
+than a hard or non-bypassable lock.
+
+After testing, the user manually disabled Accessibility. ADB confirmed Usage Access remained
+allowed, `accessibility_enabled` returned `0`, the enabled-service setting was empty, and both the
+bound and enabled Accessibility service sets were empty.
+
 ## Edge Cases Covered in Code
 
 - duplicate source IDs and replay;
