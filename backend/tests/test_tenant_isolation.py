@@ -96,6 +96,7 @@ def test_all_user_routes_fail_closed_before_phase_c(unauthenticated_client) -> N
         ("delete", "/api/v1/accountability/contacts/missing", None),
         ("get", "/api/v1/me/preferences", None),
         ("put", "/api/v1/me/preferences", {"defaultDailyLimitMinutes": 60}),
+        ("delete", "/api/v1/auth/account", None),
     ]
 
     for method, path, payload in requests:

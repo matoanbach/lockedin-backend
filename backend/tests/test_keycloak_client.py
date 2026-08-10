@@ -75,3 +75,31 @@ def test_revoke_access_token_rejection_does_not_expose_token(
     assert SYNTHETIC_ACCESS_TOKEN not in str(caught.value)
     assert SYNTHETIC_ACCESS_TOKEN not in repr(caught.value)
     assert SYNTHETIC_ACCESS_TOKEN not in caplog.text
+
+
+def test_delete_user_uses_encoded_admin_path(monkeypatch) -> None:
+    settings = _settings()
+    subject = "synthetic subject/with separator"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "DELETE"
+        assert str(request.url) == (
+            "https://issuer.test/admin/realms/lockdin/users/"
+            "synthetic%20subject%2Fwith%20separator"
+        )
+        assert "Authorization" in request.headers
+        return httpx.Response(204)
+
+    transport = httpx.MockTransport(handler)
+    monkeypatch.setattr(
+        KeycloakClient,
+        "_client",
+        lambda self: httpx.Client(transport=transport),
+    )
+    monkeypatch.setattr(
+        KeycloakClient,
+        "_service_account_token",
+        lambda self: "synthetic-service-token",
+    )
+
+    KeycloakClient(settings).delete_user(subject)

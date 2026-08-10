@@ -11,6 +11,7 @@ from lockedin_backend.api.dependencies.principal import (
     get_bearer_token,
     get_current_principal,
 )
+from lockedin_backend.core.authentication import InvalidAccessToken, verify_recent_id_token
 from lockedin_backend.core.principal import CurrentPrincipal
 from lockedin_backend.core.provider_events import (
     InvalidProviderEvent,
@@ -23,7 +24,11 @@ from lockedin_backend.schemas.auth import (
     ProviderSecurityEventRequest,
     SessionResponse,
 )
-from lockedin_backend.services.identity_service import PrincipalRejected, SessionService
+from lockedin_backend.services.identity_service import (
+    AccountDeletionService,
+    PrincipalRejected,
+    SessionService,
+)
 from lockedin_backend.services.keycloak_client import KeycloakRejected, KeycloakUnavailable
 
 
@@ -111,6 +116,46 @@ def logout_all(
         service.set_audit_outcome(db, audit_event, "local_applied_provider_failed")
         raise _provider_unavailable() from exc
     service.set_audit_outcome(db, audit_event, "success")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@protected_router.delete(
+    "/account",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        401: {"description": "Authentication required"},
+        409: {"description": "Reauthenticated account mismatch"},
+        503: {"description": "Authentication service unavailable"},
+    },
+)
+def delete_account(
+    request: Request,
+    principal: Annotated[CurrentPrincipal, Depends(get_current_principal)],
+    db: Annotated[Session, Depends(get_db)],
+    expected_account_id: Annotated[str, Header(alias="X-LockdIn-Account-Id")],
+    reauthentication_proof: Annotated[str, Header(alias="X-LockdIn-ID-Token")],
+) -> Response:
+    if expected_account_id != principal.account_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Reauthenticated account does not match the active account",
+        )
+    try:
+        verify_recent_id_token(
+            reauthentication_proof,
+            request.app.state.keycloak_client.fetch_jwks(),
+            request.app.state.settings,
+            expected_subject=principal.subject,
+        )
+        request.app.state.keycloak_client.delete_user(principal.subject)
+    except (KeycloakUnavailable, KeycloakRejected) as exc:
+        raise _provider_unavailable() from exc
+    except InvalidAccessToken as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Recent reauthentication is required",
+        ) from exc
+    AccountDeletionService().delete_account(db, principal)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

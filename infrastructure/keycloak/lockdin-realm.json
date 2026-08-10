@@ -119,6 +119,14 @@
       }
     }
   ],
+  "clientScopeMappings": {
+    "lockdin-api": [
+      {
+        "client": "realm-management",
+        "roles": ["manage-users"]
+      }
+    ]
+  },
   "authenticatorConfig": [
     {
       "alias": "LockdIn max three mobile sessions",

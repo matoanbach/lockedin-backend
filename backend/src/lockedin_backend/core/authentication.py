@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
+import jwt
+
 from lockedin_backend.core.settings import Settings
 
 
@@ -116,3 +118,73 @@ def validate_introspection(
         issued_at=datetime.fromtimestamp(issued_at, timezone.utc),
         expires_at=datetime.fromtimestamp(expires_at, timezone.utc),
     )
+
+
+def verify_recent_id_token(
+    id_token: str,
+    jwks: dict[str, Any],
+    settings: Settings,
+    *,
+    expected_subject: str,
+    now: datetime | None = None,
+) -> None:
+    """Require signed provider evidence of a recent interactive authentication."""
+
+    if not id_token or len(id_token) > 16_384:
+        raise InvalidAccessToken("Invalid reauthentication proof")
+    try:
+        header = jwt.get_unverified_header(id_token)
+    except jwt.PyJWTError as exc:
+        raise InvalidAccessToken("Invalid reauthentication proof") from exc
+    if header.get("alg") != "RS256" or not isinstance(header.get("kid"), str):
+        raise InvalidAccessToken("Invalid reauthentication proof")
+
+    matching = [
+        key
+        for key in jwks.get("keys", [])
+        if isinstance(key, dict)
+        and key.get("kid") == header["kid"]
+        and key.get("kty") == "RSA"
+    ]
+    if len(matching) != 1:
+        raise InvalidAccessToken("Invalid reauthentication proof")
+    try:
+        signing_key = jwt.PyJWK.from_dict(matching[0]).key
+        payload = jwt.decode(
+            id_token,
+            signing_key,
+            algorithms=["RS256"],
+            audience=settings.keycloak_mobile_client_id,
+            issuer=settings.keycloak_issuer,
+            leeway=settings.keycloak_clock_skew_seconds,
+            options={"require": ["iss", "aud", "sub", "iat", "exp", "auth_time"]},
+        )
+    except (jwt.PyJWTError, ValueError) as exc:
+        raise InvalidAccessToken("Invalid reauthentication proof") from exc
+
+    audience = payload.get("aud")
+    audiences = {audience} if isinstance(audience, str) else set(audience or [])
+    subject = payload.get("sub")
+    authenticated_at = payload.get("auth_time")
+    issued_at = payload.get("iat")
+    if audiences != {settings.keycloak_mobile_client_id}:
+        raise InvalidAccessToken("Invalid reauthentication proof")
+    if subject != expected_subject:
+        raise InvalidAccessToken("Invalid reauthentication proof")
+    if (
+        isinstance(authenticated_at, bool)
+        or not isinstance(authenticated_at, int)
+        or isinstance(issued_at, bool)
+        or not isinstance(issued_at, int)
+    ):
+        raise InvalidAccessToken("Invalid reauthentication proof")
+
+    current = now or datetime.now(timezone.utc)
+    current_timestamp = int(current.timestamp())
+    skew = settings.keycloak_clock_skew_seconds
+    if authenticated_at > current_timestamp + skew or authenticated_at > issued_at + skew:
+        raise InvalidAccessToken("Invalid reauthentication proof")
+    if current_timestamp - authenticated_at > (
+        settings.keycloak_recent_auth_max_age_seconds + skew
+    ):
+        raise InvalidAccessToken("Reauthentication proof is too old")
