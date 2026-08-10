@@ -330,7 +330,7 @@ missing dates as zero-usage successful days when calculating goals met and longe
 synchronization or data-gap day can therefore be counted as successful. This behavior was not
 changed during analytics clarification.
 
-## Physical Phase D Authentication Evidence — August 8, 2026
+## Physical Phase D Authentication Evidence — August 8–9, 2026
 
 An isolated Docker project with newly created disposable volumes was exercised from a Samsung
 SM-A528B without clearing or uninstalling the existing app. A purpose-specific local CA was trusted
@@ -347,15 +347,76 @@ preexisting LockdIn or Keycloak database volume participated.
 | Authenticated app state | LockdIn displayed authenticated onboarding and completed it into the Dashboard. No unclaimed-data choice appeared. |
 | Long-offline session | An older stored session attempted refresh and received `400`; the app entered terminal reauthentication and cleared native auth context instead of reusing the stale session. This is failure-path evidence, not successful-refresh evidence. |
 | Sign-out | Settings sign-out returned to the welcome screen; after force-stop/relaunch, Sign in and Create account remained visible and authenticated routes did not return. |
+| Fresh access-token refresh | After a fresh protected `200` baseline, the app remained untouched for more than the realm's 300-second access-token lifetime. A process-only relaunch then produced another protected-session `200`; LockdIn remained the resumed activity and no Chrome/provider reauthentication transition occurred. |
+| SQLite v1-to-v2 migration | An isolated test package used the authentic v1 queue writer, then upgraded in place with the current application. Its one synthetic row survived with all non-owner fields preserved, owner `unclaimed`, schema version 2, no legacy table, and the exact `(owner_generation, source_event_id)` unique-index columns. |
+| Authenticated queue ownership | A current-revision instrumentation test added one controlled row for each of the active, unclaimed, and quarantined owners. Only the active row uploaded; the other two remained locally pending. Targeted teardown restored the exact queue baseline. |
+| Backend upload corroboration | A count-only query for the three controlled source IDs returned active/unclaimed/quarantined counts of `1/0/0`; no full usage rows or identity fields were inspected. |
 
 The run also exposed and fixed two disposable-realm integration defects: the custom browser flow
 now nests required executions under a supported alternative subflow, and the mobile client includes
 Keycloak's built-in `basic` scope so token introspection supplies the required `sub` claim. The
 backend continued to reject tokens without `sub`; validation was not weakened.
 
-This evidence does **not** establish successful refresh after a long-offline provider session,
-password-recovery delivery, real SQLite v1-to-v2 migration against preexisting phone data,
-backup/restore behavior, shared/external deployment safety, or production readiness.
+The August 9 routing was disposable validation scaffolding. Because ADB could not bind privileged
+device port 443, device port 8443 was reversed to a loopback-only Caddy edge. A raw TCP sidecar
+shared the backend network namespace and forwarded backend loopback 8443 to the edge so Keycloak
+introspection could retain the external issuer. It did not terminate or inspect TLS, and CA,
+hostname, issuer, and per-request introspection validation remained enabled. This topology is not
+a production deployment design.
+
+At PR #45's merge commit, all 58 Flutter tests and all 123 backend tests passed, with 3 expected
+backend skips. PR #45 CI passed Backend test, Frontend analyze, Frontend tests, Android APK build,
+and Windows build. August 9 logout/revocation regression evidence from the merged implementation
+remained passing alongside the physical refresh, migration, and queue-ownership checks above.
+
+This evidence does **not** establish refresh of an arbitrarily old provider session, password-
+recovery delivery, migration of the main installed package's preexisting database, backup/restore
+behavior, Phase E adversarial and release controls, shared/external deployment safety, or
+production readiness.
+
+## Account-Deletion and Category Drill-Down Evidence — August 9–10, 2026
+
+Follow-up implementation after the physical Phase D run adds:
+
+- fresh system-browser reauthentication before account deletion;
+- a server-side exact active-account match so another reauthenticated account cannot be deleted;
+- fail-closed rejection without auto-provisioning for an unknown deletion identity;
+- provider identity deletion followed by profile-owned backend deletion;
+- de-identification of retained security-audit linkage;
+- deletion of only the active account generation's local queues, watermarks, and warning markers,
+  plus removal of every installation binding after authoritative deletion under the current
+  one-account-per-installation scope;
+- a one-account-per-installation guard that hides account creation on returning devices and rejects
+  a different account without replacing the existing binding; and
+- same-day per-app details inside clickable dashboard categories.
+
+The complete backend suite passed with 132 tests and 3 expected skips. After the physical follow-up
+fixes, the complete Flutter suite passed 70 tests, Flutter analysis reported no issues, and Android
+JVM tests plus the debug build completed successfully.
+
+On August 10, the Samsung SM-A528B physically completed freshly reauthenticated account deletion
+against the disposable validation stack. The first deletion request had returned `503` before the
+Keycloak service account received its narrow `realm-management/manage-users` client scope mapping.
+After that repair, the same active disposable account completed the system-browser
+**Sign in to your account** step, `DELETE /api/v1/auth/account` returned `204`, LockdIn displayed
+**Welcome to LockdIn** rather than **Sign in again**, and Keycloak rejected the deleted credentials
+with its generic invalid-credentials response. Count/status-only corroboration found one
+de-identified successful-deletion audit event and no additional deletion request.
+
+The physical run exposed two post-`204` client defects. Reconstructing `GoRouter` during the auth
+transition caused a Flutter render-tree assertion; the router is now stable and refreshes its
+redirect from auth state. A stale installation binding also hid **Create account** after deletion;
+successful deletion now clears all installation bindings and empty secure binding storage deletes
+the key. The authorized recovery removed only that already-stale binding from the validation
+installation. **Create account** then appeared. The main SQLite database remained 28,672 bytes with
+timestamp `1786304505` throughout in-place APK installation and recovery. The accepted APK is
+193,268,122 bytes with SHA-256
+`D0125033353081EB10E39E0518CDED39C38F24F5FCCEBA966E06EB109C48681E`.
+
+Account deletion and the single-account returning/deleted-device screens therefore have physical
+acceptance. Category drill-down has not yet been accepted on a physical device. Same-device
+multi-account switching is explicitly deferred. The repository still lacks a public external web
+deletion-request resource and production retention, backup-deletion, and recovery procedures.
 
 ## Edge Cases Covered in Code
 

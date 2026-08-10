@@ -26,7 +26,8 @@ The Phase C backend identity/session boundary is implemented: every protected re
 introspected, restrictive provider claims are validated, exact immutable identities provision or
 resolve one non-demo tenant, and local revocation/audit controls are enforced. Phase D now adds the
 Flutter/native authentication lifecycle, guarded routes, secure rotating tokens, bounded renewal,
-logout/account switching, and account-generation-scoped queues. Therefore:
+logout, a one-account-per-installation guard, and account-generation-scoped queues. Same-device
+multi-account switching is deferred to future development. Therefore:
 
 - evaluator credentials still depend on the prepared local Keycloak realm and must not be invented;
 - protected API requests require a valid introspected Keycloak bearer token;

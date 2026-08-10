@@ -26,7 +26,11 @@ Optional permissions:
 
 The Phase D build has a **Sign in or create account** screen. It opens the configured Keycloak page
 in the system browser; LockdIn never asks for the password inside the app. Use only a prepared local
-test identity. The seeded default profile is demo-only and is not an authenticated account.
+test identity. The seeded default profile is demo-only and is not an authenticated account. The
+current mobile scope supports one account per app installation. After an account has been used on
+the device, the welcome screen offers only **Sign in** for that account and does not reveal its
+identity while signed out. To use a different account, delete the current account first. Same-device
+multi-account switching is future development.
 
 ## First Launch
 
@@ -58,7 +62,9 @@ Category names are assigned from a curated, package-based descriptive taxonomy s
 Messaging**, **Video & Entertainment**, and **System & Utilities**. They organize comparable
 analytics; they do not judge whether an app or behavior is productive, good, or bad. Unknown
 packages retain useful supplied names and categories when available. Arbitrary category creation
-and per-app category reassignment are not available in the current build.
+and per-app category reassignment are not available in the current build. Tap a category card to
+see the friendly app names, package identifiers, and exact display durations contributing to that
+category today.
 
 To synchronize manually:
 
@@ -124,9 +130,16 @@ The settings area provides links for:
 - notification permission and diagnostics;
 - Accessibility service;
 - text size, high contrast, and larger tap targets;
-- privacy information.
-- sign out/account switching, which stops uploads, clears secure session material and account-scoped
-  caches, and preserves other-account queued rows in quarantine.
+- privacy information;
+- sign out, which stops uploads and clears secure session material and account-scoped caches; and
+- **Delete account**, which requires typing `DELETE` and a fresh system-browser sign-in for the same
+  active account. Successful deletion removes the provider identity, profile-owned backend data,
+  secure session, account binding, and that account generation's local queued data. Retained security
+  evidence is de-identified.
+
+The current repository does not provide the separate external web deletion-request resource needed
+for a public store release. That release requirement must be completed with an approved public URL
+and retention policy before production distribution.
 
 Changing an Android permission is a user-controlled system action. LockdIn opens Settings but does
 not silently grant the permission.
