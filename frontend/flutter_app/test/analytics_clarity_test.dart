@@ -51,6 +51,14 @@ const _dashboard = DashboardAnalyticsData(
       minutes: 0,
       durationMilliseconds: 19_933,
       color: AppColors.info,
+      apps: [
+        CategoryAppUsage(
+          appId: 'com.android.chrome',
+          appName: 'Chrome',
+          minutes: 0,
+          durationMilliseconds: 19_933,
+        ),
+      ],
     ),
   ],
   weeklyUsageHours: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1],
@@ -84,6 +92,14 @@ void main() {
                       'name': 'Video & Entertainment',
                       'minutes': 0,
                       'durationMilliseconds': 19_933,
+                      'apps': [
+                        {
+                          'appId': 'com.google.android.youtube',
+                          'appName': 'YouTube',
+                          'minutes': 0,
+                          'durationMilliseconds': 19_933,
+                        },
+                      ],
                     },
                     {
                       'name': 'Learning',
@@ -114,6 +130,8 @@ void main() {
       final analytics = await AnalyticsRepository(dio).fetchDashboard();
 
       expect(analytics.categoryBreakdown[0].formattedTime, '<1m');
+      expect(analytics.categoryBreakdown[0].apps.single.appName, 'YouTube');
+      expect(analytics.categoryBreakdown[0].apps.single.formattedTime, '<1m');
       expect(
         analytics.categoryBreakdown[0].color,
         AppColors.videoEntertainment,
@@ -280,6 +298,35 @@ void main() {
     expect(find.text('Lockdown Rules'), findsOneWidget);
     expect(find.byType(BottomSheet), findsOneWidget);
     expect(find.text('Create Rule'), findsWidgets);
+  });
+
+  testWidgets('Dashboard category opens its tracked apps for today', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          dashboardAnalyticsProvider.overrideWith((_) async => _dashboard),
+          devicePermissionsProvider.overrideWith(
+            _TestDevicePermissionsController.new,
+          ),
+          usageSyncControllerProvider.overrideWith(
+            _TestUsageSyncController.new,
+          ),
+        ],
+        child: const MaterialApp(home: DashboardScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Web & Search'), 300);
+
+    await tester.tap(find.text('Web & Search'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Chrome'), findsOneWidget);
+    expect(find.text('com.android.chrome'), findsOneWidget);
+    expect(find.textContaining('tracked today across 1 app'), findsOneWidget);
+    expect(find.textContaining('assigned automatically'), findsOneWidget);
   });
 
   testWidgets('Rules route opens the overview without the creation form', (

@@ -3,10 +3,18 @@ from pydantic import Field
 from lockedin_backend.core.serialization import APIModel
 
 
+class CategoryAppBreakdownItem(APIModel):
+    app_id: str
+    app_name: str
+    minutes: int
+    duration_milliseconds: int
+
+
 class CategoryBreakdownItem(APIModel):
     name: str
     minutes: int
     duration_milliseconds: int
+    apps: list[CategoryAppBreakdownItem] = Field(default_factory=list)
 
 
 class HourlyUsagePoint(APIModel):

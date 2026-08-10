@@ -139,6 +139,14 @@ def test_dashboard_trends_and_weekly_summary_are_db_backed(client, monkeypatch) 
                 "name": "Social & Messaging",
                 "minutes": 60,
                 "durationMilliseconds": 3_600_000,
+                "apps": [
+                    {
+                        "appId": "com.instagram.android",
+                        "appName": "Instagram",
+                        "minutes": 60,
+                        "durationMilliseconds": 3_600_000,
+                    }
+                ],
             }
         ],
         "weeklyUsageHours": [1.0, 0.5, 1.5, 0.8, 0.5, 0.8, 1.0],
@@ -225,6 +233,14 @@ def test_analytics_uses_exact_time_and_floors_only_display_minutes(
             "name": "Social & Messaging",
             "minutes": 5,
             "durationMilliseconds": 315_400,
+            "apps": [
+                {
+                    "appId": "com.google.android.apps.messaging",
+                    "appName": "Messages",
+                    "minutes": 5,
+                    "durationMilliseconds": 315_400,
+                }
+            ],
         }
     ]
     assert dashboard["deltaFromYesterdayPercent"] == 5
@@ -327,11 +343,27 @@ def test_known_packages_reclassify_exact_historical_style_category_duration(
             "name": "System & Utilities",
             "minutes": 0,
             "durationMilliseconds": 18_738,
+            "apps": [
+                {
+                    "appId": "com.android.vending",
+                    "appName": "Google Play Store",
+                    "minutes": 0,
+                    "durationMilliseconds": 18_738,
+                }
+            ],
         },
         {
             "name": "Web & Search",
             "minutes": 0,
             "durationMilliseconds": 1_195,
+            "apps": [
+                {
+                    "appId": "com.google.android.googlequicksearchbox",
+                    "appName": "Google",
+                    "minutes": 0,
+                    "durationMilliseconds": 1_195,
+                }
+            ],
         },
     ]
     assert sum(

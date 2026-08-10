@@ -517,36 +517,157 @@ class _CategoryItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 12,
-                height: 12,
+    return Semantics(
+      button: true,
+      label: 'View apps in ${data.name}',
+      child: AppCard(
+        onTap: () => _showCategoryDetails(context),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: data.color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                Spacing.horizontalMd,
+                Expanded(
+                  child: Text(data.name, style: AppTextStyles.titleMedium),
+                ),
+                Spacing.horizontalMd,
+                Text(
+                  data.formattedTime,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textTertiary,
+                  ),
+                ),
+                Spacing.horizontalSm,
+                const Icon(
+                  Icons.chevron_right,
+                  color: AppColors.textMuted,
+                  size: 20,
+                ),
+              ],
+            ),
+            Spacing.verticalSm,
+            AppProgressBar(value: percentage, color: data.color),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showCategoryDetails(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.background,
+      builder: (context) => _CategoryDetailsSheet(data: data),
+    );
+  }
+}
+
+class _CategoryDetailsSheet extends StatelessWidget {
+  const _CategoryDetailsSheet({required this.data});
+
+  final UsageData data;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.65,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        builder: (context, scrollController) => ListView(
+          controller: scrollController,
+          padding: Spacing.page,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
                 decoration: BoxDecoration(
-                  color: data.color,
-                  shape: BoxShape.circle,
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(999),
                 ),
               ),
-              Spacing.horizontalMd,
-              Expanded(
-                child: Text(data.name, style: AppTextStyles.titleMedium),
+            ),
+            Spacing.verticalLg,
+            Text(data.name, style: AppTextStyles.headlineSmall),
+            Spacing.verticalXs,
+            Text(
+              '${data.formattedTime} tracked today across ${data.apps.length} ${data.apps.length == 1 ? 'app' : 'apps'}.',
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textSecondary,
               ),
-              Spacing.horizontalMd,
-              Text(
-                data.formattedTime,
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.textTertiary,
+            ),
+            Spacing.verticalXl,
+            if (data.apps.isEmpty)
+              const AppCard(
+                child: Text('No app details are available for this category.'),
+              )
+            else
+              ...data.apps.map(
+                (app) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: AppCard(
+                    child: Row(
+                      children: [
+                        IconBox(
+                          icon: Icons.apps_rounded,
+                          color: data.color,
+                          size: 44,
+                          iconSize: 22,
+                        ),
+                        Spacing.horizontalMd,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                app.appName,
+                                style: AppTextStyles.titleSmall,
+                              ),
+                              Spacing.verticalXs,
+                              Text(
+                                app.appId,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTextStyles.labelSmall.copyWith(
+                                  color: AppColors.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Spacing.horizontalMd,
+                        Text(
+                          app.formattedTime,
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ],
-          ),
-          Spacing.verticalSm,
-          AppProgressBar(value: percentage, color: data.color),
-        ],
+            Spacing.verticalLg,
+            Text(
+              'Categories are assigned automatically from app package information and LockdIn’s descriptive taxonomy.',
+              style: AppTextStyles.bodySmall.copyWith(
+                color: AppColors.textMuted,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

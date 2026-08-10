@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from lockedin_backend.repositories.preferences_repository import PreferencesRepository
 from lockedin_backend.repositories.usage_repository import UsageRepository
 from lockedin_backend.schemas.analytics import (
+    CategoryAppBreakdownItem,
     CategoryBreakdownItem,
     DashboardAnalyticsResponse,
     HourlyUsagePoint,
@@ -40,7 +41,13 @@ class AnalyticsService:
         effective_timezone = self._get_effective_timezone(db, profile_id)
         today = self._today_in_timezone(effective_timezone)
         week_dates = self._build_day_range(today, 7)
-        daily_totals, category_totals, _, _ = self._collect_daily_usage(
+        (
+            daily_totals,
+            category_totals,
+            _,
+            app_names,
+            category_app_totals,
+        ) = self._collect_daily_usage(
             db, profile_id
         )
         today_categories = sorted(
@@ -62,6 +69,26 @@ class AnalyticsService:
                     name=category,
                     minutes=completed_minutes(milliseconds),
                     duration_milliseconds=milliseconds,
+                    apps=[
+                        CategoryAppBreakdownItem(
+                            app_id=app_id,
+                            app_name=app_names[app_id],
+                            minutes=completed_minutes(app_milliseconds),
+                            duration_milliseconds=app_milliseconds,
+                        )
+                        for app_id, app_milliseconds in sorted(
+                            (
+                                (app_id, app_milliseconds)
+                                for (
+                                    usage_date,
+                                    app_category,
+                                    app_id,
+                                ), app_milliseconds in category_app_totals.items()
+                                if usage_date == today and app_category == category
+                            ),
+                            key=lambda item: (-item[1], app_names[item[0]]),
+                        )
+                    ],
                 )
                 for category, milliseconds in today_categories
             ],
@@ -81,7 +108,7 @@ class AnalyticsService:
         timezone_value = ZoneInfo(effective_timezone)
         today = self._today_in_timezone(effective_timezone)
         week_dates = self._build_day_range(today, 7)
-        daily_totals, _, app_totals, app_names = self._collect_daily_usage(
+        daily_totals, _, app_totals, app_names, _ = self._collect_daily_usage(
             db, profile_id
         )
         range_start = datetime.combine(week_dates[0], time.min, tzinfo=timezone_value).astimezone(
@@ -155,7 +182,7 @@ class AnalyticsService:
         current_week_dates = self._build_day_range(today, 7)
         previous_week_end = current_week_dates[0] - timedelta(days=1)
         previous_week_dates = self._build_day_range(previous_week_end, 7)
-        daily_totals, _, _, _ = self._collect_daily_usage(db, profile_id)
+        daily_totals, _, _, _, _ = self._collect_daily_usage(db, profile_id)
         current_totals = {
             day: daily_totals.get(day, 0) for day in current_week_dates
         }
@@ -210,11 +237,13 @@ class AnalyticsService:
         dict[tuple[date, str], int],
         dict[tuple[date, str], int],
         dict[str, str],
+        dict[tuple[date, str, str], int],
     ]:
         daily_totals: dict[date, int] = defaultdict(int)
         category_totals: dict[tuple[date, str], int] = defaultdict(int)
         app_totals: dict[tuple[date, str], int] = defaultdict(int)
         app_names: dict[str, str] = {}
+        category_app_totals: dict[tuple[date, str, str], int] = defaultdict(int)
 
         for event in self.usage_repository.list_all_for_profile(db, profile_id):
             classification = classify_app(
@@ -233,8 +262,17 @@ class AnalyticsService:
                     (usage_date, classification.category)
                 ] += milliseconds
                 app_totals[(usage_date, event.app_id)] += milliseconds
+                category_app_totals[
+                    (usage_date, classification.category, event.app_id)
+                ] += milliseconds
 
-        return daily_totals, category_totals, app_totals, app_names
+        return (
+            daily_totals,
+            category_totals,
+            app_totals,
+            app_names,
+            category_app_totals,
+        )
 
     def _get_effective_timezone(self, db: Session, profile_id: str) -> str:
         return self.usage_repository.get_latest_timezone(db, profile_id) or "UTC"
