@@ -199,7 +199,7 @@ def test_usage_ingestion_rejects_overlapping_same_app_intervals(client) -> None:
     assert response.status_code == 422
 
 
-def test_usage_ingestion_rejects_overlap_with_stored_event(client, db_session) -> None:
+def test_usage_ingestion_clips_overlap_with_stored_event(client, db_session) -> None:
     now = datetime.now(timezone.utc).replace(microsecond=0)
     first = _event_payload("stored-1", now - timedelta(minutes=10), now - timedelta(minutes=5))
     overlapping = _event_payload("stored-2", now - timedelta(minutes=7), now - timedelta(minutes=2))
@@ -207,8 +207,73 @@ def test_usage_ingestion_rejects_overlap_with_stored_event(client, db_session) -
     assert client.post("/api/v1/usage/events", json={"events": [first]}).status_code == 200
     response = client.post("/api/v1/usage/events", json={"events": [overlapping]})
 
-    assert response.status_code == 409
+    assert response.status_code == 200
+    assert response.json() == {
+        "receivedCount": 1,
+        "createdCount": 1,
+        "duplicateCount": 0,
+    }
+    stored = db_session.query(UsageEvent).order_by(UsageEvent.started_at.asc()).all()
+    assert len(stored) == 2
+    assert stored[1].source_event_id == "stored-2"
+    assert stored[1].started_at == (now - timedelta(minutes=5)).replace(tzinfo=None)
+    assert stored[1].ended_at == (now - timedelta(minutes=2)).replace(tzinfo=None)
+
+
+def test_usage_ingestion_treats_fully_covered_event_as_duplicate(client, db_session) -> None:
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    stored = _event_payload("covered-1", now - timedelta(minutes=10), now)
+    covered = _event_payload(
+        "covered-2",
+        now - timedelta(minutes=8),
+        now - timedelta(minutes=2),
+    )
+
+    assert client.post("/api/v1/usage/events", json={"events": [stored]}).status_code == 200
+    response = client.post("/api/v1/usage/events", json={"events": [covered]})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "receivedCount": 1,
+        "createdCount": 0,
+        "duplicateCount": 1,
+    }
     assert db_session.query(UsageEvent).count() == 1
+
+
+def test_usage_ingestion_splits_around_multiple_stored_intervals(client, db_session) -> None:
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    first = _event_payload(
+        "split-existing-1",
+        now - timedelta(minutes=10),
+        now - timedelta(minutes=8),
+    )
+    second = _event_payload(
+        "split-existing-2",
+        now - timedelta(minutes=6),
+        now - timedelta(minutes=4),
+    )
+    recovery = _event_payload(
+        "split-recovery",
+        now - timedelta(minutes=12),
+        now - timedelta(minutes=2),
+    )
+
+    assert client.post("/api/v1/usage/events", json={"events": [first]}).status_code == 200
+    assert client.post("/api/v1/usage/events", json={"events": [second]}).status_code == 200
+    response = client.post("/api/v1/usage/events", json={"events": [recovery]})
+
+    assert response.status_code == 200
+    assert response.json()["createdCount"] == 1
+    stored = db_session.query(UsageEvent).order_by(UsageEvent.started_at.asc()).all()
+    assert len(stored) == 5
+    assert sum(event.duration_minutes for event in stored) == 10
+    assert len({event.source_event_id for event in stored}) == 5
+
+    retry = client.post("/api/v1/usage/events", json={"events": [recovery]})
+    assert retry.status_code == 200
+    assert retry.json()["duplicateCount"] == 1
+    assert db_session.query(UsageEvent).count() == 5
 
 
 def test_partial_events_keep_zero_completed_aggregate_minutes(client, db_session) -> None:

@@ -268,10 +268,57 @@ void main() {
     );
     expect(preferences.getInt('usage_sync.last_successful_at'), isNull);
   });
+
+  test('automatic sync starts when Usage Access is enabled', () async {
+    final calledMethods = <String>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          calledMethods.add(call.method);
+          if (call.method == 'getPermissionStatus') {
+            return permissionStatus(accessibility: false);
+          }
+          if (call.method == 'collectUsageEventBatch') {
+            return {'events': <Map<String, dynamic>>[], 'hasMore': false};
+          }
+          fail('Unexpected native method ${call.method}');
+        });
+
+    final result = await UsageSyncRepository(
+      Dio(),
+    ).maybeAutoSync(cooldown: Duration.zero);
+
+    expect(result, isNotNull);
+    expect(calledMethods, contains('collectUsageEventBatch'));
+    final preferences = await SharedPreferences.getInstance();
+    expect(preferences.getInt('usage_sync.last_successful_at'), isNotNull);
+  });
+
+  test('automatic sync pauses when Usage Access is revoked', () async {
+    final calledMethods = <String>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          calledMethods.add(call.method);
+          if (call.method == 'getPermissionStatus') {
+            return permissionStatus(accessibility: true, usageAccess: false);
+          }
+          fail('Unexpected native method ${call.method}');
+        });
+
+    final result = await UsageSyncRepository(Dio()).maybeAutoSync();
+
+    expect(result, isNull);
+    expect(calledMethods, isNot(contains('collectUsageEventBatch')));
+    expect(calledMethods, isNot(contains('flushPendingUsageUploads')));
+    final preferences = await SharedPreferences.getInstance();
+    expect(preferences.getInt('usage_sync.last_successful_at'), isNull);
+  });
 }
 
-Map<String, dynamic> permissionStatus({required bool accessibility}) => {
-  'usageAccess': true,
+Map<String, dynamic> permissionStatus({
+  required bool accessibility,
+  bool usageAccess = true,
+}) => {
+  'usageAccess': usageAccess,
   'notifications': false,
   'accessibility': accessibility,
   'notificationDiagnostics': <String, dynamic>{},

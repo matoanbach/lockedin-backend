@@ -205,7 +205,8 @@ def test_two_accounts_are_isolated_across_user_routes(
     )
     assert first_b.json()["createdCount"] == 1
     assert duplicate_b.json()["duplicateCount"] == 1
-    assert overlap_b.status_code == 409
+    assert overlap_b.status_code == 200
+    assert overlap_b.json()["duplicateCount"] == 1
 
     rule_b = client.post(
         "/api/v1/rules",

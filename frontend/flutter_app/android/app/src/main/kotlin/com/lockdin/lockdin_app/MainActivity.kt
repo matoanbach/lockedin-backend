@@ -1,13 +1,11 @@
 package com.lockdin.lockdin_app
 
-import android.app.AppOpsManager
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.os.Build
-import android.os.Process
 import android.provider.Settings
 import androidx.core.app.NotificationManagerCompat
 import io.flutter.embedding.android.FlutterActivity
@@ -179,24 +177,7 @@ class MainActivity : FlutterActivity() {
         )
     }
 
-    private fun hasUsageAccess(): Boolean {
-        val appOpsManager = getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-        val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            appOpsManager.unsafeCheckOpNoThrow(
-                AppOpsManager.OPSTR_GET_USAGE_STATS,
-                Process.myUid(),
-                packageName,
-            )
-        } else {
-            appOpsManager.checkOpNoThrow(
-                AppOpsManager.OPSTR_GET_USAGE_STATS,
-                Process.myUid(),
-                packageName,
-            )
-        }
-
-        return mode == AppOpsManager.MODE_ALLOWED
-    }
+    private fun hasUsageAccess(): Boolean = UsageAccessChecker.isGranted(this)
 
     private fun openUsageAccessSettings() {
         startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))

@@ -73,6 +73,11 @@ class LockdinAccessibilityService : AccessibilityService() {
             return
         }
 
+        if (!UsageAccessChecker.isGranted(this)) {
+            stopTrackingForRevokedUsageAccess()
+            return
+        }
+
         if (!isDeviceInteractiveAndUnlocked()) {
             finalizeActivePackageSession()
             return
@@ -128,6 +133,10 @@ class LockdinAccessibilityService : AccessibilityService() {
     }
 
     private fun evaluateActivePackage(forceUploadPartialSlice: Boolean = false): Boolean {
+        if (!UsageAccessChecker.isGranted(this)) {
+            stopTrackingForRevokedUsageAccess()
+            return false
+        }
         if (!isDeviceInteractiveAndUnlocked()) {
             finalizeActivePackageSession()
             return false
@@ -287,6 +296,19 @@ class LockdinAccessibilityService : AccessibilityService() {
             persistActivePackageUsage(nowMillis)
         }
 
+        activePackageName = null
+        activePackageAppName = ""
+        activePackageCategory = null
+        activePackageStartedAtMillis = null
+        activePackageUploadedUntilMillis = null
+        activePackagePersistedUntilMillis = null
+        stopMonitoring()
+    }
+
+    private fun stopTrackingForRevokedUsageAccess() {
+        if (activePackageName != null) {
+            Log.d(tag, "Usage Access was revoked; discarding the active partial session")
+        }
         activePackageName = null
         activePackageAppName = ""
         activePackageCategory = null

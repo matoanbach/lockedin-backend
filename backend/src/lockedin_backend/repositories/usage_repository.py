@@ -97,6 +97,6 @@ class UsageRepository:
                     UsageEvent.app_id == app_id,
                     UsageEvent.started_at < ended_at,
                     UsageEvent.ended_at > started_at,
-                )
+                ).order_by(UsageEvent.started_at.asc())
             ).scalars()
         )
