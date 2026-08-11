@@ -4,7 +4,7 @@ import ssl
 from contextlib import contextmanager
 from threading import BoundedSemaphore
 from typing import Any, Iterator
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 import httpx
 
@@ -35,6 +35,8 @@ class KeycloakClient:
         return configured.get_secret_value()
 
     def _verify(self) -> ssl.SSLContext | bool:
+        if urlsplit(self.settings.keycloak_backchannel_server_url).scheme == "http":
+            return True
         if self.settings.keycloak_ca_bundle is None:
             return True
         try:
@@ -76,7 +78,7 @@ class KeycloakClient:
         try:
             with self._request_slot(), self._client() as client:
                 response = client.post(
-                    self.settings.keycloak_introspection_url,
+                    self.settings.keycloak_backchannel_introspection_url,
                     data={"token": access_token, "token_type_hint": "access_token"},
                     auth=httpx.BasicAuth(
                         self.settings.keycloak_api_client_id, self._secret()
@@ -93,7 +95,7 @@ class KeycloakClient:
         try:
             with self._request_slot(), self._client() as client:
                 response = client.post(
-                    self.settings.keycloak_revocation_url,
+                    self.settings.keycloak_backchannel_revocation_url,
                     data={
                         "token": access_token,
                         "token_type_hint": "access_token",
@@ -109,7 +111,7 @@ class KeycloakClient:
         try:
             with self._request_slot(), self._client() as client:
                 response = client.post(
-                    self.settings.keycloak_token_url,
+                    self.settings.keycloak_backchannel_token_url,
                     data={"grant_type": "client_credentials"},
                     auth=httpx.BasicAuth(
                         self.settings.keycloak_api_client_id, self._secret()
@@ -155,7 +157,7 @@ class KeycloakClient:
 
     def _admin_user_url(self, subject: str) -> str:
         return (
-            f"{self.settings.keycloak_server_url}/admin/realms/"
+            f"{self.settings.keycloak_backchannel_server_url}/admin/realms/"
             f"{quote(self.settings.keycloak_realm, safe='')}/users/"
             f"{quote(subject, safe='')}"
         )
@@ -164,7 +166,7 @@ class KeycloakClient:
         try:
             with self._request_slot(), self._client() as client:
                 response = client.get(
-                    self.settings.keycloak_jwks_url,
+                    self.settings.keycloak_backchannel_jwks_url,
                     headers={"Accept": "application/json"},
                 )
             payload = self._json(response)

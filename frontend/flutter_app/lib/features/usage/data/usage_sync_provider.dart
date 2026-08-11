@@ -377,24 +377,7 @@ class UsageSyncRepository {
     }
 
     if (permissions.accessibility) {
-      final rawSummary = await _channel.invokeMapMethod<String, dynamic>(
-        'flushPendingUsageUploads',
-      );
-      final summary = rawSummary ?? const <String, dynamic>{};
-      final uploadedCount = (summary['uploadedCount'] as num?)?.toInt() ?? 0;
-      final pendingCount = (summary['pendingCount'] as num?)?.toInt() ?? 0;
-      if (pendingCount > 0) {
-        throw StateError(
-          'Live usage uploads are still pending. Keep the backend online and try again.',
-        );
-      }
-
-      return UsageSyncResult(
-        collectedCount: uploadedCount,
-        createdCount: uploadedCount,
-        duplicateCount: 0,
-        syncedAt: DateTime.now(),
-      );
+      return _drainLiveUsageQueue();
     }
 
     final preferences = await SharedPreferences.getInstance();
@@ -484,6 +467,64 @@ class UsageSyncRepository {
     );
   }
 
+  Future<UsageSyncResult> _drainLiveUsageQueue() async {
+    var totalUploadedCount = 0;
+    var pendingCount = 0;
+
+    for (
+      var batchNumber = 0;
+      batchNumber < _maximumLiveQueueDrainBatches;
+      batchNumber++
+    ) {
+      final rawSummary = await _channel.invokeMapMethod<String, dynamic>(
+        'flushPendingUsageUploads',
+      );
+      final summary = rawSummary ?? const <String, dynamic>{};
+      final uploadedCount = (summary['uploadedCount'] as num?)?.toInt() ?? 0;
+      final failedCount = (summary['failedCount'] as num?)?.toInt() ?? 0;
+      pendingCount = (summary['pendingCount'] as num?)?.toInt() ?? 0;
+      final lastError = summary['lastError'] as String? ?? '';
+      totalUploadedCount += uploadedCount;
+
+      if (pendingCount == 0) {
+        return UsageSyncResult(
+          collectedCount: totalUploadedCount,
+          createdCount: totalUploadedCount,
+          duplicateCount: 0,
+          syncedAt: DateTime.now(),
+        );
+      }
+
+      if (failedCount > 0) {
+        throw StateError(_liveUsageFailureMessage(lastError, pendingCount));
+      }
+
+      if (uploadedCount == 0) {
+        throw StateError(
+          'Live usage upload made no progress. '
+          '$pendingCount events remain; reopen LockdIn and try again.',
+        );
+      }
+    }
+
+    throw StateError(
+      'Uploaded $totalUploadedCount live usage events, but $pendingCount remain '
+      'after the safe per-sync limit. Run Sync Recent Usage again.',
+    );
+  }
+
+  String _liveUsageFailureMessage(String lastError, int pendingCount) {
+    final reason = switch (lastError) {
+      'network_error' => 'The backend could not be reached.',
+      'HTTP 401' ||
+      'HTTP 403' => 'Your authenticated session could not upload usage.',
+      _ when lastError.startsWith('HTTP ') =>
+        'The backend rejected a live usage upload ($lastError).',
+      _ => 'A live usage upload failed.',
+    };
+    return '$reason $pendingCount events remain; try again.';
+  }
+
   Future<void> _storeSuccessfulSync(UsageSyncResult result) async {
     final preferences = await SharedPreferences.getInstance();
     await preferences.setInt(
@@ -514,5 +555,6 @@ class UsageSyncRepository {
 
   static const int _maximumQueryDays = 3;
   static const int _maximumBatches = 50;
+  static const int _maximumLiveQueueDrainBatches = 20;
   static const String _usageWatermarkAtKey = 'usage_sync.watermark_at';
 }

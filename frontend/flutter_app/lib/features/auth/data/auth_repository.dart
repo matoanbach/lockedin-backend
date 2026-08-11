@@ -15,6 +15,7 @@ class AuthRepository {
     required this.storage,
     required this.oidcClient,
     required this.nativeBridge,
+    this.legacyKeycloakIssuer = '',
     DateTime Function()? now,
     Random? secureRandom,
   }) : _now = now ?? DateTime.now,
@@ -24,6 +25,7 @@ class AuthRepository {
   final AuthStorage storage;
   final OidcClient oidcClient;
   final NativeAuthBridge nativeBridge;
+  final String legacyKeycloakIssuer;
   final DateTime Function() _now;
   final Random _secureRandom;
 
@@ -83,8 +85,25 @@ class AuthRepository {
     if (issuer != stored.config.issuer) {
       throw const ReauthenticationRequired();
     }
-    final bindings = await storage.readAccountBindings();
+    var bindings = await storage.readAccountBindings();
     final bindingKey = _accountBindingKey(issuer, subject);
+    if (transitioningAccount &&
+        bindings.isNotEmpty &&
+        !bindings.containsKey(bindingKey) &&
+        legacyKeycloakIssuer.isNotEmpty &&
+        legacyKeycloakIssuer != issuer) {
+      final legacyBindingKey = _accountBindingKey(
+        legacyKeycloakIssuer,
+        subject,
+      );
+      final legacyGeneration = bindings[legacyBindingKey];
+      if (legacyGeneration != null && legacyGeneration.isNotEmpty) {
+        bindings = {...bindings}
+          ..remove(legacyBindingKey)
+          ..[bindingKey] = legacyGeneration;
+        await storage.writeAccountBindings(bindings);
+      }
+    }
     if (transitioningAccount &&
         bindings.isNotEmpty &&
         !bindings.containsKey(bindingKey)) {

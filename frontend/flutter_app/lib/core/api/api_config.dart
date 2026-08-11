@@ -5,6 +5,10 @@ class ApiConfig {
     'LOCKDIN_API_BASE_URL',
     defaultValue: '',
   );
+  static const String legacyKeycloakIssuer = String.fromEnvironment(
+    'LOCKDIN_LEGACY_KEYCLOAK_ISSUER',
+    defaultValue: '',
+  );
 
   static String get baseUrl {
     if (_baseUrlOverride.isNotEmpty) {

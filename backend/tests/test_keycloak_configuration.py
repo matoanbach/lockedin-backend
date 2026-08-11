@@ -106,6 +106,23 @@ def test_session_limiter_reset_and_compose_import_wiring() -> None:
     assert "KEYCLOAK_CA_BUNDLE_HOST_PATH:?" in compose
 
 
+def test_tailscale_override_keeps_internal_services_off_host_interfaces() -> None:
+    override = (REPOSITORY_ROOT / "docker-compose.tailscale.yml").read_text(
+        encoding="utf-8"
+    )
+    caddyfile = (REPOSITORY_ROOT / "infrastructure" / "Caddyfile.tailscale").read_text(
+        encoding="utf-8"
+    )
+
+    assert override.count("ports: !reset []") == 2
+    assert '"127.0.0.1:${LOCKDIN_TAILSCALE_EDGE_PORT:-8088}:8080"' in override
+    assert "KEYCLOAK_BACKCHANNEL_BASE_URL: http://keycloak:8080" in override
+    assert 'KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"' in override
+    assert "auto_https off" in caddyfile
+    assert "@keycloak path /realms/* /resources/* /.well-known/*" in caddyfile
+    assert "/admin/*" not in caddyfile
+
+
 def test_browser_flow_nests_required_session_limit_after_authentication() -> None:
     realm = _realm()
     flows = {flow["alias"]: flow for flow in realm["authenticationFlows"]}

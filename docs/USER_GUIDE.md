@@ -13,7 +13,8 @@ You need:
 - an Android device or emulator;
 - the LockdIn debug build installed;
 - the LockdIn backend and PostgreSQL running;
-- the device able to reach the backend URL;
+- the device signed into the same private tailnet as the Windows host and able to reach the stable
+  `https://<machine>.<tailnet>.ts.net` backend URL;
 - Android Usage Access if you want real device-usage synchronization.
 
 Optional permissions:
@@ -76,6 +77,14 @@ To synchronize manually:
 
 LockdIn also attempts an automatic sync when the app resumes. A later manual sync may correctly
 show zero new events if the automatic sync already imported them.
+
+Dashboard usage belongs to the signed-in account's profile. Creating an account does not reset
+Android's device-level UsageStats, but a new account does not inherit usage already owned by another
+LockdIn account. Usage recorded before sign-in remains unclaimed until the user explicitly chooses
+**Import**; choosing **Discard** does not assign it to the account. When Accessibility is enabled,
+manual sync drains that account's live queue instead of backfilling the device's complete Android
+history, which avoids silently transferring another account's activity or counting it twice. After
+a successful sync, the refreshed dashboard value should appear within seconds.
 
 ## Rules
 
@@ -150,9 +159,11 @@ not silently grant the permission.
 | --- | --- | --- |
 | `Authentication unavailable` | The app cannot validate the saved session or reach the configured authentication boundary | Verify backend/provider availability and retry; do not bypass the route guard |
 | `Sign in again` | Renewal failed or the saved credential is no longer usable | Complete system-browser sign-in again |
-| `Could not connect to the backend at ...` | Network or backend connection failed | Check Wi-Fi, host IP, firewall, container health, and frontend `.env` |
+| `Could not connect to the backend at ...` | Network or backend connection failed | Check Tailscale on both devices, Docker/container health, Tailscale Serve status, and the compiled frontend `.env` origin |
 | `Grant Usage Access before syncing...` | Android usage permission is missing | Open Device Permissions and grant Usage Access |
-| `Live usage uploads are still pending...` | Accessibility events remain queued | Keep the backend reachable and retry |
+| `The backend could not be reached...` or an authenticated-session upload error | A queued Accessibility event could not be uploaded | Check the backend and private network, or sign in again when prompted, then retry |
+| `Uploaded ... but ... remain after the safe per-sync limit` | More than 300 queued Accessibility events were available | Tap **Sync Recent Usage** again to drain the remaining account-owned events |
+| `Live usage upload made no progress...` | The native queue could not advance even though no upload failure was reported | Reopen LockdIn and retry; if it persists, collect diagnostics |
 | Manual sync reports `0/0/0` | No new completed sessions were found | This is normal after automatic sync |
 | A rule already exists | The app already has a configured rule | Edit the existing rule instead |
 | Invalid email | Accountability contact validation failed | Enter a complete email address |
@@ -173,8 +184,8 @@ watermarks, and pending state.
 
 - Usage history and accountability contacts are personal information.
 - Use demo addresses and test accounts during presentations.
-- Do not expose the local stack to the public internet. Protected routes authenticate in Phase C,
-  but deployed-edge hardening and production TLS trust do not have implementation evidence.
+- Do not expose the local stack to the public internet or enable Tailscale Funnel. The private
+  tailnet edge is for the current development/thesis prototype and is not production hardening.
 - Do not display notifications containing private information during screen sharing.
 - Do not reset the Docker volume unless all stored data may be deleted.
 - Do not enable Accessibility solely for a presentation unless the feature is part of the planned
@@ -196,6 +207,14 @@ v1-to-v2 migration remain unverified.
 
 Raw usage events retain timestamp precision, while some dashboard values are displayed as whole
 minutes. Display rounding does not mean the raw interval was recorded as a full minute.
+
+### Does usage restart when I create a new account?
+
+Android's device usage counter does not restart, but LockdIn analytics are isolated by account and
+profile. A new account starts with its own subsequently recorded usage plus any unclaimed local
+usage the user explicitly imports; it does not inherit a previous account's history. The number of
+raw uploaded events is also not a minute count: Today's Screen Time uses the current profile, local
+calendar-day boundaries, and non-overlapping aggregate durations.
 
 ### Why did a session appear after a later sync?
 

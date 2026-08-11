@@ -130,6 +130,33 @@ void main() {
     expect(native.events.last, 'clear');
   });
 
+  test('an exact legacy issuer preserves the account generation', () async {
+    const legacyIssuer = 'https://legacy.example/realms/lockdin';
+    final storage = FakeAuthStorage();
+    final repository = buildRepository(
+      storage: storage,
+      oidc: FakeOidcClient(tokens('same-account-new-issuer')),
+      native: FakeNativeAuthBridge(),
+      legacyKeycloakIssuer: legacyIssuer,
+    );
+    final originalGeneration = await repository.accountGenerationFor(
+      legacyIssuer,
+      'subject-1',
+    );
+
+    final state = await repository.signIn();
+
+    expect(state.phase, AuthPhase.authenticated);
+    expect(state.session?.accountGeneration, originalGeneration);
+    expect(storage.bindings, hasLength(1));
+    expect(storage.bindings.values.single, originalGeneration);
+    expect(
+      await repository.accountGenerationFor(config.issuer, 'subject-1'),
+      originalGeneration,
+    );
+    expect(storage.bindings, hasLength(1));
+  });
+
   test(
     'different-account rejection keeps a coherent signed-out state',
     () async {
@@ -525,6 +552,7 @@ AuthRepository buildRepository({
   bool failConfigConnection = false,
   bool failConfigTls = false,
   bool failAccountDeletion = false,
+  String legacyKeycloakIssuer = '',
 }) {
   final dio = Dio(BaseOptions(baseUrl: 'https://api.example'));
   dio.interceptors.add(
@@ -631,6 +659,7 @@ AuthRepository buildRepository({
     storage: storage,
     oidcClient: oidc,
     nativeBridge: native,
+    legacyKeycloakIssuer: legacyKeycloakIssuer,
     now: () => DateTime.utc(2026),
     secureRandom: Random(42),
   );

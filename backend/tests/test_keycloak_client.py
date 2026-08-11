@@ -10,19 +10,35 @@ from lockedin_backend.services.keycloak_client import KeycloakClient, KeycloakRe
 SYNTHETIC_ACCESS_TOKEN = "synthetic-access-token-marker"
 
 
-def _settings() -> Settings:
+def _settings(*, backchannel: bool = False) -> Settings:
     return Settings(
         keycloak_issuer="https://issuer.test/realms/lockdin",
+        keycloak_backchannel_base_url=(
+            "http://keycloak:8080/" if backchannel else None
+        ),
         keycloak_api_client_secret="synthetic-api-secret",
     )
 
 
+def test_backchannel_urls_do_not_change_the_external_issuer_contract() -> None:
+    settings = _settings(backchannel=True)
+
+    assert settings.keycloak_issuer == "https://issuer.test/realms/lockdin"
+    assert settings.keycloak_token_url == (
+        "https://issuer.test/realms/lockdin/protocol/openid-connect/token"
+    )
+    assert settings.keycloak_backchannel_server_url == "http://keycloak:8080"
+    assert settings.keycloak_backchannel_token_url == (
+        "http://keycloak:8080/realms/lockdin/protocol/openid-connect/token"
+    )
+
+
 def test_revoke_access_token_identifies_as_public_mobile_client(monkeypatch) -> None:
-    settings = _settings()
+    settings = _settings(backchannel=True)
 
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.method == "POST"
-        assert str(request.url) == settings.keycloak_revocation_url
+        assert str(request.url) == settings.keycloak_backchannel_revocation_url
         assert parse_qs(request.content.decode("ascii")) == {
             "token": [SYNTHETIC_ACCESS_TOKEN],
             "token_type_hint": ["access_token"],
@@ -78,13 +94,13 @@ def test_revoke_access_token_rejection_does_not_expose_token(
 
 
 def test_delete_user_uses_encoded_admin_path(monkeypatch) -> None:
-    settings = _settings()
+    settings = _settings(backchannel=True)
     subject = "synthetic subject/with separator"
 
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.method == "DELETE"
         assert str(request.url) == (
-            "https://issuer.test/admin/realms/lockdin/users/"
+            "http://keycloak:8080/admin/realms/lockdin/users/"
             "synthetic%20subject%2Fwith%20separator"
         )
         assert "Authorization" in request.headers

@@ -150,8 +150,8 @@ LOCKDIN_API_BASE_URL=http://10.0.2.2:8000
 # Desktop/web on the backend host
 LOCKDIN_API_BASE_URL=http://127.0.0.1:8000
 
-# Physical phone: replace with the host's current Wi-Fi IPv4 address
-LOCKDIN_API_BASE_URL=http://192.168.2.44:8000
+# Physical phone in the private development tailnet
+LOCKDIN_API_BASE_URL=https://windows-machine.example-tailnet.ts.net
 
 # Deployed environment
 LOCKDIN_API_BASE_URL=https://api.example.com
@@ -187,12 +187,17 @@ so the toolchain can create symbolic links.
 
 ## Physical Android Setup
 
-1. Start the full Docker stack.
-2. Find the host's current Wi-Fi IPv4 address using `ipconfig`.
-3. Put that address in `frontend/flutter_app/.env`.
-4. Confirm the phone can reach `http://<host-ip>:8000/api/v1/health`.
-5. Connect and authorize USB debugging.
-6. Confirm the device:
+1. Follow [the private Tailscale runbook](docs/TAILSCALE_PRIVATE_NETWORK.md). Install and sign in
+   on Windows and Android, approve the Android VPN profile, and enable MagicDNS/HTTPS if prompted.
+2. Configure the full private `https://<machine>.<tailnet>.ts.net` origin in the ignored Compose
+   and Flutter environment files.
+3. Start the stack with the Tailscale Compose override and configure Tailscale Serve for the
+   loopback edge. The runbook also documents an optional, separate tailnet-only HTTPS route for
+   opening the loopback-bound Mailpit inbox from the phone.
+4. Confirm the phone can reach
+   `https://<machine>.<tailnet>.ts.net/api/v1/health` without USB or an ADB reverse rule.
+5. Connect and authorize USB debugging only when installing or diagnosing a debug build.
+6. If USB is connected, confirm the device:
 
    ```powershell
    adb devices -l

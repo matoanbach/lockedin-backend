@@ -30,16 +30,27 @@ migration and tenant-isolation suites.
 
 - Caddy terminates local TLS for the canonical origin `https://192.168.2.44` using its internal
   CA and proxies Keycloak paths without changing the issuer origin.
+- The optional `docker-compose.tailscale.yml` mode instead uses `Caddyfile.tailscale` as an
+  HTTP-only path router bound to host loopback. Tailscale Serve terminates trusted tailnet HTTPS;
+  this mode publishes neither the backend nor either PostgreSQL service on the host.
 - Caddy's `/data` volume contains CA and certificate private material. Never export it into the
   repository or test artifacts.
 - Keycloak has a separate PostgreSQL service and named volume. It never shares or replaces the
   LockdIn application database volume.
 - Mailpit's SMTP port is internal to the Compose network. Only its web UI is bound, on loopback;
-  no relay configuration exists. Use synthetic addresses only.
+  no relay configuration exists. In Tailscale mode, the runbook permits a separate tailnet-only
+  HTTPS Serve route for phone access to that loopback UI. Use synthetic addresses only and restrict
+  the route with tailnet policy if additional users or devices join.
 - The Keycloak database and bootstrap-admin passwords are required environment values. Do not use
   the placeholders from `.env.example` as actual credentials.
 - The API-client secret and event-webhook secret are separate required environment values. The
   backend CA bundle is an operator-owned read-only mount; never commit CA or private-key material.
+- In Tailscale mode, backend-to-Keycloak calls use the private Compose-network URL while the exact
+  external `*.ts.net` issuer remains authoritative for discovery and token validation. The
+  Keycloak administration path is not routed by the Tailscale Caddyfile.
+
+See `docs/TAILSCALE_PRIVATE_NETWORK.md` for the private prototype runbook and issuer-migration
+safeguards. This mode is tailnet-private, not public-production hardening.
 
 ## Phase C validation status
 
