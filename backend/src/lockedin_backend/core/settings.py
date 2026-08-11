@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from pydantic import Field
 from pydantic import SecretStr
@@ -22,6 +23,7 @@ class Settings(BaseSettings):
         default=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
     )
     keycloak_issuer: str = Field(default=DEFAULT_KEYCLOAK_ISSUER)
+    keycloak_backchannel_base_url: str | None = Field(default=None)
     keycloak_mobile_client_id: str = Field(default="lockdin-mobile")
     keycloak_api_client_id: str = Field(default="lockdin-api")
     keycloak_api_client_secret: SecretStr | None = Field(default=None)
@@ -51,6 +53,37 @@ class Settings(BaseSettings):
             raise ValueError("KEYCLOAK_ISSUER must be an HTTPS Keycloak realm issuer")
         return issuer
 
+    @field_validator("keycloak_backchannel_base_url", mode="before")
+    @classmethod
+    def normalize_keycloak_backchannel_base_url(
+        cls, value: object
+    ) -> object:
+        if value is None or value == "":
+            return None
+        if not isinstance(value, str):
+            return value
+        base_url = value.rstrip("/")
+        parsed = urlsplit(base_url)
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError(
+                "KEYCLOAK_BACKCHANNEL_BASE_URL must be an HTTP(S) server URL "
+                "without credentials, a query, or a fragment"
+            )
+        try:
+            parsed.port
+        except ValueError as exc:
+            raise ValueError(
+                "KEYCLOAK_BACKCHANNEL_BASE_URL contains an invalid port"
+            ) from exc
+        return base_url
+
     @property
     def keycloak_realm(self) -> str:
         return self.keycloak_issuer.rsplit("/realms/", 1)[1]
@@ -58,6 +91,14 @@ class Settings(BaseSettings):
     @property
     def keycloak_server_url(self) -> str:
         return self.keycloak_issuer.rsplit("/realms/", 1)[0]
+
+    @property
+    def keycloak_backchannel_server_url(self) -> str:
+        return self.keycloak_backchannel_base_url or self.keycloak_server_url
+
+    @property
+    def keycloak_backchannel_realm_url(self) -> str:
+        return f"{self.keycloak_backchannel_server_url}/realms/{self.keycloak_realm}"
 
     @property
     def keycloak_introspection_url(self) -> str:
@@ -82,6 +123,25 @@ class Settings(BaseSettings):
     @property
     def keycloak_jwks_url(self) -> str:
         return f"{self.keycloak_issuer}/protocol/openid-connect/certs"
+
+    @property
+    def keycloak_backchannel_introspection_url(self) -> str:
+        return (
+            f"{self.keycloak_backchannel_realm_url}"
+            "/protocol/openid-connect/token/introspect"
+        )
+
+    @property
+    def keycloak_backchannel_token_url(self) -> str:
+        return f"{self.keycloak_backchannel_realm_url}/protocol/openid-connect/token"
+
+    @property
+    def keycloak_backchannel_revocation_url(self) -> str:
+        return f"{self.keycloak_backchannel_realm_url}/protocol/openid-connect/revoke"
+
+    @property
+    def keycloak_backchannel_jwks_url(self) -> str:
+        return f"{self.keycloak_backchannel_realm_url}/protocol/openid-connect/certs"
 
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",

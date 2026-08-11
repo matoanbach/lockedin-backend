@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_error.dart';
+import '../../../core/api/api_config.dart';
 import '../../../core/api/api_transport.dart';
 import 'auth_models.dart';
 import 'auth_repository.dart';
@@ -24,6 +25,7 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
     storage: ref.watch(authStorageProvider),
     oidcClient: ref.watch(oidcClientProvider),
     nativeBridge: ref.watch(nativeAuthBridgeProvider),
+    legacyKeycloakIssuer: ApiConfig.legacyKeycloakIssuer,
   );
 });
 

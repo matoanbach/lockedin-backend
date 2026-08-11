@@ -452,6 +452,71 @@ After testing, the user manually disabled Accessibility. ADB confirmed Usage Acc
 allowed, `accessibility_enabled` returned `0`, the enabled-service setting was empty, and both the
 bound and enabled Accessibility service sets were empty.
 
+## Physical Private-Tailnet Migration Evidence — August 10, 2026
+
+The existing Samsung SM-A528B installation and persistent Docker volumes were migrated from the
+disposable IP/ADB routing to a private Tailscale Serve origin. The real machine and tailnet names
+remain in ignored local environment files and are not recorded in the repository. Funnel was not
+enabled; PostgreSQL, FastAPI, Keycloak, and Keycloak PostgreSQL remained container-only. The HTTP
+edge and Mailpit web UI were published only on Windows loopback for separate Tailscale Serve routes.
+
+Before the issuer change, verified custom-format backups were created for the application and
+Keycloak databases. A guarded, operator-approved transaction changed only the two matching
+`external_identities.issuer` values from the exact legacy issuer to the exact new HTTPS issuer.
+Source count, target count, and subject-conflict checks ran before the update. Historical revoked-
+session and audit rows retained the issuer that produced them.
+
+| Step | Physical and stack result |
+| --- | --- |
+| Tailnet membership | The Windows host and Samsung phone were online in the same two-device tailnet. |
+| Stable name and HTTPS | Android MagicDNS resolved the Windows full name to its Tailscale address. Chrome loaded `/api/v1/health` with no certificate warning, and an independent OpenSSL client verified the exact hostname and public CA chain over TLS 1.3. The Tailscale machine page reported a valid certificate. |
+| Private routing | `tailscale serve status` exposed the loopback edge on standard private HTTPS and the loopback-bound Mailpit UI on a separate private HTTPS port. Every route was labeled `tailnet only`; no Funnel/public route was configured. Docker continued to publish the edge and Mailpit only on `127.0.0.1`. |
+| Alternate Wi-Fi | With the laptop and phone on a different Wi-Fi network, Android showed validated Wi-Fi-backed Tailscale VPN connectivity. MagicDNS ping returned three of three replies, and Android HTTPS requests returned `200` for both the app health endpoint and the private Mailpit UI/API. No IP edit, APK rebuild, or ADB reverse rule was used. |
+| OIDC routing | External discovery used the exact new HTTPS issuer. From the backend container, discovery retained that issuer while token and JWKS endpoints used `http://keycloak:8080` on the Compose network. |
+| In-place APK migration | Debug APK SHA-256 `1B650F5585FFEC5648C668E4277EC5E3ADDE583D028DBFE7298B31C6744A8531` was installed with `adb install -r`. The June 15 first-install timestamp and Usage Access permission were preserved; Accessibility remained disabled and unbound. |
+| AppAuth and protected session | The stale legacy session entered the expected reauthentication screen. AppAuth opened the real Keycloak form on the private HTTPS origin, the same existing account signed in, and the browser redirected to LockdIn. `GET /api/v1/auth/session` returned `200`. |
+| Account and history preservation | Post-login count checks found 2 accounts, 2 identities on only the new issuer, and 3 profiles. No duplicate account was provisioned. Existing dashboard history rendered on the phone. |
+| Usage synchronization | The authenticated phone received `200` for `POST /api/v1/usage/events`; stored usage increased from 2,192 to 2,272 events and daily app aggregates from 164 to 171. |
+| Token renewal | The realm access-token lifetime was 300 seconds. At 514 seconds after the initial protected-session request, the phone made successful protected usage and dashboard requests without another provider sign-in, establishing fresh access-token renewal. |
+| USB independence | ADB reported no connected device after the cable was physically unplugged. The phone then received `200` for protected usage upload and dashboard requests through Tailscale, with no reverse rule. |
+
+The phone's Wi-Fi-to-mobile-data transition is intentionally deferred and is not claimed by this
+run. A machine reboot was not performed. Two automated Windows service-restart attempts were denied
+by the service ACL before the service could stop, so restart persistence is also not claimed;
+Tailscale remained running and the background Serve route and trusted HTTPS health response remained
+available after those denied attempts. This remains a private thesis prototype: every client must
+join the tailnet, and the Windows host, Docker stack, and Tailscale must stay available.
+
+## Manual Live-Queue Sync Automated Validation -- August 10, 2026
+
+The native Accessibility uploader intentionally processes at most 15 queued rows per drain. Manual
+**Sync Recent Usage** now repeats successful native drains until the signed-in account's queue is
+empty, an upload fails, a drain makes no progress, or the 20-drain/300-upload safety limit is
+reached. Tests cover a 35-row queue drained in three calls, a genuine network failure, a no-progress
+response, and a continuously growing queue stopped after exactly 20 calls with an honest remaining-
+work message.
+
+The complete Flutter suite passed with 77 tests, Flutter analysis reported no issues, and the
+backend suite remained at 142 passed with 3 expected skips. Fresh debug APK SHA-256
+`D064BEA97EECEFA74EB0ED179BD3E13342CF3BBD4D6D4313EBD695C444744E89` built successfully and was
+installed in place with `adb install -r`. The installed APK hash matched, the June 15 first-install
+timestamp and both Usage Access and Accessibility remained intact, and no ADB reverse rule was
+present. One-tap draining of multiple real 15-row chunks, the resulting dashboard refresh, and
+duplicate-count checks remain physical verification items and are not claimed here.
+
+The user then manually deleted the current account and created a new one. The new dashboard showed
+zero for Today's Screen Time, and **Sync Recent Usage** truthfully reported that no Android usage
+sessions were available yet; it did not import the prior account's history or report a backend
+failure. A read-only, identifier-free database check found two short raw intervals owned by the
+newest account but zero completed app/category aggregate minutes, consistent with the dashboard's
+whole-minute display. This physically verifies account-scoped history isolation, but not the
+multi-batch drain because the new account had no pending live queue to drain.
+
+The user then generated new foreground usage and confirmed that Today's Screen Time began
+accumulating for the new account. An identifier-free database check corroborated seven raw events
+and two completed minutes in both app and category aggregates for the newest account. This verifies
+that isolation did not prevent new account-owned usage from being recorded and displayed.
+
 ## Edge Cases Covered in Code
 
 - duplicate source IDs and replay;

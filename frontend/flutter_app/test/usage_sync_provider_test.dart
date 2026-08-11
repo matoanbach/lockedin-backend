@@ -108,6 +108,138 @@ void main() {
     expect(calledMethods, isNot(contains('collectUsageEventBatch')));
   });
 
+  test('drains multiple live queue batches in one manual sync', () async {
+    var flushCount = 0;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          if (call.method == 'getPermissionStatus') {
+            return permissionStatus(accessibility: true);
+          }
+          if (call.method == 'flushPendingUsageUploads') {
+            flushCount += 1;
+            return switch (flushCount) {
+              1 => {
+                'uploadedCount': 15,
+                'failedCount': 0,
+                'pendingCount': 20,
+                'lastError': '',
+              },
+              2 => {
+                'uploadedCount': 15,
+                'failedCount': 0,
+                'pendingCount': 5,
+                'lastError': '',
+              },
+              _ => {
+                'uploadedCount': 5,
+                'failedCount': 0,
+                'pendingCount': 0,
+                'lastError': '',
+              },
+            };
+          }
+          fail('Unexpected native method ${call.method}');
+        });
+
+    final result = await UsageSyncRepository(Dio()).syncRecentUsage();
+
+    expect(flushCount, 3);
+    expect(result.collectedCount, 35);
+    expect(result.createdCount, 35);
+  });
+
+  test('reports a genuine live queue network failure', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          if (call.method == 'getPermissionStatus') {
+            return permissionStatus(accessibility: true);
+          }
+          if (call.method == 'flushPendingUsageUploads') {
+            return {
+              'uploadedCount': 0,
+              'failedCount': 1,
+              'pendingCount': 4,
+              'lastError': 'network_error',
+            };
+          }
+          fail('Unexpected native method ${call.method}');
+        });
+
+    await expectLater(
+      UsageSyncRepository(Dio()).syncRecentUsage(),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          'The backend could not be reached. 4 events remain; try again.',
+        ),
+      ),
+    );
+  });
+
+  test('stops when a live queue drain makes no progress', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          if (call.method == 'getPermissionStatus') {
+            return permissionStatus(accessibility: true);
+          }
+          if (call.method == 'flushPendingUsageUploads') {
+            return {
+              'uploadedCount': 0,
+              'failedCount': 0,
+              'pendingCount': 4,
+              'lastError': '',
+            };
+          }
+          fail('Unexpected native method ${call.method}');
+        });
+
+    await expectLater(
+      UsageSyncRepository(Dio()).syncRecentUsage(),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          'Live usage upload made no progress. '
+              '4 events remain; reopen LockdIn and try again.',
+        ),
+      ),
+    );
+  });
+
+  test('bounds a continuously growing live queue', () async {
+    var flushCount = 0;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          if (call.method == 'getPermissionStatus') {
+            return permissionStatus(accessibility: true);
+          }
+          if (call.method == 'flushPendingUsageUploads') {
+            flushCount += 1;
+            return {
+              'uploadedCount': 15,
+              'failedCount': 0,
+              'pendingCount': 1,
+              'lastError': '',
+            };
+          }
+          fail('Unexpected native method ${call.method}');
+        });
+
+    await expectLater(
+      UsageSyncRepository(Dio()).syncRecentUsage(),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          'Uploaded 300 live usage events, but 1 remain after the safe '
+              'per-sync limit. Run Sync Recent Usage again.',
+        ),
+      ),
+    );
+    expect(flushCount, 20);
+  });
+
   test(
     'keeps the session watermark when Android has not finalized an event',
     () async {
