@@ -14,9 +14,14 @@ import '../widgets/app_limit_warning.dart';
 
 /// Screen for managing lockdown rules.
 class LockdownRulesScreen extends ConsumerStatefulWidget {
-  const LockdownRulesScreen({super.key, this.openCreateForm = false});
+  const LockdownRulesScreen({
+    super.key,
+    this.openCreateForm = false,
+    this.installedAppsLoader,
+  });
 
   final bool openCreateForm;
+  final Future<List<InstalledRuleApp>> Function()? installedAppsLoader;
 
   @override
   ConsumerState<LockdownRulesScreen> createState() =>
@@ -24,7 +29,6 @@ class LockdownRulesScreen extends ConsumerStatefulWidget {
 }
 
 class _LockdownRulesScreenState extends ConsumerState<LockdownRulesScreen> {
-  bool _showLockedState = false;
   bool _didAutoOpenCreateForm = false;
   int _reminderThresholdMinutes = 30;
   late final TextEditingController _reminderThresholdController;
@@ -50,6 +54,7 @@ class _LockdownRulesScreenState extends ConsumerState<LockdownRulesScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) => RuleFormSheet(
         initialRule: initialRule,
+        installedAppsLoader: widget.installedAppsLoader,
         onSubmit: (value) async {
           if (initialRule == null) {
             await ref
@@ -96,12 +101,6 @@ class _LockdownRulesScreenState extends ConsumerState<LockdownRulesScreen> {
   Widget build(BuildContext context) {
     final rulesAsync = ref.watch(lockdownRulesProvider);
     final ruleStatusesAsync = ref.watch(ruleStatusesProvider);
-
-    if (_showLockedState) {
-      return _LockedStateView(
-        onBack: () => setState(() => _showLockedState = false),
-      );
-    }
 
     return rulesAsync.when(
       data: (rules) {
@@ -235,12 +234,6 @@ class _LockdownRulesScreenState extends ConsumerState<LockdownRulesScreen> {
                       ),
                     ),
                   ),
-                  Spacing.verticalLg,
-                  SecondaryButton(
-                    onPressed: () => setState(() => _showLockedState = true),
-                    label: 'Preview Locked State',
-                    icon: Icons.lock_outline,
-                  ),
                   Spacing.verticalXxl,
                   DashedCard(
                     onTap: () async {
@@ -248,7 +241,7 @@ class _LockdownRulesScreenState extends ConsumerState<LockdownRulesScreen> {
                     },
                     icon: Icons.add,
                     title: 'Add New Rule',
-                    subtitle: 'Use real app names like Instagram',
+                    subtitle: 'Choose any installed app and set a daily limit',
                   ),
                   Spacing.verticalXxl,
                   const InfoCard(
@@ -356,11 +349,13 @@ class RuleFormSheet extends StatefulWidget {
     required this.onSubmit,
     this.initialRule,
     this.onDelete,
+    this.installedAppsLoader,
   });
 
   final LockdownRule? initialRule;
   final Future<void> Function(RuleFormValue value) onSubmit;
   final Future<void> Function()? onDelete;
+  final Future<List<InstalledRuleApp>> Function()? installedAppsLoader;
 
   @override
   State<RuleFormSheet> createState() => _RuleFormSheetState();
@@ -377,6 +372,7 @@ class _RuleFormSheetState extends State<RuleFormSheet> {
   bool _showAdvancedAppId = false;
   String? _selectedKnownAppId;
   String? _submissionError;
+  late Future<List<InstalledRuleApp>> _installedAppsFuture;
 
   bool get _isEditing => widget.initialRule != null;
 
@@ -398,6 +394,7 @@ class _RuleFormSheetState extends State<RuleFormSheet> {
     _enabled = initialRule?.enabled ?? true;
     _selectedKnownAppId = knownApp?.appId;
     _showAdvancedAppId = _isEditing;
+    _installedAppsFuture = _loadInstalledApps();
   }
 
   @override
@@ -432,6 +429,34 @@ class _RuleFormSheetState extends State<RuleFormSheet> {
     });
   }
 
+  Future<List<InstalledRuleApp>> _loadInstalledApps() {
+    return (widget.installedAppsLoader ?? loadLaunchableRuleApps)();
+  }
+
+  void _retryInstalledApps() {
+    setState(() => _installedAppsFuture = _loadInstalledApps());
+  }
+
+  void _applyInstalledApp(InstalledRuleApp app) {
+    final knownApp = knownRuleAppFor(app.appId, app.displayName);
+    setState(() {
+      _selectedKnownAppId = knownApp?.appId;
+      _showAdvancedAppId = false;
+      _appNameController.text = app.displayName;
+      _appIdController.text = app.appId;
+    });
+  }
+
+  Future<void> _openInstalledAppPicker(List<InstalledRuleApp> apps) async {
+    final selected = await showSearch<InstalledRuleApp?>(
+      context: context,
+      delegate: _InstalledAppSearchDelegate(apps),
+    );
+    if (selected != null && mounted) {
+      _applyInstalledApp(selected);
+    }
+  }
+
   void _handleAppNameChanged(String value) {
     if (_isEditing) {
       return;
@@ -461,7 +486,7 @@ class _RuleFormSheetState extends State<RuleFormSheet> {
     if (appId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Choose a common app or enter an app identifier.'),
+          content: Text('Choose an installed app or enter an app identifier.'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -631,7 +656,7 @@ class _RuleFormSheetState extends State<RuleFormSheet> {
                                     Text(
                                       _isEditing
                                           ? 'Update the limit and display name for this app.'
-                                          : 'Pick a real app name like Instagram, then save the matching backend rule.',
+                                          : 'Choose any launchable app installed on this device, then set its daily limit.',
                                       style: AppTextStyles.bodySmall.copyWith(
                                         color: AppColors.textTertiary,
                                       ),
@@ -668,6 +693,65 @@ class _RuleFormSheetState extends State<RuleFormSheet> {
                                     onTap: () => _applyKnownApp(app),
                                   ),
                               ],
+                            ),
+                            Spacing.verticalLg,
+                            Text(
+                              'All Installed Apps',
+                              style: AppTextStyles.titleMedium.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            Spacing.verticalXs,
+                            Text(
+                              'Search every launchable app on this device.',
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: AppColors.textTertiary,
+                              ),
+                            ),
+                            Spacing.verticalSm,
+                            FutureBuilder<List<InstalledRuleApp>>(
+                              future: _installedAppsFuture,
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState !=
+                                    ConnectionState.done) {
+                                  return const LinearProgressIndicator();
+                                }
+                                if (snapshot.hasError) {
+                                  return AppCard(
+                                    padding: const EdgeInsets.all(14),
+                                    child: Row(
+                                      children: [
+                                        const Expanded(
+                                          child: Text(
+                                            'Installed apps could not be loaded. You can still enter an identifier manually.',
+                                          ),
+                                        ),
+                                        TextButton(
+                                          onPressed: _retryInstalledApps,
+                                          child: const Text('Retry'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }
+                                final apps =
+                                    snapshot.data ?? const <InstalledRuleApp>[];
+                                return SizedBox(
+                                  width: double.infinity,
+                                  child: OutlinedButton.icon(
+                                    key: const ValueKey('installed-app-picker'),
+                                    onPressed: apps.isEmpty
+                                        ? null
+                                        : () => _openInstalledAppPicker(apps),
+                                    icon: const Icon(Icons.search),
+                                    label: Text(
+                                      apps.isEmpty
+                                          ? 'No launchable apps found'
+                                          : 'Search ${apps.length} installed apps',
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
                           ],
                           Spacing.verticalLg,
@@ -928,69 +1012,65 @@ class _PresetAppChip extends StatelessWidget {
   }
 }
 
-class _LockedStateView extends StatelessWidget {
-  const _LockedStateView({required this.onBack});
+class _InstalledAppSearchDelegate extends SearchDelegate<InstalledRuleApp?> {
+  _InstalledAppSearchDelegate(this.apps);
 
-  final VoidCallback onBack;
+  final List<InstalledRuleApp> apps;
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Padding(
-          padding: Spacing.page,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 96,
-                height: 96,
-                decoration: BoxDecoration(
-                  color: AppColors.errorLight,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.error, width: 4),
-                ),
-                child: const Center(
-                  child: Icon(Icons.lock, size: 48, color: AppColors.error),
-                ),
-              ),
-              Spacing.verticalXxl,
-              Text('App Locked', style: AppTextStyles.headlineMedium),
-              Spacing.verticalSm,
-              Text(
-                'You\'ve reached your 2-hour limit for Instagram today.',
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.textTertiary,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              Spacing.verticalXxl,
-              AppCard(
-                child: RichText(
-                  textAlign: TextAlign.center,
-                  text: TextSpan(
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                    children: [
-                      const TextSpan(text: 'Your limit resets in '),
-                      TextSpan(
-                        text: '6h 24m',
-                        style: AppTextStyles.titleSmall.copyWith(
-                          color: AppColors.purple400,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Spacing.verticalXxl,
-              SecondaryButton(onPressed: onBack, label: 'Back to Rules'),
-            ],
-          ),
-        ),
+  String get searchFieldLabel => 'Search installed apps';
+
+  @override
+  List<Widget>? buildActions(BuildContext context) => [
+    if (query.isNotEmpty)
+      IconButton(
+        tooltip: 'Clear search',
+        onPressed: () => query = '',
+        icon: const Icon(Icons.clear),
       ),
+  ];
+
+  @override
+  Widget? buildLeading(BuildContext context) => IconButton(
+    tooltip: 'Back',
+    onPressed: () => close(context, null),
+    icon: const Icon(Icons.arrow_back),
+  );
+
+  @override
+  Widget buildResults(BuildContext context) => _buildMatches(context);
+
+  @override
+  Widget buildSuggestions(BuildContext context) => _buildMatches(context);
+
+  Widget _buildMatches(BuildContext context) {
+    final normalizedQuery = query.trim().toLowerCase();
+    final matches = normalizedQuery.isEmpty
+        ? apps
+        : apps
+              .where(
+                (app) =>
+                    app.displayName.toLowerCase().contains(normalizedQuery) ||
+                    app.appId.toLowerCase().contains(normalizedQuery),
+              )
+              .toList();
+
+    if (matches.isEmpty) {
+      return const Center(child: Text('No installed apps match your search.'));
+    }
+
+    return ListView.separated(
+      itemCount: matches.length,
+      separatorBuilder: (_, _) => const Divider(height: 1),
+      itemBuilder: (context, index) {
+        final app = matches[index];
+        return ListTile(
+          leading: const Icon(Icons.apps),
+          title: Text(app.displayName),
+          subtitle: Text(app.appId),
+          onTap: () => close(context, app),
+        );
+      },
     );
   }
 }

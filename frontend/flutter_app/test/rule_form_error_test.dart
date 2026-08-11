@@ -41,6 +41,7 @@ void main() {
                   isScrollControlled: true,
                   backgroundColor: Colors.transparent,
                   builder: (_) => RuleFormSheet(
+                    installedAppsLoader: () async => const [],
                     onSubmit: (_) => _DuplicateRuleResponse.throwConflict(),
                   ),
                 );

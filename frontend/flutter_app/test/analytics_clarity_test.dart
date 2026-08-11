@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -42,6 +43,8 @@ class _TestLockdownRulesController extends LockdownRulesController {
   @override
   Future<List<LockdownRule>> build() async => const [];
 }
+
+Future<List<InstalledRuleApp>> _loadNoInstalledApps() async => const [];
 
 const _dashboard = DashboardAnalyticsData(
   todayTotalMinutes: 1,
@@ -102,19 +105,14 @@ void main() {
                       ],
                     },
                     {
-                      'name': 'Learning',
-                      'minutes': 2,
-                      'durationMilliseconds': 120_000,
-                    },
-                    {
-                      'name': 'System & Utilities',
-                      'minutes': 3,
-                      'durationMilliseconds': 180_000,
-                    },
-                    {
                       'name': 'Other',
                       'minutes': 4,
                       'durationMilliseconds': 240_000,
+                    },
+                    {
+                      'name': 'Learning',
+                      'minutes': 2,
+                      'durationMilliseconds': 120_000,
                     },
                   ],
                   'weeklyUsageHours': <double>[],
@@ -138,10 +136,10 @@ void main() {
       );
       expect(analytics.categoryBreakdown[1].formattedTime, '2m');
       expect(analytics.categoryBreakdown[1].color, AppColors.success);
-      expect(analytics.categoryBreakdown[2].color, AppColors.systemUtilities);
-      expect(analytics.categoryBreakdown[3].color, AppColors.otherCategory);
+      expect(analytics.categoryBreakdown[2].name, 'Other');
+      expect(analytics.categoryBreakdown[2].formattedTime, '4m');
+      expect(analytics.categoryBreakdown[2].color, AppColors.otherCategory);
       expect(AppColors.socialMessaging, isNot(AppColors.videoEntertainment));
-      expect(AppColors.systemUtilities, isNot(AppColors.otherCategory));
     },
   );
 
@@ -267,6 +265,7 @@ void main() {
           path: '/rules',
           builder: (_, state) => LockdownRulesScreen(
             openCreateForm: state.uri.queryParameters['create'] == 'true',
+            installedAppsLoader: _loadNoInstalledApps,
           ),
         ),
       ],
@@ -339,6 +338,7 @@ void main() {
           path: '/rules',
           builder: (_, state) => LockdownRulesScreen(
             openCreateForm: state.uri.queryParameters['create'] == 'true',
+            installedAppsLoader: _loadNoInstalledApps,
           ),
         ),
       ],
@@ -359,6 +359,20 @@ void main() {
     expect(find.text('Lockdown Rules'), findsOneWidget);
     expect(find.byType(BottomSheet), findsNothing);
     expect(find.text('Active Rules'), findsOneWidget);
+    expect(find.text('Preview Locked State'), findsNothing);
+    expect(find.text('Add New Rule'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.text('Add New Rule')).textAlign,
+      TextAlign.center,
+    );
+    expect(
+      tester
+          .widget<Text>(
+            find.text('Choose any installed app and set a daily limit'),
+          )
+          .textAlign,
+      TextAlign.center,
+    );
   });
 
   testWidgets('Trends has clear totals, labels, colors, and one peak insight', (
@@ -369,7 +383,32 @@ void main() {
         overrides: [
           trendsAnalyticsProvider.overrideWith(
             (_) async => const TrendsAnalyticsData(
-              hourlyUsage: [],
+              hourlyUsage: [
+                HourlyUsage(hour: '12 AM', minutes: 0),
+                HourlyUsage(hour: '1 AM', minutes: 1),
+                HourlyUsage(hour: '2 AM', minutes: 2),
+                HourlyUsage(hour: '3 AM', minutes: 3),
+                HourlyUsage(hour: '4 AM', minutes: 4),
+                HourlyUsage(hour: '5 AM', minutes: 5),
+                HourlyUsage(hour: '6 AM', minutes: 6),
+                HourlyUsage(hour: '7 AM', minutes: 7),
+                HourlyUsage(hour: '8 AM', minutes: 8),
+                HourlyUsage(hour: '9 AM', minutes: 9),
+                HourlyUsage(hour: '10 AM', minutes: 10),
+                HourlyUsage(hour: '11 AM', minutes: 11),
+                HourlyUsage(hour: '12 PM', minutes: 12),
+                HourlyUsage(hour: '1 PM', minutes: 13),
+                HourlyUsage(hour: '2 PM', minutes: 14),
+                HourlyUsage(hour: '3 PM', minutes: 15),
+                HourlyUsage(hour: '4 PM', minutes: 16),
+                HourlyUsage(hour: '5 PM', minutes: 17),
+                HourlyUsage(hour: '6 PM', minutes: 18),
+                HourlyUsage(hour: '7 PM', minutes: 19),
+                HourlyUsage(hour: '8 PM', minutes: 20),
+                HourlyUsage(hour: '9 PM', minutes: 19),
+                HourlyUsage(hour: '10 PM', minutes: 18),
+                HourlyUsage(hour: '11 PM', minutes: 17),
+              ],
               weeklyUsage: [
                 DailyUsage(day: 'Mon', hours: 4.2),
                 DailyUsage(day: 'Tue', hours: 0.1),
@@ -387,8 +426,8 @@ void main() {
                   minutes: 20,
                 ),
                 TopAppUsage(
-                  appId: 'com.sec.android.app.launcher',
-                  appName: 'One UI Home',
+                  appId: 'com.spotify.music',
+                  appName: 'Spotify',
                   minutes: 10,
                 ),
               ],
@@ -407,6 +446,34 @@ void main() {
     expect(find.text('2h'), findsOneWidget);
     expect(find.text('4h'), findsOneWidget);
     expect(find.text('6h'), findsOneWidget);
+    expect(
+      find.text('Scroll hour by hour, then tap a point for exact usage.'),
+      findsOneWidget,
+    );
+    expect(find.text('1 AM'), findsOneWidget);
+    expect(find.text('2 AM'), findsOneWidget);
+    final hourlyChartBounds = tester.getRect(find.byType(LineChart));
+    final topYAxisLabelBounds = tester.getRect(
+      find.byKey(const ValueKey('hourly-y-axis-20')),
+    );
+    final finalXAxisLabelBounds = tester.getRect(
+      find.byKey(const ValueKey('hourly-x-axis-23')),
+    );
+    final precedingXAxisLabelBounds = tester.getRect(
+      find.byKey(const ValueKey('hourly-x-axis-22')),
+    );
+    expect(
+      topYAxisLabelBounds.top,
+      greaterThanOrEqualTo(hourlyChartBounds.top),
+    );
+    expect(
+      finalXAxisLabelBounds.right,
+      lessThanOrEqualTo(hourlyChartBounds.right),
+    );
+    expect(
+      precedingXAxisLabelBounds.right,
+      lessThanOrEqualTo(finalXAxisLabelBounds.left),
+    );
     expect(find.textContaining('11 PM - 1 AM'), findsOneWidget);
     expect(find.textContaining('Your busiest window is'), findsNothing);
     final topAppIcons = tester.widgetList<Icon>(

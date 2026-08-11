@@ -29,6 +29,9 @@ class MainActivity : FlutterActivity() {
         ).setMethodCallHandler { call, result ->
             when (call.method) {
                 "getPermissionStatus" -> result.success(getPermissionStatus())
+                "getLaunchableApps" -> result.success(
+                    UsagePackagePolicy.launchableApps(this).map(LaunchableAppInfo::toChannelMap),
+                )
                 "sendTestWarningNotification" -> {
                     result.success(NativeWarningNotifier.showTestWarning(this))
                 }
@@ -238,7 +241,7 @@ class MainActivity : FlutterActivity() {
         }
 
         val reconstructed = UsageEventReconstructor(
-            excludedPackages = setOf(packageName),
+            excludedPackages = UsagePackagePolicy.excludedPackages(this),
             maximumSessionMillis = MAX_SESSION_MILLIS,
         ).reconstruct(timelineEvents)
         val payloads = mutableListOf<UsageSessionPayload>()

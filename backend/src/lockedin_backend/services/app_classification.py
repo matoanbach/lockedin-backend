@@ -7,6 +7,22 @@ from typing import Final, Mapping
 from lockedin_backend.services.usage_time import DEFAULT_CATEGORY
 
 
+EXCLUDED_SCREEN_TIME_APP_IDS: Final[frozenset[str]] = frozenset(
+    {
+        "com.android.launcher",
+        "com.android.launcher2",
+        "com.android.launcher3",
+        "com.google.android.apps.nexuslauncher",
+        "com.huawei.android.launcher",
+        "com.miui.home",
+        "com.oneplus.launcher",
+        "com.oppo.launcher",
+        "com.sec.android.app.launcher",
+        "com.vivo.launcher",
+    }
+)
+
+
 @dataclass(frozen=True, slots=True)
 class AppClassification:
     display_name: str
@@ -47,13 +63,13 @@ _KNOWN_APPS: Final[Mapping[str, AppClassification]] = MappingProxyType(
             "Gmail", "Email & Communication"
         ),
         "com.sec.android.app.launcher": AppClassification(
-            "One UI Home", "System & Utilities"
+            "One UI Home", DEFAULT_CATEGORY
         ),
         "com.sec.android.app.clockpackage": AppClassification(
-            "Clock", "System & Utilities"
+            "Clock", DEFAULT_CATEGORY
         ),
         "com.android.vending": AppClassification(
-            "Google Play Store", "System & Utilities"
+            "Google Play Store", DEFAULT_CATEGORY
         ),
     }
 )
@@ -71,7 +87,13 @@ def classify_app(
 
     supplied_name = app_name.strip() if app_name is not None else ""
     supplied_category = category.strip() if category is not None else ""
+    if supplied_category.casefold() == "system & utilities":
+        supplied_category = DEFAULT_CATEGORY
     return AppClassification(
         display_name=supplied_name or normalized_app_id,
         category=supplied_category or DEFAULT_CATEGORY,
     )
+
+
+def is_excluded_from_screen_time(app_id: str) -> bool:
+    return app_id.strip().lower() in EXCLUDED_SCREEN_TIME_APP_IDS

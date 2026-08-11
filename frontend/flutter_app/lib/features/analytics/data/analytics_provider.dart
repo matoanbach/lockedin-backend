@@ -32,7 +32,9 @@ class AnalyticsRepository {
   Future<DashboardAnalyticsData> fetchDashboard() async {
     final response = await _dio.get('/api/v1/analytics/dashboard');
     final json = Map<String, dynamic>.from(response.data as Map);
-    final categoryBreakdown = _listFromJson(json['categoryBreakdown']);
+    final categoryBreakdown = _otherCategoryLast(
+      _listFromJson(json['categoryBreakdown']),
+    );
 
     return DashboardAnalyticsData(
       todayTotalMinutes: (json['todayTotalMinutes'] as num?)?.toInt() ?? 0,
@@ -135,6 +137,19 @@ List<Map<String, dynamic>> _listFromJson(Object? value) {
   }).toList();
 }
 
+List<Map<String, dynamic>> _otherCategoryLast(
+  List<Map<String, dynamic>> categories,
+) {
+  return [
+    ...categories.where(
+      (item) => (item['name'] as String? ?? '').trim().toLowerCase() != 'other',
+    ),
+    ...categories.where(
+      (item) => (item['name'] as String? ?? '').trim().toLowerCase() == 'other',
+    ),
+  ];
+}
+
 const _categoryPalette = <Color>[
   AppColors.chart1,
   AppColors.chart2,
@@ -158,8 +173,6 @@ Color _colorForCategory(String category, int index) {
       return AppColors.warning;
     case 'email & communication':
       return AppColors.messages;
-    case 'system & utilities':
-      return AppColors.systemUtilities;
     case 'other':
       return AppColors.otherCategory;
     default:
