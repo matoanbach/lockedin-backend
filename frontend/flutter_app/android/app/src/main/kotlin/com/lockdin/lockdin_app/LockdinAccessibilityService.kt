@@ -22,6 +22,7 @@ import kotlin.math.absoluteValue
 
 class LockdinAccessibilityService : AccessibilityService() {
     private val tag = "LockdInAccessibility"
+    private val excludedUsagePackages by lazy { UsagePackagePolicy.excludedPackages(this) }
     private val monitorHandler = Handler(Looper.getMainLooper())
     private val monitorRunnable = object : Runnable {
         override fun run() {
@@ -105,6 +106,17 @@ class LockdinAccessibilityService : AccessibilityService() {
     }
 
     private fun handleForegroundPackage(packageName: String) {
+        if (packageName in excludedUsagePackages) {
+            if (activePackageName != null) {
+                finalizeActivePackageSession()
+            }
+            if (packageName == this.packageName) {
+                RuleEnforcementStore.clearInterventionCooldown(this)
+            }
+            Log.d(tag, "Ignoring non-screen-time package=$packageName")
+            return
+        }
+
         if (activePackageName != null && activePackageName != packageName) {
             finalizeActivePackageSession()
         }
@@ -122,12 +134,6 @@ class LockdinAccessibilityService : AccessibilityService() {
         }
 
         if (packageName != activePackageName) {
-            return
-        }
-
-        if (packageName == this.packageName) {
-            finalizeActivePackageSession()
-            RuleEnforcementStore.clearInterventionCooldown(this)
             return
         }
 

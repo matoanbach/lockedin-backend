@@ -1,4 +1,7 @@
-from lockedin_backend.services.app_classification import classify_app
+from lockedin_backend.services.app_classification import (
+    classify_app,
+    is_excluded_from_screen_time,
+)
 
 
 def test_known_package_has_canonical_label_and_category() -> None:
@@ -39,3 +42,21 @@ def test_youtube_aliases_have_the_same_classification() -> None:
     assert google_package == alternate_package
     assert google_package.display_name == "YouTube"
     assert google_package.category == "Video & Entertainment"
+
+
+def test_system_utilities_are_folded_into_other() -> None:
+    known_utility = classify_app(
+        "com.android.vending", "Package label", "System & Utilities"
+    )
+    unknown_utility = classify_app(
+        "com.example.utility", "Example Utility", "sYsTeM & uTiLiTiEs"
+    )
+
+    assert known_utility.category == "Other"
+    assert unknown_utility.category == "Other"
+
+
+def test_home_launchers_are_excluded_from_screen_time() -> None:
+    assert is_excluded_from_screen_time("com.sec.android.app.launcher")
+    assert is_excluded_from_screen_time(" COM.GOOGLE.ANDROID.APPS.NEXUSLAUNCHER ")
+    assert not is_excluded_from_screen_time("com.android.vending")

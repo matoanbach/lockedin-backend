@@ -60,12 +60,15 @@ The dashboard shows:
 - a visible **View Weekly Summary** action.
 
 Category names are assigned from a curated, package-based descriptive taxonomy such as **Social &
-Messaging**, **Video & Entertainment**, and **System & Utilities**. They organize comparable
-analytics; they do not judge whether an app or behavior is productive, good, or bad. Unknown
-packages retain useful supplied names and categories when available. Arbitrary category creation
-and per-app category reassignment are not available in the current build. Tap a category card to
-see the friendly app names, package identifiers, and exact display durations contributing to that
-category today.
+Messaging**, **Video & Entertainment**, and **Other**. They organize comparable analytics; they do
+not judge whether an app or behavior is productive, good, or bad. Recognized launcher and
+home-screen usage, including Samsung One UI Home, is excluded from totals even when it exists in
+older synchronized history. Legitimate utilities such as Clock and Google Play Store are grouped
+into **Other**, and
+**Other** is always shown after the named categories. Unknown packages retain useful supplied names
+and categories when available. Arbitrary category creation and per-app category reassignment are
+not available in the current build. Tap a category card to see the friendly app names, package
+identifiers, and exact display durations contributing to that category today.
 
 To synchronize manually:
 
@@ -92,14 +95,17 @@ Use **Rules** to create, edit, enable, disable, or remove a per-app daily limit.
 
 1. From the dashboard, tap **Add Rule** to open the creation form directly. Tap **Rules** instead
    when you want to open the rules overview without immediately opening the form.
-2. From the overview, use **Add Rule** when you are ready to create another rule.
-3. Select a known application.
-4. Set a positive time limit.
-5. Save the rule.
+2. From the overview, use the full-width **Add New Rule** card when you are ready to create another
+   rule. The old **Preview Locked State** control is no longer part of this screen.
+3. Use a common-app shortcut or open **All Installed Apps** and search the launchable applications
+   on the Android device. LockdIn and launcher/home applications are not offered in this picker.
+4. If an app cannot be discovered, use **Enter App Identifier Manually** as a fallback and provide
+   its package identifier and a friendly display name.
+5. Set a positive time limit and save the rule.
 6. Use the switch to enable or disable it.
 
-Current known app choices include Instagram, YouTube, Messages, Spotify, and TikTok. The backend
-rejects a second rule for the same application.
+Common shortcuts include Instagram, YouTube, Messages, Spotify, and TikTok, but rules are not
+limited to those apps. The backend rejects a second rule for the same application.
 
 Rule behavior is soft enforcement. Android platform constraints, force-stop, permission removal,
 device policy, and OEM behavior can prevent absolute blocking.
@@ -107,7 +113,8 @@ device policy, and OEM behavior can prevent absolute blocking.
 ## Trends and Weekly Summary
 
 - Tap **Trends** to view hourly usage, seven-day activity, top apps, and one contextual **Peak Usage
-  Window** insight. Weekly-chart labels use a consistent whole-hour scale.
+  Window** insight. The hourly chart scrolls horizontally across all 24 hour labels; tap a plotted
+  point to see its exact hour and minutes. Weekly-chart labels use a consistent whole-hour scale.
 - Tap **View Weekly Summary** on the dashboard to open **Weekly Summary**.
 - Weekly Summary shows total time and daily average. **Weekly Highlights** contains exactly two
   summaries: **Goal Progress** and **Best Streak**.

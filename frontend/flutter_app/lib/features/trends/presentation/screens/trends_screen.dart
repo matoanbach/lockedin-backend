@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -97,89 +99,150 @@ class _TimeOfDayChart extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Usage by Time of Day', style: AppTextStyles.titleMedium),
-          Spacing.verticalLg,
-          SizedBox(
-            height: 220,
-            child: LineChart(
-              LineChartData(
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: false,
-                  horizontalInterval: maxY / 4,
-                  getDrawingHorizontalLine: (value) =>
-                      FlLine(color: AppColors.border, strokeWidth: 1),
-                ),
-                titlesData: FlTitlesData(
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 30,
-                      getTitlesWidget: (value, meta) => Text(
-                        '${value.toInt()}',
-                        style: AppTextStyles.labelSmall,
-                      ),
-                    ),
-                  ),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (value, meta) {
-                        final index = value.toInt();
-                        if (index < 0 ||
-                            index >= data.length ||
-                            index % 3 != 0) {
-                          return const SizedBox.shrink();
-                        }
-
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text(
-                            data[index].hour,
-                            style: AppTextStyles.labelSmall,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  rightTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                ),
-                borderData: FlBorderData(show: false),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: data.asMap().entries.map((entry) {
-                      return FlSpot(
-                        entry.key.toDouble(),
-                        entry.value.minutes.toDouble(),
-                      );
-                    }).toList(),
-                    isCurved: true,
-                    color: AppColors.primary,
-                    barWidth: 3,
-                    dotData: FlDotData(
-                      show: true,
-                      getDotPainter: (spot, percent, barData, index) {
-                        return FlDotCirclePainter(
-                          radius: 3.5,
-                          color: AppColors.primary,
-                          strokeWidth: 0,
-                        );
-                      },
-                    ),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      color: AppColors.primary.withValues(alpha: 0.1),
-                    ),
-                  ),
-                ],
-                minY: 0,
-                maxY: maxY,
-              ),
+          Spacing.verticalXs,
+          Text(
+            'Scroll hour by hour, then tap a point for exact usage.',
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textTertiary,
             ),
+          ),
+          Spacing.verticalLg,
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final chartWidth = math.max(
+                constraints.maxWidth,
+                data.length * 64.0,
+              );
+              return SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SizedBox(
+                  width: chartWidth,
+                  height: 240,
+                  child: LineChart(
+                    LineChartData(
+                      gridData: FlGridData(
+                        show: true,
+                        drawVerticalLine: false,
+                        horizontalInterval: maxY / 4,
+                        getDrawingHorizontalLine: (value) =>
+                            FlLine(color: AppColors.border, strokeWidth: 1),
+                      ),
+                      titlesData: FlTitlesData(
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 30,
+                            getTitlesWidget: (value, meta) => SideTitleWidget(
+                              meta: meta,
+                              fitInside: SideTitleFitInsideData.fromTitleMeta(
+                                meta,
+                              ),
+                              child: Text(
+                                '${value.toInt()}',
+                                key: ValueKey(
+                                  'hourly-y-axis-${value.toInt()}',
+                                ),
+                                style: AppTextStyles.labelSmall,
+                              ),
+                            ),
+                          ),
+                        ),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 36,
+                            interval: 1,
+                            getTitlesWidget: (value, meta) {
+                              final index = value.round();
+                              if ((value - index).abs() > 0.01 ||
+                                  index < 0 ||
+                                  index >= data.length) {
+                                return const SizedBox.shrink();
+                              }
+
+                              return SideTitleWidget(
+                                meta: meta,
+                                child: Text(
+                                  data[index].hour,
+                                  key: ValueKey('hourly-x-axis-$index'),
+                                  style: AppTextStyles.labelSmall,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        topTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        rightTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                      ),
+                      borderData: FlBorderData(show: false),
+                      lineTouchData: LineTouchData(
+                        enabled: data.isNotEmpty,
+                        touchSpotThreshold: 24,
+                        touchTooltipData: LineTouchTooltipData(
+                          fitInsideHorizontally: true,
+                          fitInsideVertically: true,
+                          getTooltipColor: (_) => AppColors.surface,
+                          tooltipBorder: BorderSide(color: AppColors.border),
+                          getTooltipItems: (spots) {
+                            if (data.isEmpty) {
+                              return const <LineTooltipItem>[];
+                            }
+                            return spots.map((spot) {
+                              final index = spot.x
+                                  .round()
+                                  .clamp(0, data.length - 1)
+                                  .toInt();
+                              final item = data[index];
+                              return LineTooltipItem(
+                                '${item.hour}\n${item.minutes} min',
+                                AppTextStyles.labelSmall.copyWith(
+                                  color: AppColors.textPrimary,
+                                ),
+                              );
+                            }).toList();
+                          },
+                        ),
+                      ),
+                      lineBarsData: [
+                        LineChartBarData(
+                          spots: data.asMap().entries.map((entry) {
+                            return FlSpot(
+                              entry.key.toDouble(),
+                              entry.value.minutes.toDouble(),
+                            );
+                          }).toList(),
+                          isCurved: true,
+                          color: AppColors.primary,
+                          barWidth: 3,
+                          dotData: FlDotData(
+                            show: true,
+                            getDotPainter: (spot, percent, barData, index) {
+                              return FlDotCirclePainter(
+                                radius: 3.5,
+                                color: AppColors.primary,
+                                strokeWidth: 0,
+                              );
+                            },
+                          ),
+                          belowBarData: BarAreaData(
+                            show: true,
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                          ),
+                        ),
+                      ],
+                      minX: -1,
+                      maxX: math.max(1, data.length).toDouble(),
+                      minY: 0,
+                      maxY: maxY,
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),

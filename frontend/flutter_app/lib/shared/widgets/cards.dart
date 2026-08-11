@@ -170,6 +170,7 @@ class DashedCard extends StatelessWidget {
       onTap: onTap,
       borderRadius: Spacing.borderRadiusLg,
       child: Container(
+        width: double.infinity,
         padding: Spacing.card,
         decoration: BoxDecoration(
           borderRadius: Spacing.borderRadiusLg,
@@ -192,11 +193,16 @@ class DashedCard extends StatelessWidget {
               child: Icon(icon, color: AppColors.primary, size: 28),
             ),
             Spacing.verticalMd,
-            Text(title, style: AppTextStyles.titleMedium),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.titleMedium,
+            ),
             if (subtitle != null) ...[
               Spacing.verticalXs,
               Text(
                 subtitle!,
+                textAlign: TextAlign.center,
                 style: AppTextStyles.bodySmall.copyWith(
                   color: AppColors.textTertiary,
                 ),

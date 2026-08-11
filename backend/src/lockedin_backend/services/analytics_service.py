@@ -18,7 +18,10 @@ from lockedin_backend.schemas.analytics import (
     WeeklySummaryResponse,
     WeeklyUsagePoint,
 )
-from lockedin_backend.services.app_classification import classify_app
+from lockedin_backend.services.app_classification import (
+    classify_app,
+    is_excluded_from_screen_time,
+)
 from lockedin_backend.services.usage_time import (
     MILLISECONDS_PER_MINUTE,
     completed_minutes,
@@ -56,7 +59,7 @@ class AnalyticsService:
                 for (usage_date, category), milliseconds in category_totals.items()
                 if usage_date == today
             ),
-            key=lambda item: (-item[1], item[0]),
+            key=lambda item: (item[0].casefold() == "other", -item[1], item[0]),
         )
         today_total = daily_totals.get(today, 0)
         yesterday_total = daily_totals.get(today - timedelta(days=1), 0)
@@ -127,6 +130,8 @@ class AnalyticsService:
             range_start,
             range_end,
         ):
+            if is_excluded_from_screen_time(event.app_id):
+                continue
             clipped_start = max(ensure_utc(event.started_at), range_start)
             clipped_end = min(ensure_utc(event.ended_at), range_end)
             for hour_index, milliseconds in split_milliseconds_by_local_hour(
@@ -246,6 +251,8 @@ class AnalyticsService:
         category_app_totals: dict[tuple[date, str, str], int] = defaultdict(int)
 
         for event in self.usage_repository.list_all_for_profile(db, profile_id):
+            if is_excluded_from_screen_time(event.app_id):
+                continue
             classification = classify_app(
                 event.app_id,
                 event.app_name,
@@ -312,13 +319,7 @@ class AnalyticsService:
         return f"{self._format_hour_window_label(best_start_hour)} - {self._format_hour_window_label((best_start_hour + 2) % 24)}"
 
     def _format_hour_label(self, hour: int) -> str:
-        if hour == 0:
-            return "12am"
-        if hour < 12:
-            return f"{hour}am"
-        if hour == 12:
-            return "12pm"
-        return f"{hour - 12}pm"
+        return self._format_hour_window_label(hour)
 
     def _format_hour_window_label(self, hour: int) -> str:
         if hour == 0:

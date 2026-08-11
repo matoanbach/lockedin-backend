@@ -517,6 +517,28 @@ accumulating for the new account. An identifier-free database check corroborated
 and two completed minutes in both app and category aggregates for the newest account. This verifies
 that isolation did not prevent new account-owned usage from being recorded and displayed.
 
+## Rules and Usage-Insights Automated Validation — August 10, 2026
+
+The rules and analytics update was validated without installing the APK or changing device
+permissions. The completed checks were:
+
+- focused backend classification and analytics tests: 11 passed;
+- complete backend suite: 144 passed and 3 expected skips;
+- focused Flutter analytics, rules-error, and installed-app selection tests: 9 passed;
+- complete Flutter suite: 78 passed;
+- Flutter analysis: no issues found;
+- Android `testDebugUnitTest`: `BUILD SUCCESSFUL`; and
+- debug APK build with the existing environment definition file: successful.
+
+Automated coverage verifies recognized-launcher exclusion from stored-event analytics, utility
+reclassification into **Other**, case-insensitive legacy-category normalization, **Other** ordering,
+the absence of **Preview Locked State**, centered **Add New Rule** copy, injected installed-app
+search and selection, consecutive hourly labels, and the hourly-chart inspection instruction. The
+Android build also compiles the launchable-app package query and the shared launcher-exclusion
+policy. This run does not claim physical-device verification of launcher filtering, the installed-
+app picker, chart scrolling/tooltips, Accessibility behavior, or a launcher change while the
+Accessibility service remains running.
+
 ## Edge Cases Covered in Code
 
 - duplicate source IDs and replay;

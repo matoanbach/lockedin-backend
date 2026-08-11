@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_client.dart';
@@ -55,6 +57,58 @@ const knownRuleApps = <KnownRuleApp>[
     color: AppColors.warning,
   ),
 ];
+
+class InstalledRuleApp {
+  const InstalledRuleApp({required this.displayName, required this.appId});
+
+  final String displayName;
+  final String appId;
+}
+
+const _usageChannel = MethodChannel('lockdin/usage');
+
+Future<List<InstalledRuleApp>> loadLaunchableRuleApps() async {
+  if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+    return [
+      for (final app in knownRuleApps)
+        InstalledRuleApp(displayName: app.displayName, appId: app.appId),
+    ];
+  }
+
+  try {
+    final rawApps = await _usageChannel.invokeListMethod<dynamic>(
+      'getLaunchableApps',
+    );
+    final appsById = <String, InstalledRuleApp>{};
+    for (final rawApp in rawApps ?? const <dynamic>[]) {
+      if (rawApp is! Map) {
+        continue;
+      }
+      final appId = rawApp['appId'] as String? ?? '';
+      final displayName = rawApp['appName'] as String? ?? '';
+      if (appId.trim().isEmpty || displayName.trim().isEmpty) {
+        continue;
+      }
+      appsById[appId] = InstalledRuleApp(
+        displayName: displayName,
+        appId: appId,
+      );
+    }
+    final apps = appsById.values.toList()
+      ..sort((left, right) {
+        final byName = left.displayName.toLowerCase().compareTo(
+          right.displayName.toLowerCase(),
+        );
+        return byName != 0 ? byName : left.appId.compareTo(right.appId);
+      });
+    return apps;
+  } on MissingPluginException {
+    return [
+      for (final app in knownRuleApps)
+        InstalledRuleApp(displayName: app.displayName, appId: app.appId),
+    ];
+  }
+}
 
 final rulesRepositoryProvider = Provider<RulesRepository>((ref) {
   return RulesRepository(ref.watch(dioProvider));

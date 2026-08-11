@@ -173,9 +173,9 @@ def test_dashboard_trends_and_weekly_summary_are_db_backed(client, monkeypatch) 
     ]
     assert trends_payload["peakUsageWindow"] == "7 PM - 9 PM"
     assert len(trends_payload["hourlyUsage"]) == 24
-    assert trends_payload["hourlyUsage"][19] == {"hour": "7pm", "minutes": 105}
-    assert trends_payload["hourlyUsage"][20] == {"hour": "8pm", "minutes": 90}
-    assert trends_payload["hourlyUsage"][21] == {"hour": "9pm", "minutes": 90}
+    assert trends_payload["hourlyUsage"][19] == {"hour": "7 PM", "minutes": 105}
+    assert trends_payload["hourlyUsage"][20] == {"hour": "8 PM", "minutes": 90}
+    assert trends_payload["hourlyUsage"][21] == {"hour": "9 PM", "minutes": 90}
 
     assert weekly_summary_response.status_code == 200
     assert weekly_summary_response.json() == {
@@ -253,7 +253,7 @@ def test_analytics_uses_exact_time_and_floors_only_display_minutes(
             "minutes": 10,
         }
     ]
-    assert trends["hourlyUsage"][12] == {"hour": "12pm", "minutes": 10}
+    assert trends["hourlyUsage"][12] == {"hour": "12 PM", "minutes": 10}
 
 
 def test_authoritative_weekly_total_does_not_sum_rounded_daily_values(
@@ -329,6 +329,15 @@ def test_known_packages_reclassify_exact_historical_style_category_duration(
                     "endedAt": "2026-06-08T10:01:01.195Z",
                     "timezone": "UTC",
                 },
+                {
+                    "sourceEventId": "launcher-ten-minutes",
+                    "appId": "com.sec.android.app.launcher",
+                    "appName": "One UI Home",
+                    "category": "System & Utilities",
+                    "startedAt": "2026-06-08T10:02:00.000Z",
+                    "endedAt": "2026-06-08T10:12:00.000Z",
+                    "timezone": "UTC",
+                },
             ]
         },
     )
@@ -339,19 +348,6 @@ def test_known_packages_reclassify_exact_historical_style_category_duration(
 
     assert dashboard["todayTotalMinutes"] == 0
     assert dashboard["categoryBreakdown"] == [
-        {
-            "name": "System & Utilities",
-            "minutes": 0,
-            "durationMilliseconds": 18_738,
-            "apps": [
-                {
-                    "appId": "com.android.vending",
-                    "appName": "Google Play Store",
-                    "minutes": 0,
-                    "durationMilliseconds": 18_738,
-                }
-            ],
-        },
         {
             "name": "Web & Search",
             "minutes": 0,
@@ -365,7 +361,21 @@ def test_known_packages_reclassify_exact_historical_style_category_duration(
                 }
             ],
         },
+        {
+            "name": "Other",
+            "minutes": 0,
+            "durationMilliseconds": 18_738,
+            "apps": [
+                {
+                    "appId": "com.android.vending",
+                    "appName": "Google Play Store",
+                    "minutes": 0,
+                    "durationMilliseconds": 18_738,
+                }
+            ],
+        },
     ]
+    assert trends["hourlyUsage"][10] == {"hour": "10 AM", "minutes": 0}
     assert sum(
         item["durationMilliseconds"] for item in dashboard["categoryBreakdown"]
     ) == 19_933
