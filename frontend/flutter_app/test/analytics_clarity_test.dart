@@ -462,7 +462,10 @@ void main() {
     final precedingXAxisLabelBounds = tester.getRect(
       find.byKey(const ValueKey('hourly-x-axis-22')),
     );
-    expect(topYAxisLabelBounds.top, greaterThanOrEqualTo(hourlyChartBounds.top));
+    expect(
+      topYAxisLabelBounds.top,
+      greaterThanOrEqualTo(hourlyChartBounds.top),
+    );
     expect(
       finalXAxisLabelBounds.right,
       lessThanOrEqualTo(hourlyChartBounds.right),

@@ -139,9 +139,7 @@ class _TimeOfDayChart extends StatelessWidget {
                               ),
                               child: Text(
                                 '${value.toInt()}',
-                                key: ValueKey(
-                                  'hourly-y-axis-${value.toInt()}',
-                                ),
+                                key: ValueKey('hourly-y-axis-${value.toInt()}'),
                                 style: AppTextStyles.labelSmall,
                               ),
                             ),
